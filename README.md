@@ -1,0 +1,174 @@
+# 健康管理系统模块（Spring Boot + Vue）
+
+## 技术栈
+- 后端：Spring Boot 3.x + Java 17 + Spring Security 6 + JWT + MyBatis-Plus + MySQL 8
+- 前端：Vue 3 + Element Plus + Axios
+
+## 核心接口（认证与RBAC）
+- `POST /api/auth/login`
+  - 入参：`{ username, password }`
+  - 出参：`{ code, msg, data: { token, userInfo } }`
+- `POST /api/auth/register`
+  - 患者自注册
+  - 入参：`{ username, password, phone, name }`
+
+- `GET /api/admin/user`：管理员查询患者/医生账号
+- `POST /api/admin/user`：管理员新增患者/医生账号
+- `PUT /api/admin/user`：管理员编辑账号
+- `PATCH /api/admin/user/{id}/status?status=0|1`：管理员禁用/启用账号
+
+## 患者档案与上报接口
+- `GET /api/patient/archive`：查看个人档案
+- `POST /api/patient/archive`：创建/保存个人档案
+- `PUT /api/patient/archive`：更新个人档案
+- `DELETE /api/patient/archive/{id}`：删除个人档案
+
+- `POST /api/patient/data`：上报健康数据
+  - 入参：`{ indicatorType, value, reportTime, remark }`
+- `GET /api/patient/data?indicator_type=血压&timeRange=week`：查询本人上报数据（支持类型和时间范围筛选）
+- `PUT /api/patient/data/{id}`：修改本人上报数据
+- `DELETE /api/patient/data/{id}`：删除本人上报数据
+
+## 数据校验规则
+- 血压：格式 `xx/xx`，且每段为正数
+- 血糖：必须为正数且范围 `0-30`
+- 体重：必须为正数
+- 服药：仅支持 `已服药/未服药/1/0`
+- 所有患者接口均按当前登录用户ID做数据隔离：只能操作自己的档案和健康数据
+
+## 权限控制逻辑
+1. 登录成功后签发 JWT，前端存 `localStorage.token`。
+2. Axios 请求头统一携带 `Authorization: Bearer <token>`。
+3. JWT 过滤器解析 token 并写入 Spring Security 上下文。
+4. URL 前缀角色拦截：
+   - `/api/admin/**` -> `ADMIN`
+   - `/api/doctor/**` -> `DOCTOR`
+   - `/api/patient/**` -> `PATIENT`
+5. 未登录返回 401，无权限返回 403。
+
+## 前端页面
+- 登录页、注册页、管理员用户管理页
+- 患者个人档案编辑页
+- 患者健康数据上报页
+- 患者历史数据列表页（筛选/编辑/删除）
+
+## 系统部署文档与配置说明
+
+### 1) 后端配置（多环境）
+后端已提供以下配置文件：
+- `backend/src/main/resources/application.yml`（公共配置 + `spring.profiles.active`）
+- `backend/src/main/resources/application-dev.yml`
+- `backend/src/main/resources/application-test.yml`
+- `backend/src/main/resources/application-prod.yml`
+
+> 启动时可通过 `--spring.profiles.active=dev|test|prod` 切换环境。
+
+#### 关键配置项
+- `server.port`：服务端口
+- `spring.datasource.*`：MySQL 数据库连接
+- `jwt.secret` / `jwt.expiration`：JWT 密钥和过期时间
+
+### 2) 前端配置
+项目当前使用 Vite（`vite.config.js`），同时补充了 `vue.config.js`（便于统一交付要求）。
+
+- `frontend/vite.config.js`：Vite 代理配置
+- `frontend/vue.config.js`：接口代理 + 打包参数（`outputDir/assetsDir/productionSourceMap`）
+
+### 3) 部署步骤
+
+#### 3.1 数据库初始化
+1. 登录 MySQL。
+2. 执行 SQL 脚本：
+```bash
+mysql -uroot -p < /path/to/health_system/sql/health_system.sql
+```
+3. 脚本会自动创建库表并初始化管理员账号：
+- 用户名：`admin`
+- 密码：`123456`
+
+#### 3.2 后端部署（Spring Boot Jar）
+1. 打包：
+```bash
+cd /path/to/health_system/backend
+mvn clean package -DskipTests
+```
+2. Linux 服务器运行（示例 prod）：
+```bash
+nohup java -jar target/health-system-1.0.0.jar --spring.profiles.active=prod > health-system.log 2>&1 &
+```
+3. 查看日志：
+```bash
+tail -f health-system.log
+```
+
+#### 3.3 前端部署（Nginx）
+1. 构建前端：
+```bash
+cd /path/to/health_system/frontend
+npm install
+npm run build
+```
+2. 将 `dist/` 上传到 Nginx 静态目录，例如 `/usr/share/nginx/html/health-system`。
+3. Nginx 配置示例：
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+
+    root /usr/share/nginx/html/health-system;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:9090/api/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+```
+4. 重载 Nginx：
+```bash
+nginx -t && nginx -s reload
+```
+
+## 测试用例与接口测试脚本
+- 后端单元测试：`backend/src/test/java/com/health/system/service/impl/`
+  - `UserServiceImplTest`
+  - `HealthDataServiceImplTest`
+- 接口测试脚本：`scripts/api_test.sh`
+- 前端手工测试步骤与核心场景：`docs/testing_cases.md`
+
+## Docker 部署配置
+
+### 新增文件
+- `docker-compose.yml`：一键编排 `mysql + backend + frontend`
+- `backend/Dockerfile`：Spring Boot 后端镜像（Maven 构建 + JRE 运行）
+- `frontend/Dockerfile`：Vue 前端镜像（Node 构建 + Nginx 托管）
+- `frontend/nginx/default.conf`：前端 Nginx 配置（含 `/api` 反向代理）
+- `.dockerignore`：构建上下文忽略规则
+
+### 快速启动
+```bash
+docker compose up -d --build
+```
+
+访问地址：
+- 前端：`http://localhost`
+- 后端：`http://localhost:9090`
+- MySQL：`localhost:3306`
+
+### 关键环境变量（backend）
+- `SPRING_PROFILES_ACTIVE=prod`
+- `DB_HOST` / `DB_PORT` / `DB_NAME`
+- `DB_USER` / `DB_PASSWORD`
+- `JWT_SECRET` / `JWT_EXPIRATION`
+
+### 数据初始化
+`docker-compose.yml` 已挂载：
+- `./sql/health_system.sql -> /docker-entrypoint-initdb.d/01_init.sql`
+
+首次启动 MySQL 容器会自动执行建表与初始化管理员账号脚本。
