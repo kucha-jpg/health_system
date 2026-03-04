@@ -51,3 +51,93 @@
 - 患者个人档案编辑页
 - 患者健康数据上报页
 - 患者历史数据列表页（筛选/编辑/删除）
+
+## 系统部署文档与配置说明
+
+### 1) 后端配置（多环境）
+后端已提供以下配置文件：
+- `backend/src/main/resources/application.yml`（公共配置 + `spring.profiles.active`）
+- `backend/src/main/resources/application-dev.yml`
+- `backend/src/main/resources/application-test.yml`
+- `backend/src/main/resources/application-prod.yml`
+
+> 启动时可通过 `--spring.profiles.active=dev|test|prod` 切换环境。
+
+#### 关键配置项
+- `server.port`：服务端口
+- `spring.datasource.*`：MySQL 数据库连接
+- `jwt.secret` / `jwt.expiration`：JWT 密钥和过期时间
+
+### 2) 前端配置
+项目当前使用 Vite（`vite.config.js`），同时补充了 `vue.config.js`（便于统一交付要求）。
+
+- `frontend/vite.config.js`：Vite 代理配置
+- `frontend/vue.config.js`：接口代理 + 打包参数（`outputDir/assetsDir/productionSourceMap`）
+
+### 3) 部署步骤
+
+#### 3.1 数据库初始化
+1. 登录 MySQL。
+2. 执行 SQL 脚本：
+```bash
+mysql -uroot -p < /path/to/health_system/sql/health_system.sql
+```
+3. 脚本会自动创建库表并初始化管理员账号：
+- 用户名：`admin`
+- 密码：`123456`
+
+#### 3.2 后端部署（Spring Boot Jar）
+1. 打包：
+```bash
+cd /path/to/health_system/backend
+mvn clean package -DskipTests
+```
+2. Linux 服务器运行（示例 prod）：
+```bash
+nohup java -jar target/health-system-1.0.0.jar --spring.profiles.active=prod > health-system.log 2>&1 &
+```
+3. 查看日志：
+```bash
+tail -f health-system.log
+```
+
+#### 3.3 前端部署（Nginx）
+1. 构建前端：
+```bash
+cd /path/to/health_system/frontend
+npm install
+npm run build
+```
+2. 将 `dist/` 上传到 Nginx 静态目录，例如 `/usr/share/nginx/html/health-system`。
+3. Nginx 配置示例：
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+
+    root /usr/share/nginx/html/health-system;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:9090/api/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+```
+4. 重载 Nginx：
+```bash
+nginx -t && nginx -s reload
+```
+
+## 测试用例与接口测试脚本
+- 后端单元测试：`backend/src/test/java/com/health/system/service/impl/`
+  - `UserServiceImplTest`
+  - `HealthDataServiceImplTest`
+- 接口测试脚本：`scripts/api_test.sh`
+- 前端手工测试步骤与核心场景：`docs/testing_cases.md`
