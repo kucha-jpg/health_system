@@ -1,18 +1,33 @@
 package com.health.system.controller;
 
 import com.health.system.common.ApiResponse;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import com.health.system.dto.AlertHandleDTO;
+import com.health.system.entity.HealthAlert;
+import com.health.system.service.HealthAlertService;
+import jakarta.validation.Valid;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/doctor")
 public class DoctorController {
 
-    @GetMapping("/home")
-    public ApiResponse<Map<String, String>> home() {
-        return ApiResponse.success(Map.of("message", "医生首页"));
+    private final HealthAlertService healthAlertService;
+
+    public DoctorController(HealthAlertService healthAlertService) {
+        this.healthAlertService = healthAlertService;
+    }
+
+    @GetMapping("/alerts")
+    public ApiResponse<List<HealthAlert>> openAlerts() {
+        return ApiResponse.success(healthAlertService.listOpenAlerts());
+    }
+
+    @PostMapping("/alerts/{id}/handle")
+    public ApiResponse<Void> handleAlert(Authentication authentication, @PathVariable Long id, @Valid @RequestBody AlertHandleDTO dto) {
+        healthAlertService.handleAlert(authentication.getName(), id, dto.getHandleRemark());
+        return ApiResponse.success("处理成功", null);
     }
 }

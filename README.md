@@ -141,3 +141,34 @@ nginx -t && nginx -s reload
   - `HealthDataServiceImplTest`
 - 接口测试脚本：`scripts/api_test.sh`
 - 前端手工测试步骤与核心场景：`docs/testing_cases.md`
+
+## Docker 部署配置
+
+### 新增文件
+- `docker-compose.yml`：一键编排 `mysql + backend + frontend`
+- `backend/Dockerfile`：Spring Boot 后端镜像（Maven 构建 + JRE 运行）
+- `frontend/Dockerfile`：Vue 前端镜像（Node 构建 + Nginx 托管）
+- `frontend/nginx/default.conf`：前端 Nginx 配置（含 `/api` 反向代理）
+- `.dockerignore`：构建上下文忽略规则
+
+### 快速启动
+```bash
+docker compose up -d --build
+```
+
+访问地址：
+- 前端：`http://localhost`
+- 后端：`http://localhost:9090`
+- MySQL：`localhost:3306`
+
+### 关键环境变量（backend）
+- `SPRING_PROFILES_ACTIVE=prod`
+- `DB_HOST` / `DB_PORT` / `DB_NAME`
+- `DB_USER` / `DB_PASSWORD`
+- `JWT_SECRET` / `JWT_EXPIRATION`
+
+### 数据初始化
+`docker-compose.yml` 已挂载：
+- `./sql/health_system.sql -> /docker-entrypoint-initdb.d/01_init.sql`
+
+首次启动 MySQL 容器会自动执行建表与初始化管理员账号脚本。

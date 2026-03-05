@@ -8,6 +8,8 @@ import RoleHomeView from '../views/RoleHomeView.vue'
 import PatientArchiveView from '../views/PatientArchiveView.vue'
 import PatientDataReportView from '../views/PatientDataReportView.vue'
 import PatientDataListView from '../views/PatientDataListView.vue'
+import DoctorAlertsView from '../views/DoctorAlertsView.vue'
+import AdminMonitorView from '../views/AdminMonitorView.vue'
 
 const routes = [
   { path: '/login', component: LoginView },
@@ -18,6 +20,8 @@ const routes = [
     children: [
       { path: 'home', component: RoleHomeView, meta: { roles: ['PATIENT', 'DOCTOR', 'ADMIN'] } },
       { path: 'admin/users', component: UserView, meta: { roles: ['ADMIN'] } },
+      { path: 'admin/monitor', component: AdminMonitorView, meta: { roles: ['ADMIN'] } },
+      { path: 'doctor/alerts', component: DoctorAlertsView, meta: { roles: ['DOCTOR'] } },
       { path: 'patient/archive', component: PatientArchiveView, meta: { roles: ['PATIENT'] } },
       { path: 'patient/report', component: PatientDataReportView, meta: { roles: ['PATIENT'] } },
       { path: 'patient/data', component: PatientDataListView, meta: { roles: ['PATIENT'] } }

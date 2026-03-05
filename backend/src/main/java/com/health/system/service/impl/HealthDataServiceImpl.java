@@ -6,6 +6,7 @@ import com.health.system.entity.HealthData;
 import com.health.system.entity.User;
 import com.health.system.mapper.HealthDataMapper;
 import com.health.system.mapper.UserMapper;
+import com.health.system.service.HealthAlertService;
 import com.health.system.service.HealthDataService;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -19,10 +20,12 @@ public class HealthDataServiceImpl implements HealthDataService {
 
     private final HealthDataMapper healthDataMapper;
     private final UserMapper userMapper;
+    private final HealthAlertService healthAlertService;
 
-    public HealthDataServiceImpl(HealthDataMapper healthDataMapper, UserMapper userMapper) {
+    public HealthDataServiceImpl(HealthDataMapper healthDataMapper, UserMapper userMapper, HealthAlertService healthAlertService) {
         this.healthDataMapper = healthDataMapper;
         this.userMapper = userMapper;
+        this.healthAlertService = healthAlertService;
     }
 
     @Override
@@ -37,6 +40,7 @@ public class HealthDataServiceImpl implements HealthDataService {
         data.setReportTime(dto.getReportTime() == null ? LocalDateTime.now() : dto.getReportTime());
         data.setRemark(dto.getRemark());
         healthDataMapper.insert(data);
+        healthAlertService.evaluateAndCreateAlert(userId, data.getId(), data.getIndicatorType(), data.getValue());
     }
 
     @Override
@@ -78,6 +82,8 @@ public class HealthDataServiceImpl implements HealthDataService {
         old.setReportTime(dto.getReportTime() == null ? old.getReportTime() : dto.getReportTime());
         old.setRemark(dto.getRemark());
         healthDataMapper.updateById(old);
+        healthAlertService.deleteByHealthDataId(old.getId());
+        healthAlertService.evaluateAndCreateAlert(userId, old.getId(), old.getIndicatorType(), old.getValue());
     }
 
     @Override
@@ -87,6 +93,7 @@ public class HealthDataServiceImpl implements HealthDataService {
         if (old == null || !userId.equals(old.getUserId())) {
             throw new RuntimeException("数据不存在或无权限");
         }
+        healthAlertService.deleteByHealthDataId(id);
         healthDataMapper.deleteById(id);
     }
 
