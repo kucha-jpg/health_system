@@ -1,0 +1,55 @@
+body {
+  margin: 0;
+  background: #f5f7fa;
+  font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+.login-page {
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, #e6f4ff, #f9fcff);
+}
+
+.login-card {
+  width: 360px;
+}
+
+.layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 220px;
+  background: #fff;
+  border-right: 1px solid #ebeef5;
+}
+
+.logo {
+  padding: 18px;
+  color: #409EFF;
+  font-weight: 600;
+}
+
+.main-content {
+  flex: 1;
+  padding: 16px;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.w-full {
+  width: 100%;
+}
