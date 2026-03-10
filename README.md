@@ -146,15 +146,16 @@ nginx -t && nginx -s reload
 
 ### 新增文件
 - `docker-compose.yml`：一键编排 `mysql + backend + frontend`
-- `backend/Dockerfile`：Spring Boot 后端镜像（Maven 构建 + JRE 运行）
-- `frontend/Dockerfile`：Vue 前端镜像（Node 构建 + Nginx 托管）
-- `frontend/nginx/default.conf`：前端 Nginx 配置（含 `/api` 反向代理）
-- `.dockerignore`：构建上下文忽略规则
+- `backend/Dockerfile`：Spring Boot 后端镜像（Maven 构建 + JRE 运行，内置 Maven 镜像源）
+- `frontend/Dockerfile`：Vue 前端镜像（Node 运行 Vite 服务）
+- `frontend/nginx/default.conf`：前端 Nginx 配置（用于非当前 Docker 运行方式，可保留）
 
 ### 快速启动
 ```bash
 docker compose up -d --build
 ```
+
+如遇 `open //./pipe/dockerDesktopLinuxEngine` 错误，请先启动 Docker Desktop 再执行上面命令。
 
 访问地址：
 - 前端：`http://localhost`
@@ -167,8 +168,38 @@ docker compose up -d --build
 - `DB_USER` / `DB_PASSWORD`
 - `JWT_SECRET` / `JWT_EXPIRATION`
 
+当前 `docker-compose.yml` 默认使用：
+- `DB_NAME=health_system`
+- `DB_USER=root`
+- `DB_PASSWORD=root`
+- MySQL 映射端口：`3306`
+- 后端映射端口：`9090`
+- 前端映射端口：`80`
+
 ### 数据初始化
 `docker-compose.yml` 已挂载：
 - `./sql/health_system.sql -> /docker-entrypoint-initdb.d/01_init.sql`
 
 首次启动 MySQL 容器会自动执行建表与初始化管理员账号脚本。
+
+## 本次补齐功能交付清单
+
+### 已补齐模块
+- 管理员：角色权限管理（`/api/admin/roles` + `AdminRoleView`）
+- 管理员：系统公告管理（`/api/admin/config/notices` + `AdminNoticeView`）
+- 管理员：操作日志查询（`/api/admin/logs` + `AdminLogView`）
+- 医生：群组管理（`/api/doctor/groups` + `DoctorGroupView`）
+- 患者：预警详情（`/api/patient/alerts` + `PatientAlertsView`）
+- 患者：周报月报（`/api/patient/reports/summary` + `PatientReportSummaryView`）
+
+### 快速验收（Docker）
+```bash
+docker compose up -d --build
+docker compose ps
+```
+
+访问：
+- 前端：`http://localhost`
+- 后端：`http://localhost:9090`
+
+推荐按 `docs/testing_cases.md` 执行分角色验收步骤。

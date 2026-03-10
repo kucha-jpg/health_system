@@ -1,0 +1,17 @@
+# IDE
+.idea/
+**/.idea/
+.vscode/
+
+# Backend build artifacts
+backend/target/
+**/target/
+
+# Frontend build artifacts
+frontend/dist/
+frontend/node_modules/
+
+# Logs and temp
+*.log
+*.tmp
+*.swp
