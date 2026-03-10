@@ -10,6 +10,12 @@ import PatientDataReportView from '../views/PatientDataReportView.vue'
 import PatientDataListView from '../views/PatientDataListView.vue'
 import DoctorAlertsView from '../views/DoctorAlertsView.vue'
 import AdminMonitorView from '../views/AdminMonitorView.vue'
+import DoctorGroupView from '../views/DoctorGroupView.vue'
+import PatientAlertsView from '../views/PatientAlertsView.vue'
+import PatientReportSummaryView from '../views/PatientReportSummaryView.vue'
+import AdminNoticeView from '../views/AdminNoticeView.vue'
+import AdminLogView from '../views/AdminLogView.vue'
+import AdminRoleView from '../views/AdminRoleView.vue'
 
 const routes = [
   { path: '/login', component: LoginView },
@@ -21,10 +27,16 @@ const routes = [
       { path: 'home', component: RoleHomeView, meta: { roles: ['PATIENT', 'DOCTOR', 'ADMIN'] } },
       { path: 'admin/users', component: UserView, meta: { roles: ['ADMIN'] } },
       { path: 'admin/monitor', component: AdminMonitorView, meta: { roles: ['ADMIN'] } },
+      { path: 'admin/notices', component: AdminNoticeView, meta: { roles: ['ADMIN'] } },
+      { path: 'admin/roles', component: AdminRoleView, meta: { roles: ['ADMIN'] } },
+      { path: 'admin/logs', component: AdminLogView, meta: { roles: ['ADMIN'] } },
       { path: 'doctor/alerts', component: DoctorAlertsView, meta: { roles: ['DOCTOR'] } },
+      { path: 'doctor/groups', component: DoctorGroupView, meta: { roles: ['DOCTOR'] } },
       { path: 'patient/archive', component: PatientArchiveView, meta: { roles: ['PATIENT'] } },
       { path: 'patient/report', component: PatientDataReportView, meta: { roles: ['PATIENT'] } },
-      { path: 'patient/data', component: PatientDataListView, meta: { roles: ['PATIENT'] } }
+      { path: 'patient/data', component: PatientDataListView, meta: { roles: ['PATIENT'] } },
+      { path: 'patient/alerts', component: PatientAlertsView, meta: { roles: ['PATIENT'] } },
+      { path: 'patient/summary', component: PatientReportSummaryView, meta: { roles: ['PATIENT'] } }
     ]
   },
   { path: '/:pathMatch(.*)*', redirect: '/home' }

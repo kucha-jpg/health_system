@@ -5,11 +5,17 @@
       <el-menu :default-active="$route.path" router>
         <el-menu-item index="/home">首页</el-menu-item>
         <el-menu-item v-if="role === 'ADMIN'" index="/admin/users">账号管理</el-menu-item>
+        <el-menu-item v-if="role === 'ADMIN'" index="/admin/notices">系统公告</el-menu-item>
+        <el-menu-item v-if="role === 'ADMIN'" index="/admin/roles">角色权限</el-menu-item>
         <el-menu-item v-if="role === 'ADMIN'" index="/admin/monitor">系统监控</el-menu-item>
+        <el-menu-item v-if="role === 'ADMIN'" index="/admin/logs">操作日志</el-menu-item>
         <el-menu-item v-if="role === 'DOCTOR'" index="/doctor/alerts">医生工作台</el-menu-item>
+        <el-menu-item v-if="role === 'DOCTOR'" index="/doctor/groups">群组管理</el-menu-item>
         <el-menu-item v-if="role === 'PATIENT'" index="/patient/archive">个人档案</el-menu-item>
         <el-menu-item v-if="role === 'PATIENT'" index="/patient/report">健康上报</el-menu-item>
         <el-menu-item v-if="role === 'PATIENT'" index="/patient/data">历史数据</el-menu-item>
+        <el-menu-item v-if="role === 'PATIENT'" index="/patient/alerts">预警详情</el-menu-item>
+        <el-menu-item v-if="role === 'PATIENT'" index="/patient/summary">周报月报</el-menu-item>
       </el-menu>
     </aside>
     <main class="main-content">

@@ -26,6 +26,6 @@ const overview = ref({})
 
 onMounted(async () => {
   const res = await getMonitorOverviewApi()
-  overview.value = res.data || {}
+  overview.value = res || {}
 })
 </script>

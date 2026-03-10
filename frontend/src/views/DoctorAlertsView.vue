@@ -6,7 +6,11 @@
       <el-table-column prop="indicatorType" label="指标" width="90" />
       <el-table-column prop="value" label="数值" width="120" />
       <el-table-column prop="level" label="等级" width="90" />
-      <el-table-column prop="reason" label="原因" />
+      <el-table-column label="原因">
+        <template #default="scope">
+          {{ scope.row.reasonText || scope.row.reason }}
+        </template>
+      </el-table-column>
       <el-table-column label="操作" width="120">
         <template #default="scope">
           <el-button size="small" type="primary" @click="handle(scope.row)">闭环处理</el-button>
@@ -28,7 +32,7 @@ const loadData = async () => {
   loading.value = true
   try {
     const res = await getDoctorAlertsApi()
-    alerts.value = res.data || []
+    alerts.value = res || []
   } finally {
     loading.value = false
   }

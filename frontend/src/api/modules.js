@@ -19,3 +19,18 @@ export const deleteHealthDataApi = (id) => http.delete(`/patient/data/${id}`)
 
 export const getDoctorAlertsApi = () => http.get('/doctor/alerts')
 export const handleDoctorAlertApi = (id, payload) => http.post(`/doctor/alerts/${id}/handle`, payload)
+export const getDoctorGroupsApi = () => http.get('/doctor/groups')
+export const createDoctorGroupApi = (payload) => http.post('/doctor/groups', payload)
+export const addDoctorGroupPatientApi = (id, payload) => http.post(`/doctor/groups/${id}/patients`, payload)
+export const listDoctorGroupPatientsApi = (id) => http.get(`/doctor/groups/${id}/patients`)
+
+export const getPatientAlertsApi = (params) => http.get('/patient/alerts', { params })
+export const getPatientReportSummaryApi = (params) => http.get('/patient/reports/summary', { params })
+
+export const listNoticesApi = (params) => http.get('/admin/config/notices', { params })
+export const createNoticeApi = (payload) => http.post('/admin/config/notices', payload)
+export const updateNoticeApi = (payload) => http.put('/admin/config/notices', payload)
+export const deleteNoticeApi = (id) => http.delete(`/admin/config/notices/${id}`)
+export const listOperationLogsApi = (params) => http.get('/admin/logs', { params })
+export const listRolesApi = () => http.get('/admin/roles')
+export const updateRolePermissionApi = (payload) => http.put('/admin/roles', payload)
