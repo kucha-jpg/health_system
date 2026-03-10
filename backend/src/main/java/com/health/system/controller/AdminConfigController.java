@@ -20,8 +20,10 @@ public class AdminConfigController {
     }
 
     @GetMapping("/notices")
-    public ApiResponse<List<SystemNotice>> list(@RequestParam(defaultValue = "true") boolean includeOffline) {
-        return ApiResponse.success(systemNoticeService.listNotices(includeOffline));
+    public ApiResponse<List<SystemNotice>> list(@RequestParam(defaultValue = "true") boolean includeOffline,
+                                                @RequestParam(required = false) String keyword,
+                                                @RequestParam(required = false) Integer status) {
+        return ApiResponse.success(systemNoticeService.listNotices(includeOffline, keyword, status));
     }
 
     @PostMapping("/notices")

@@ -6,6 +6,7 @@ import com.health.system.entity.SystemNotice;
 import com.health.system.mapper.SystemNoticeMapper;
 import com.health.system.service.SystemNoticeService;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 
@@ -19,9 +20,17 @@ public class SystemNoticeServiceImpl implements SystemNoticeService {
     }
 
     @Override
-    public List<SystemNotice> listNotices(boolean includeOffline) {
+    public List<SystemNotice> listNotices(boolean includeOffline, String keyword, Integer status) {
         LambdaQueryWrapper<SystemNotice> wrapper = new LambdaQueryWrapper<SystemNotice>()
                 .orderByDesc(SystemNotice::getCreateTime);
+
+        if (StringUtils.hasText(keyword)) {
+            wrapper.and(w -> w.like(SystemNotice::getTitle, keyword)
+                    .or().like(SystemNotice::getContent, keyword));
+        }
+        if (status != null) {
+            wrapper.eq(SystemNotice::getStatus, status);
+        }
         if (!includeOffline) {
             wrapper.eq(SystemNotice::getStatus, 1);
         }

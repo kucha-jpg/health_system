@@ -5,6 +5,7 @@ import com.health.system.entity.OperationLog;
 import com.health.system.mapper.OperationLogMapper;
 import com.health.system.service.OperationLogService;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 
@@ -30,9 +31,23 @@ public class OperationLogServiceImpl implements OperationLogService {
     }
 
     @Override
-    public List<OperationLog> latestLogs(int limit) {
-        return operationLogMapper.selectList(new LambdaQueryWrapper<OperationLog>()
+    public List<OperationLog> latestLogs(int limit, String keyword, String roleType, Integer success) {
+        LambdaQueryWrapper<OperationLog> wrapper = new LambdaQueryWrapper<OperationLog>()
                 .orderByDesc(OperationLog::getCreateTime)
-                .last("limit " + Math.max(limit, 1)));
+                .last("limit " + Math.max(limit, 1));
+
+        if (StringUtils.hasText(keyword)) {
+            wrapper.and(w -> w.like(OperationLog::getUsername, keyword)
+                    .or().like(OperationLog::getRequestUri, keyword)
+                    .or().like(OperationLog::getMessage, keyword));
+        }
+        if (StringUtils.hasText(roleType)) {
+            wrapper.eq(OperationLog::getRoleType, roleType);
+        }
+        if (success != null) {
+            wrapper.eq(OperationLog::getSuccess, success);
+        }
+
+        return operationLogMapper.selectList(wrapper);
     }
 }

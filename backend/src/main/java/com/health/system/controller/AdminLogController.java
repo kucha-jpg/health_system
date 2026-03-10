@@ -21,7 +21,10 @@ public class AdminLogController {
     }
 
     @GetMapping
-    public ApiResponse<List<OperationLog>> latest(@RequestParam(defaultValue = "100") int limit) {
-        return ApiResponse.success(operationLogService.latestLogs(limit));
+    public ApiResponse<List<OperationLog>> latest(@RequestParam(defaultValue = "100") int limit,
+                                                  @RequestParam(required = false) String keyword,
+                                                  @RequestParam(required = false) String roleType,
+                                                  @RequestParam(required = false) Integer success) {
+        return ApiResponse.success(operationLogService.latestLogs(limit, keyword, roleType, success));
     }
 }

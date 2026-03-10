@@ -3,6 +3,15 @@
     <template #header>
       <div class="toolbar">
         <span>系统公告管理</span>
+        <div style="display:flex; gap:8px; align-items:center; margin-left:auto; margin-right:8px;">
+          <el-input v-model="query.keyword" placeholder="标题/内容关键字" clearable style="width:220px" />
+          <el-select v-model="query.status" placeholder="状态" clearable style="width:120px">
+            <el-option label="发布" :value="1" />
+            <el-option label="下线" :value="0" />
+          </el-select>
+          <el-button @click="load">查询</el-button>
+          <el-button @click="resetQuery">重置</el-button>
+        </div>
         <el-button type="primary" @click="openDialog()">新增公告</el-button>
       </div>
     </template>
@@ -46,9 +55,15 @@ import { createNoticeApi, deleteNoticeApi, listNoticesApi, updateNoticeApi } fro
 const notices = ref([])
 const visible = ref(false)
 const form = reactive({ id: null, title: '', content: '', status: 1 })
+const query = reactive({ keyword: '', status: null })
 
 const load = async () => {
-  notices.value = await listNoticesApi({ includeOffline: true })
+  notices.value = await listNoticesApi({ includeOffline: true, keyword: query.keyword, status: query.status })
+}
+
+const resetQuery = async () => {
+  Object.assign(query, { keyword: '', status: null })
+  await load()
 }
 
 const openDialog = (row) => {
