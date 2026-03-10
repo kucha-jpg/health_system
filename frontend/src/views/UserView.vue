@@ -3,6 +3,19 @@
     <template #header>
       <div class="toolbar">
         <span>管理员账号管理</span>
+        <div style="display:flex; gap:8px; align-items:center; margin-left:auto; margin-right:8px;">
+          <el-input v-model="query.keyword" placeholder="用户名/姓名/手机号" clearable style="width:220px" />
+          <el-select v-model="query.roleType" placeholder="角色" clearable style="width:120px">
+            <el-option label="患者" value="PATIENT" />
+            <el-option label="医生" value="DOCTOR" />
+          </el-select>
+          <el-select v-model="query.status" placeholder="状态" clearable style="width:120px">
+            <el-option label="启用" :value="1" />
+            <el-option label="禁用" :value="0" />
+          </el-select>
+          <el-button @click="load">查询</el-button>
+          <el-button @click="resetQuery">重置</el-button>
+        </div>
         <el-button type="primary" @click="openDialog()">新增账号</el-button>
       </div>
     </template>
@@ -57,9 +70,15 @@ import { addUserApi, getUsersApi, updateUserApi, updateUserStatusApi } from '../
 const users = ref([])
 const visible = ref(false)
 const form = reactive({})
+const query = reactive({ keyword: '', roleType: '', status: null })
 
 const load = async () => {
-  users.value = await getUsersApi()
+  users.value = await getUsersApi(query)
+}
+
+const resetQuery = async () => {
+  Object.assign(query, { keyword: '', roleType: '', status: null })
+  await load()
 }
 
 const openDialog = (row) => {

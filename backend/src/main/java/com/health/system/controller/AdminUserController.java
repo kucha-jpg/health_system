@@ -20,8 +20,10 @@ public class AdminUserController {
     }
 
     @GetMapping
-    public ApiResponse<List<User>> list() {
-        return ApiResponse.success(userService.listUsers());
+    public ApiResponse<List<User>> list(@RequestParam(required = false) String keyword,
+                                        @RequestParam(required = false) String roleType,
+                                        @RequestParam(required = false) Integer status) {
+        return ApiResponse.success(userService.listUsers(keyword, roleType, status));
     }
 
     @PostMapping

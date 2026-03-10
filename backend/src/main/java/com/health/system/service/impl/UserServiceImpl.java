@@ -9,6 +9,7 @@ import com.health.system.mapper.RoleMapper;
 import com.health.system.mapper.UserMapper;
 import com.health.system.mapper.UserRoleMapper;
 import com.health.system.service.UserService;
+import org.springframework.util.StringUtils;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -30,8 +31,24 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public List<User> listUsers() {
-        return userMapper.selectList(new LambdaQueryWrapper<User>().ne(User::getRoleType, "ADMIN").orderByDesc(User::getCreateTime));
+    public List<User> listUsers(String keyword, String roleType, Integer status) {
+        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<User>()
+                .ne(User::getRoleType, "ADMIN")
+                .orderByDesc(User::getCreateTime);
+
+        if (StringUtils.hasText(keyword)) {
+            wrapper.and(w -> w.like(User::getUsername, keyword)
+                    .or().like(User::getName, keyword)
+                    .or().like(User::getPhone, keyword));
+        }
+        if (StringUtils.hasText(roleType)) {
+            wrapper.eq(User::getRoleType, roleType);
+        }
+        if (status != null) {
+            wrapper.eq(User::getStatus, status);
+        }
+
+        return userMapper.selectList(wrapper);
     }
 
     @Override

@@ -6,7 +6,7 @@ import com.health.system.entity.User;
 import java.util.List;
 
 public interface UserService {
-    List<User> listUsers();
+    List<User> listUsers(String keyword, String roleType, Integer status);
 
     void createUser(UserDTO dto);
 
