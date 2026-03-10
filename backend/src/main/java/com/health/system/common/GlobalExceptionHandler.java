@@ -1,6 +1,7 @@
 package com.health.system.common;
 
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -10,9 +11,10 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ApiResponse<Void> handleValidation(MethodArgumentNotValidException ex) {
-        String msg = ex.getBindingResult().getFieldError() != null
-                ? ex.getBindingResult().getFieldError().getDefaultMessage()
-                : "参数校验失败";
+        FieldError fieldError = ex.getBindingResult().getFieldError();
+        String msg = (fieldError != null && fieldError.getDefaultMessage() != null)
+            ? fieldError.getDefaultMessage()
+            : "参数校验失败";
         return ApiResponse.fail(400, msg);
     }
 

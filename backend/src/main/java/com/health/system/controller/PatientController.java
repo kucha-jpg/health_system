@@ -3,9 +3,12 @@ package com.health.system.controller;
 import com.health.system.common.ApiResponse;
 import com.health.system.dto.HealthDataDTO;
 import com.health.system.dto.PatientArchiveDTO;
+import com.health.system.entity.HealthAlert;
 import com.health.system.entity.HealthData;
 import com.health.system.entity.PatientArchive;
+import com.health.system.service.HealthAlertService;
 import com.health.system.service.HealthDataService;
+import com.health.system.service.PatientReportService;
 import com.health.system.service.PatientArchiveService;
 import jakarta.validation.Valid;
 import org.springframework.security.core.Authentication;
@@ -20,10 +23,17 @@ public class PatientController {
 
     private final PatientArchiveService patientArchiveService;
     private final HealthDataService healthDataService;
+    private final HealthAlertService healthAlertService;
+    private final PatientReportService patientReportService;
 
-    public PatientController(PatientArchiveService patientArchiveService, HealthDataService healthDataService) {
+    public PatientController(PatientArchiveService patientArchiveService,
+                             HealthDataService healthDataService,
+                             HealthAlertService healthAlertService,
+                             PatientReportService patientReportService) {
         this.patientArchiveService = patientArchiveService;
         this.healthDataService = healthDataService;
+        this.healthAlertService = healthAlertService;
+        this.patientReportService = patientReportService;
     }
 
     @GetMapping("/home")
@@ -79,5 +89,17 @@ public class PatientController {
     public ApiResponse<Void> deleteData(@PathVariable Long id, Authentication authentication) {
         healthDataService.delete(authentication.getName(), id);
         return ApiResponse.success("删除成功", null);
+    }
+
+    @GetMapping("/alerts")
+    public ApiResponse<List<HealthAlert>> listMyAlerts(@RequestParam(required = false) String status,
+                                                        Authentication authentication) {
+        return ApiResponse.success(healthAlertService.listMyAlerts(authentication.getName(), status));
+    }
+
+    @GetMapping("/reports/summary")
+    public ApiResponse<Map<String, Object>> reportSummary(@RequestParam(defaultValue = "week") String range,
+                                                          Authentication authentication) {
+        return ApiResponse.success(patientReportService.summary(authentication.getName(), range));
     }
 }

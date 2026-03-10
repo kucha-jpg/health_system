@@ -13,6 +13,8 @@ public interface HealthAlertService {
 
     List<HealthAlert> listOpenAlerts();
 
+    List<HealthAlert> listMyAlerts(String username, String status);
+
     void handleAlert(String doctorUsername, Long id, String handleRemark);
 
     Map<String, Object> monitorOverview();

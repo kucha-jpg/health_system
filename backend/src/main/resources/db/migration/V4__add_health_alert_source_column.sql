@@ -1,0 +1,9 @@
+ALTER TABLE health_alert
+    ADD COLUMN source VARCHAR(20) NULL COMMENT '预警来源: SYSTEM/MANUAL' AFTER status;
+
+UPDATE health_alert
+SET source = 'SYSTEM'
+WHERE source IS NULL;
+
+ALTER TABLE health_alert
+    MODIFY COLUMN source VARCHAR(20) NOT NULL DEFAULT 'SYSTEM' COMMENT '预警来源: SYSTEM/MANUAL';

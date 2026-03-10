@@ -41,7 +41,8 @@ public class HealthAlertServiceImpl implements HealthAlertService {
         alert.setIndicatorType(indicatorType);
         alert.setValue(value);
         alert.setLevel(decision.level());
-        alert.setReason(decision.reason());
+        alert.setReasonCode(decision.reasonCode());
+        alert.setReasonText(decision.reasonText());
         alert.setStatus("OPEN");
         healthAlertMapper.insert(alert);
     }
@@ -56,6 +57,21 @@ public class HealthAlertServiceImpl implements HealthAlertService {
         return healthAlertMapper.selectList(new LambdaQueryWrapper<HealthAlert>()
                 .eq(HealthAlert::getStatus, "OPEN")
                 .orderByDesc(HealthAlert::getCreateTime));
+    }
+
+    @Override
+    public List<HealthAlert> listMyAlerts(String username, String status) {
+        User user = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, username));
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
+        LambdaQueryWrapper<HealthAlert> wrapper = new LambdaQueryWrapper<HealthAlert>()
+                .eq(HealthAlert::getUserId, user.getId())
+                .orderByDesc(HealthAlert::getCreateTime);
+        if (status != null && !status.isBlank()) {
+            wrapper.eq(HealthAlert::getStatus, status);
+        }
+        return healthAlertMapper.selectList(wrapper);
     }
 
     @Override
@@ -112,10 +128,10 @@ public class HealthAlertServiceImpl implements HealthAlertService {
         int systolic = Integer.parseInt(arr[0]);
         int diastolic = Integer.parseInt(arr[1]);
         if (systolic >= 180 || diastolic >= 120) {
-            return new AlertDecision("HIGH", "血压达到危急阈值，建议立即就医");
+            return new AlertDecision("HIGH", "BP_CRITICAL", "血压达到危急阈值，建议立即就医");
         }
         if (systolic >= 140 || diastolic >= 90) {
-            return new AlertDecision("MEDIUM", "血压偏高，建议复测并医生随访");
+            return new AlertDecision("MEDIUM", "BP_HIGH", "血压偏高，建议复测并医生随访");
         }
         return null;
     }
@@ -123,10 +139,10 @@ public class HealthAlertServiceImpl implements HealthAlertService {
     private AlertDecision evaluateBloodSugar(String value) {
         BigDecimal bloodSugar = new BigDecimal(value);
         if (bloodSugar.compareTo(BigDecimal.valueOf(16.7)) >= 0) {
-            return new AlertDecision("HIGH", "血糖显著升高，建议尽快干预");
+            return new AlertDecision("HIGH", "GLUCOSE_CRITICAL", "血糖显著升高，建议尽快干预");
         }
         if (bloodSugar.compareTo(BigDecimal.valueOf(11.1)) >= 0) {
-            return new AlertDecision("MEDIUM", "血糖偏高，建议重点观察");
+            return new AlertDecision("MEDIUM", "GLUCOSE_HIGH", "血糖偏高，建议重点观察");
         }
         return null;
     }
@@ -134,11 +150,11 @@ public class HealthAlertServiceImpl implements HealthAlertService {
     private AlertDecision evaluateWeight(String value) {
         BigDecimal weight = new BigDecimal(value);
         if (weight.compareTo(BigDecimal.valueOf(200)) >= 0) {
-            return new AlertDecision("MEDIUM", "体重异常偏高，建议医生评估");
+            return new AlertDecision("MEDIUM", "WEIGHT_HIGH", "体重异常偏高，建议医生评估");
         }
         return null;
     }
 
-    private record AlertDecision(String level, String reason) {
+    private record AlertDecision(String level, String reasonCode, String reasonText) {
     }
 }

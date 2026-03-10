@@ -1,10 +1,11 @@
 package com.health.system.entity;
 
+import java.time.LocalDateTime;
+
 import com.baomidou.mybatisplus.annotation.TableName;
+
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-
-import java.time.LocalDateTime;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -15,7 +16,8 @@ public class HealthAlert extends BaseEntity {
     private String indicatorType;
     private String value;
     private String level;
-    private String reason;
+    private String reasonCode;
+    private String reasonText;
     private String status;
     private Long handledBy;
     private String handleRemark;
