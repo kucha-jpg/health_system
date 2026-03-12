@@ -21,10 +21,12 @@ jobs:
   backend-and-api-gate:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Start backend dependencies
         run: docker compose up -d --build mysql backend
@@ -44,7 +46,7 @@ jobs:
           exit 1
 
       - name: Setup JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
