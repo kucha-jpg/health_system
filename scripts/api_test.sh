@@ -14,6 +14,11 @@ ADMIN_PASS="${ADMIN_PASS:-123456}"
 DOCTOR_USER="${DOCTOR_USER:-doctor_demo_01}"
 DOCTOR_PASS="${DOCTOR_PASS:-123456}"
 
+PYTHON_BIN="python3"
+if ! command -v "$PYTHON_BIN" >/dev/null 2>&1; then
+  PYTHON_BIN="python"
+fi
+
 echo "[INFO] BASE_URL=${BASE_URL}"
 echo "[INFO] ASSERT_ONLY=${ASSERT_ONLY}"
 
@@ -46,15 +51,13 @@ put_json_raw() {
 }
 
 extract_code() {
-  python - <<'PY'
-import json,sys
+  "$PYTHON_BIN" -c 'import json,sys
 raw=sys.stdin.read()
 try:
     data=json.loads(raw)
     print(data.get("code", ""))
 except Exception:
-    print("")
-PY
+    print("")'
 }
 
 assert_equal() {
@@ -70,27 +73,23 @@ assert_equal() {
 }
 
 extract_token() {
-  python - <<'PY'
-import json,sys
+  "$PYTHON_BIN" -c 'import json,sys
 raw=sys.stdin.read()
 try:
     data=json.loads(raw)
     print(data.get("data",{}).get("token", ""))
 except Exception:
-    print("")
-PY
+    print("")'
 }
 
 extract_user_id() {
-  python - <<'PY'
-import json,sys
+  "$PYTHON_BIN" -c 'import json,sys
 raw=sys.stdin.read()
 try:
     data=json.loads(raw)
     print(data.get("data",{}).get("userInfo",{}).get("id", ""))
 except Exception:
-    print("")
-PY
+    print("")'
 }
 
 if [[ "${ASSERT_ONLY}" != "1" ]]; then
@@ -137,18 +136,15 @@ if [[ "${ASSERT_ONLY}" != "1" ]]; then
     echo "[GROUP_CREATE] ${GROUP_CREATE}"
     GROUP_LIST=$(curl -sS -H "Authorization: Bearer ${DOCTOR_TOKEN}" "${BASE_URL}/doctor/groups")
     echo "[GROUP_LIST] ${GROUP_LIST}"
-    GROUP_ID=$(python - <<'PY'
-import json,sys,os
-name=os.environ.get("GROUP_NAME","")
-raw=sys.stdin.read()
-try:
-    data=json.loads(raw).get("data",[])
-    target=next((x for x in data if x.get("groupName")==name),None)
+    GROUP_ID=$(echo "$GROUP_LIST" | GROUP_NAME="$GROUP_NAME" "$PYTHON_BIN" -c 'import json,sys,os
+  name=os.environ.get("GROUP_NAME", "")
+  raw=sys.stdin.read()
+  try:
+    data=json.loads(raw).get("data", [])
+    target=next((x for x in data if x.get("groupName") == name), None)
     print(target.get("id") if target else "")
-except Exception:
-    print("")
-PY
-<<< "$GROUP_LIST")
+  except Exception:
+    print("")')
     if [[ -n "$GROUP_ID" && -n "$PATIENT_USER_ID" ]]; then
       GROUP_ADD=$(post_json "/doctor/groups/${GROUP_ID}/patients" "{\"patientUserId\":${PATIENT_USER_ID}}" "$DOCTOR_TOKEN" || true)
       echo "[GROUP_ADD] ${GROUP_ADD}"
@@ -162,20 +158,17 @@ PY
   echo "\n[CASE-4] 管理员角色权限管理"
   ROLE_LIST=$(curl -sS -H "Authorization: Bearer ${ADMIN_TOKEN}" "${BASE_URL}/admin/roles")
   echo "[ROLE_LIST] ${ROLE_LIST}"
-  ROLE_PAYLOAD=$(python - <<'PY'
-import json,sys
-raw=sys.stdin.read()
-try:
-    arr=json.loads(raw).get("data",[])
+    ROLE_PAYLOAD=$(echo "$ROLE_LIST" | "$PYTHON_BIN" -c 'import json,sys
+  raw=sys.stdin.read()
+  try:
+    arr=json.loads(raw).get("data", [])
     if not arr:
-        print("")
+      print("")
     else:
-        r=arr[0]
-        print(json.dumps({"id":r.get("id"),"permission":r.get("permission")},ensure_ascii=False))
-except Exception:
-    print("")
-PY
-<<< "$ROLE_LIST")
+      r=arr[0]
+      print(json.dumps({"id": r.get("id"), "permission": r.get("permission")}, ensure_ascii=False))
+  except Exception:
+    print("")')
   if [[ -n "$ROLE_PAYLOAD" ]]; then
     ROLE_UPDATE=$(curl -sS -H "Content-Type: application/json" -H "Authorization: Bearer ${ADMIN_TOKEN}" -X PUT "${BASE_URL}/admin/roles" -d "$ROLE_PAYLOAD")
     echo "[ROLE_UPDATE] ${ROLE_UPDATE}"
