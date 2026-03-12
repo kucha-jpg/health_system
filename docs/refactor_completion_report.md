@@ -47,8 +47,8 @@
 - 编译验证：Docker Maven 编译通过。
 - 单元测试：Docker Maven 测试通过。
 - 验证命令（示例）：
-  - `docker run --rm -v "${PWD}/backend:/workspace" -w /workspace docker.1ms.run/library/maven:3.9-eclipse-temurin-17 mvn -q -DskipTests compile`
-  - `docker run --rm -v "${PWD}/backend:/workspace" -w /workspace docker.1ms.run/library/maven:3.9-eclipse-temurin-17 mvn -q test`
+  - `docker run --rm -v "${PWD}/backend:/workspace" -w /workspace maven:3.9-eclipse-temurin-17 mvn -q -DskipTests compile`
+  - `docker run --rm -v "${PWD}/backend:/workspace" -w /workspace maven:3.9-eclipse-temurin-17 mvn -q test`
 
 ## 5. 现存技术债（未改行为）
 - 业务异常、错误码分层与错误码枚举已完成；后续可继续做错误码细分（如业务子码）。
