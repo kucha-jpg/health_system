@@ -26,15 +26,22 @@
       <el-table-column prop="username" label="用户名" />
       <el-table-column prop="name" label="姓名" />
       <el-table-column prop="phone" label="手机号" />
+      <el-table-column label="操作" width="160">
+        <template #default="scope">
+          <el-button link type="primary" @click="goPatientInsight(scope.row)">查看档案与趋势</el-button>
+        </template>
+      </el-table-column>
     </el-table>
   </el-dialog>
 </template>
 
 <script setup>
 import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { addDoctorGroupPatientApi, createDoctorGroupApi, getDoctorGroupsApi, listDoctorGroupPatientsApi } from '../api/modules'
 
+const router = useRouter()
 const groups = ref([])
 const patients = ref([])
 const patientDialogVisible = ref(false)
@@ -60,6 +67,10 @@ const addPatient = async (row) => {
   const result = await ElMessageBox.prompt('请输入患者用户ID', `添加到群组: ${row.groupName}`)
   await addDoctorGroupPatientApi(row.id, { patientUserId: Number(result.value) })
   ElMessage.success('添加成功')
+}
+
+const goPatientInsight = (row) => {
+  router.push(`/doctor/patients/${row.id}`)
 }
 
 onMounted(load)

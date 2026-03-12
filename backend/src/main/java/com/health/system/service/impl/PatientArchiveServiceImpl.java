@@ -1,6 +1,7 @@
 package com.health.system.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.health.system.common.BusinessException;
 import com.health.system.dto.PatientArchiveDTO;
 import com.health.system.entity.PatientArchive;
 import com.health.system.entity.User;
@@ -52,7 +53,7 @@ public class PatientArchiveServiceImpl implements PatientArchiveService {
         Long userId = getCurrentUserId(username);
         PatientArchive archive = patientArchiveMapper.selectById(id);
         if (archive == null || !userId.equals(archive.getUserId())) {
-            throw new RuntimeException("档案不存在或无权限");
+            throw BusinessException.forbidden("档案不存在或无权限");
         }
         patientArchiveMapper.deleteById(id);
     }
@@ -60,7 +61,7 @@ public class PatientArchiveServiceImpl implements PatientArchiveService {
     private Long getCurrentUserId(String username) {
         User user = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, username));
         if (user == null) {
-            throw new RuntimeException("用户不存在");
+            throw BusinessException.notFound("用户不存在");
         }
         return user.getId();
     }

@@ -15,13 +15,14 @@
 </template>
 
 <script setup>
-import { reactive } from 'vue'
-import { useRouter } from 'vue-router'
+import { onMounted, reactive } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { loginApi } from '../api/modules'
 import { authStore } from '../stores/auth'
 
 const router = useRouter()
+const route = useRoute()
 const form = reactive({ username: '', password: '' })
 
 const onLogin = async () => {
@@ -30,4 +31,18 @@ const onLogin = async () => {
   ElMessage.success('登录成功')
   router.push('/home')
 }
+
+onMounted(() => {
+  const queryNotice = typeof route.query.notice === 'string' ? route.query.notice : ''
+  const notice = queryNotice || authStore.consumeAuthNotice()
+  if (!notice) return
+  ElMessage.error({
+    message: notice,
+    duration: 12000,
+    showClose: true
+  })
+  if (queryNotice) {
+    router.replace('/login')
+  }
+})
 </script>

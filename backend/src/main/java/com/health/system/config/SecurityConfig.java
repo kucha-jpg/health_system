@@ -2,6 +2,7 @@ package com.health.system.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.health.system.common.ApiResponse;
+import com.health.system.common.ErrorCode;
 import com.health.system.security.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -42,12 +43,14 @@ public class SecurityConfig {
                         .authenticationEntryPoint((request, response, authException) -> {
                             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
                             response.setCharacterEncoding("UTF-8");
-                            response.getWriter().write(objectMapper.writeValueAsString(ApiResponse.fail(401, "未登录或登录已过期")));
+                            response.getWriter().write(objectMapper.writeValueAsString(
+                                    ApiResponse.fail(ErrorCode.UNAUTHORIZED.code(), "未登录或登录已过期")));
                         })
                         .accessDeniedHandler((request, response, accessDeniedException) -> {
                             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
                             response.setCharacterEncoding("UTF-8");
-                            response.getWriter().write(objectMapper.writeValueAsString(ApiResponse.fail(403, "无权限访问")));
+                            response.getWriter().write(objectMapper.writeValueAsString(
+                                    ApiResponse.fail(ErrorCode.FORBIDDEN.code(), "无权限访问")));
                         }));
 
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

@@ -1,6 +1,7 @@
 package com.health.system.service.impl;
 
 import com.health.system.entity.HealthAlert;
+import com.health.system.mapper.AlertRuleMapper;
 import com.health.system.mapper.HealthAlertMapper;
 import com.health.system.mapper.HealthDataMapper;
 import com.health.system.mapper.UserMapper;
@@ -13,7 +14,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class HealthAlertServiceImplTest {
@@ -24,6 +27,8 @@ class HealthAlertServiceImplTest {
     private HealthDataMapper healthDataMapper;
     @Mock
     private UserMapper userMapper;
+    @Mock
+    private AlertRuleMapper alertRuleMapper;
 
     @InjectMocks
     private HealthAlertServiceImpl healthAlertService;
@@ -36,6 +41,8 @@ class HealthAlertServiceImplTest {
         healthAlertService.evaluateAndCreateAlert(1L, 2L, "血压", "190/120");
 
         verify(healthAlertMapper).insert(alertCaptor.capture());
+        verify(alertRuleMapper).selectOne(any());
+        verifyNoInteractions(healthDataMapper, userMapper);
         HealthAlert saved = alertCaptor.getValue();
         assertEquals("HIGH", saved.getLevel());
         assertEquals("OPEN", saved.getStatus());
@@ -45,6 +52,8 @@ class HealthAlertServiceImplTest {
     @Test
     void evaluateAndCreateAlert_shouldNotCreateAlert_whenIndicatorIsNormal() {
         healthAlertService.evaluateAndCreateAlert(1L, 2L, "血糖", "6.1");
+        verify(alertRuleMapper).selectOne(any());
+        verifyNoInteractions(healthDataMapper, userMapper);
         verify(healthAlertMapper, org.mockito.Mockito.never()).insert(org.mockito.Mockito.any());
     }
 }

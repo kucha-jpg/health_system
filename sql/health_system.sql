@@ -89,6 +89,36 @@ CREATE TABLE IF NOT EXISTS health_alert (
     INDEX idx_alert_health_data (health_data_id)
 );
 
+CREATE TABLE IF NOT EXISTS feedback_message (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    sender_user_id BIGINT NOT NULL,
+    sender_username VARCHAR(64) NOT NULL,
+    sender_role_type VARCHAR(20) NOT NULL,
+    content VARCHAR(500) NOT NULL,
+    status TINYINT NOT NULL DEFAULT 0 COMMENT '0未处理 1已处理',
+    reply_content VARCHAR(500) NULL,
+    replied_time DATETIME NULL,
+    reply_read TINYINT NOT NULL DEFAULT 0 COMMENT '0未读 1已读',
+    reply_read_time DATETIME NULL,
+    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted TINYINT NOT NULL DEFAULT 0,
+    INDEX idx_feedback_sender_time (sender_user_id, create_time),
+    INDEX idx_feedback_status_time (status, create_time)
+);
+
+CREATE TABLE IF NOT EXISTS alert_rule (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    indicator_type VARCHAR(20) NOT NULL,
+    high_rule VARCHAR(64) NOT NULL,
+    medium_rule VARCHAR(64),
+    enabled TINYINT NOT NULL DEFAULT 1 COMMENT '1启用 0停用',
+    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted TINYINT NOT NULL DEFAULT 0,
+    UNIQUE KEY uk_indicator_type (indicator_type)
+);
+
 INSERT INTO sys_permission (perm_name, perm_code) VALUES
 ('管理员用户管理', 'admin:user:manage'),
 ('医生首页访问', 'doctor:home:view'),
@@ -98,6 +128,11 @@ INSERT INTO sys_role (role_name, permission) VALUES
 ('ADMIN', 'admin:user:manage'),
 ('DOCTOR', 'doctor:home:view'),
 ('PATIENT', 'patient:home:view');
+
+INSERT INTO alert_rule (indicator_type, high_rule, medium_rule, enabled) VALUES
+('血压', '180/120', '140/90', 1),
+('血糖', '16.7', '11.1', 1),
+('体重', '200', '', 1);
 
 -- 预置管理员账号：admin / 123456
 INSERT INTO sys_user (username, password, phone, name, role_type, status)

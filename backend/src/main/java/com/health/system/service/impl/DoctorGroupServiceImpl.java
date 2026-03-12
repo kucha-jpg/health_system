@@ -1,6 +1,7 @@
 package com.health.system.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.health.system.common.BusinessException;
 import com.health.system.dto.DoctorGroupDTO;
 import com.health.system.entity.DoctorGroup;
 import com.health.system.entity.DoctorGroupMember;
@@ -52,11 +53,11 @@ public class DoctorGroupServiceImpl implements DoctorGroupService {
         User doctor = getDoctor(doctorUsername);
         DoctorGroup group = doctorGroupMapper.selectById(groupId);
         if (group == null || !doctor.getId().equals(group.getDoctorId())) {
-            throw new RuntimeException("群组不存在或无权限");
+            throw BusinessException.forbidden("群组不存在或无权限");
         }
         User patient = userMapper.selectById(patientUserId);
         if (patient == null || !"PATIENT".equals(patient.getRoleType())) {
-            throw new RuntimeException("患者不存在");
+            throw BusinessException.notFound("患者不存在");
         }
         DoctorGroupMember exists = doctorGroupMemberMapper.selectOne(new LambdaQueryWrapper<DoctorGroupMember>()
                 .eq(DoctorGroupMember::getGroupId, groupId)
@@ -75,7 +76,7 @@ public class DoctorGroupServiceImpl implements DoctorGroupService {
         User doctor = getDoctor(doctorUsername);
         DoctorGroup group = doctorGroupMapper.selectById(groupId);
         if (group == null || !doctor.getId().equals(group.getDoctorId())) {
-            throw new RuntimeException("群组不存在或无权限");
+            throw BusinessException.forbidden("群组不存在或无权限");
         }
         List<DoctorGroupMember> members = doctorGroupMemberMapper.selectList(new LambdaQueryWrapper<DoctorGroupMember>()
                 .eq(DoctorGroupMember::getGroupId, groupId));
@@ -92,7 +93,7 @@ public class DoctorGroupServiceImpl implements DoctorGroupService {
     private User getDoctor(String username) {
         User doctor = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, username));
         if (doctor == null || !"DOCTOR".equals(doctor.getRoleType())) {
-            throw new RuntimeException("医生不存在");
+            throw BusinessException.notFound("医生不存在");
         }
         return doctor;
     }

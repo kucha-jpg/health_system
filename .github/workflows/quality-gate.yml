@@ -1,0 +1,68 @@
+name: quality-gate
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main", "master"]
+    paths:
+      - "backend/**"
+      - "scripts/**"
+      - "docs/**"
+      - ".github/workflows/quality-gate.yml"
+  pull_request:
+    branches: ["main", "master"]
+    paths:
+      - "backend/**"
+      - "scripts/**"
+      - "docs/**"
+      - ".github/workflows/quality-gate.yml"
+
+jobs:
+  backend-and-api-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Start backend dependencies
+        run: docker compose up -d --build mysql backend
+
+      - name: Wait for backend ready
+        run: |
+          for i in {1..60}; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:9090/api/auth/ping || true)
+            if [ "$code" = "200" ]; then
+              echo "Backend is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Backend is not ready in time"
+          docker compose logs backend
+          exit 1
+
+      - name: Backend unit tests (Docker Maven)
+        run: |
+          docker run --rm \
+            -v "${PWD}/backend:/workspace" \
+            -w /workspace \
+            docker.1ms.run/library/maven:3.9-eclipse-temurin-17 \
+            mvn -q test
+
+      - name: API error-code assertions gate
+        run: |
+          chmod +x ./scripts/api_assert.sh
+          BASE_URL=http://127.0.0.1:9090/api ./scripts/api_assert.sh
+
+      - name: Dump service logs on failure
+        if: failure()
+        run: |
+          docker compose ps
+          docker compose logs mysql
+          docker compose logs backend
+
+      - name: Cleanup
+        if: always()
+        run: docker compose down -v

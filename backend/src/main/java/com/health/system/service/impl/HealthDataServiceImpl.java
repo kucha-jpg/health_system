@@ -1,6 +1,7 @@
 package com.health.system.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.health.system.common.BusinessException;
 import com.health.system.dto.HealthDataDTO;
 import com.health.system.entity.HealthData;
 import com.health.system.entity.User;
@@ -74,7 +75,7 @@ public class HealthDataServiceImpl implements HealthDataService {
         Long userId = getCurrentUserId(username);
         HealthData old = healthDataMapper.selectById(id);
         if (old == null || !userId.equals(old.getUserId())) {
-            throw new RuntimeException("数据不存在或无权限");
+            throw BusinessException.notFound("数据不存在或无权限");
         }
         validateData(dto.getIndicatorType(), dto.getValue());
         old.setIndicatorType(dto.getIndicatorType());
@@ -91,7 +92,7 @@ public class HealthDataServiceImpl implements HealthDataService {
         Long userId = getCurrentUserId(username);
         HealthData old = healthDataMapper.selectById(id);
         if (old == null || !userId.equals(old.getUserId())) {
-            throw new RuntimeException("数据不存在或无权限");
+            throw BusinessException.notFound("数据不存在或无权限");
         }
         healthAlertService.deleteByHealthDataId(id);
         healthDataMapper.deleteById(id);
@@ -99,32 +100,32 @@ public class HealthDataServiceImpl implements HealthDataService {
 
     private void validateData(String indicatorType, String value) {
         if (!StringUtils.hasText(indicatorType) || !StringUtils.hasText(value)) {
-            throw new RuntimeException("指标类型和值不能为空");
+            throw BusinessException.badRequest("指标类型和值不能为空");
         }
         switch (indicatorType) {
             case "血压" -> {
                 if (!value.matches("^[1-9]\\d{1,2}/[1-9]\\d{1,2}$")) {
-                    throw new RuntimeException("血压格式必须为xx/xx，且为正数");
+                    throw BusinessException.badRequest("血压格式必须为xx/xx，且为正数");
                 }
             }
             case "血糖" -> {
                 BigDecimal v = parsePositiveNumber(value, "血糖必须是正数");
                 if (v.compareTo(BigDecimal.valueOf(30)) > 0) {
-                    throw new RuntimeException("血糖必须在0-30之间");
+                    throw BusinessException.badRequest("血糖必须在0-30之间");
                 }
             }
             case "体重" -> {
                 BigDecimal v = parsePositiveNumber(value, "体重必须是正数");
                 if (v.compareTo(BigDecimal.valueOf(500)) > 0) {
-                    throw new RuntimeException("体重数值异常，请确认后再提交");
+                    throw BusinessException.badRequest("体重数值异常，请确认后再提交");
                 }
             }
             case "服药" -> {
                 if (!("已服药".equals(value) || "未服药".equals(value) || "1".equals(value) || "0".equals(value))) {
-                    throw new RuntimeException("服药值仅支持 已服药/未服药/1/0");
+                    throw BusinessException.badRequest("服药值仅支持 已服药/未服药/1/0");
                 }
             }
-            default -> throw new RuntimeException("不支持的指标类型");
+            default -> throw BusinessException.badRequest("不支持的指标类型");
         }
     }
 
@@ -132,18 +133,18 @@ public class HealthDataServiceImpl implements HealthDataService {
         try {
             BigDecimal n = new BigDecimal(value);
             if (n.compareTo(BigDecimal.ZERO) <= 0) {
-                throw new RuntimeException(msg);
+                throw BusinessException.badRequest(msg);
             }
             return n;
         } catch (NumberFormatException ex) {
-            throw new RuntimeException(msg);
+            throw BusinessException.badRequest(msg);
         }
     }
 
     private Long getCurrentUserId(String username) {
         User user = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, username));
         if (user == null) {
-            throw new RuntimeException("用户不存在");
+            throw BusinessException.notFound("用户不存在");
         }
         return user.getId();
     }

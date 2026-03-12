@@ -21,12 +21,13 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { getDoctorAlertsApi, handleDoctorAlertApi } from '../api/modules'
 
 const loading = ref(false)
 const alerts = ref([])
+let timer = null
 
 const loadData = async () => {
   loading.value = true
@@ -45,5 +46,15 @@ const handle = async (row) => {
   await loadData()
 }
 
-onMounted(loadData)
+onMounted(() => {
+  loadData()
+  timer = window.setInterval(loadData, 10000)
+})
+
+onUnmounted(() => {
+  if (timer) {
+    window.clearInterval(timer)
+    timer = null
+  }
+})
 </script>

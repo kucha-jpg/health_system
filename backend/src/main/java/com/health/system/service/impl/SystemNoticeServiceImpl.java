@@ -1,6 +1,7 @@
 package com.health.system.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.health.system.common.BusinessException;
 import com.health.system.dto.SystemNoticeDTO;
 import com.health.system.entity.SystemNotice;
 import com.health.system.mapper.SystemNoticeMapper;
@@ -50,7 +51,7 @@ public class SystemNoticeServiceImpl implements SystemNoticeService {
     public void updateNotice(SystemNoticeDTO dto) {
         SystemNotice exists = systemNoticeMapper.selectById(dto.getId());
         if (exists == null) {
-            throw new RuntimeException("公告不存在");
+            throw BusinessException.notFound("公告不存在");
         }
         exists.setTitle(dto.getTitle());
         exists.setContent(dto.getContent());

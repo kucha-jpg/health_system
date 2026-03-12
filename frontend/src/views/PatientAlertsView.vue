@@ -23,15 +23,26 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { getPatientAlertsApi } from '../api/modules'
 
 const alerts = ref([])
 const status = ref('')
+let timer = null
 
 const load = async () => {
   alerts.value = await getPatientAlertsApi({ status: status.value })
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  timer = window.setInterval(load, 10000)
+})
+
+onUnmounted(() => {
+  if (timer) {
+    window.clearInterval(timer)
+    timer = null
+  }
+})
 </script>

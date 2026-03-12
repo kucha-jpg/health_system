@@ -3,6 +3,7 @@ package com.health.system.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.health.system.dto.LoginRequest;
 import com.health.system.dto.RegisterRequest;
+import com.health.system.common.BusinessException;
 import com.health.system.entity.User;
 import com.health.system.entity.UserRole;
 import com.health.system.mapper.RoleMapper;
@@ -41,12 +42,18 @@ public class AuthServiceImpl implements AuthService {
     public Map<String, Object> login(LoginRequest request) {
         User user = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, request.getUsername()));
         if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new RuntimeException("用户名或密码错误");
+            throw BusinessException.unauthorized("用户名或密码错误");
         }
         if (user.getStatus() != 1) {
-            throw new RuntimeException("账号已被禁用");
+            throw BusinessException.forbidden("该账号已被禁用");
         }
-        String token = jwtUtils.generateToken(user.getUsername(), user.getRoleType(), user.getId());
+
+        Long currentVersion = user.getLoginVersion();
+        long nextVersion = (currentVersion == null ? 0L : currentVersion) + 1L;
+        user.setLoginVersion(nextVersion);
+        userMapper.updateById(user);
+
+        String token = jwtUtils.generateToken(user.getUsername(), user.getRoleType(), user.getId(), nextVersion);
         Map<String, Object> userInfo = new HashMap<>();
         userInfo.put("id", user.getId());
         userInfo.put("username", user.getUsername());
@@ -64,7 +71,7 @@ public class AuthServiceImpl implements AuthService {
     public void register(RegisterRequest request) {
         User exists = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, request.getUsername()));
         if (exists != null) {
-            throw new RuntimeException("用户名已存在");
+            throw BusinessException.conflict("用户名已存在");
         }
 
         User user = new User();
@@ -74,6 +81,7 @@ public class AuthServiceImpl implements AuthService {
         user.setName(request.getName());
         user.setRoleType("PATIENT");
         user.setStatus(1);
+        user.setLoginVersion(0L);
         userMapper.insert(user);
 
         Long patientRoleId = roleMapper.selectOne(new LambdaQueryWrapper<com.health.system.entity.Role>()

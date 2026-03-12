@@ -1,22 +1,37 @@
 package com.health.system.controller;
 
-import com.health.system.common.ApiResponse;
-import com.health.system.dto.SystemNoticeDTO;
-import com.health.system.entity.SystemNotice;
-import com.health.system.service.SystemNoticeService;
-import jakarta.validation.Valid;
-import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
+
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.health.system.common.ApiResponse;
+import com.health.system.dto.AlertRuleDTO;
+import com.health.system.dto.SystemNoticeDTO;
+import com.health.system.entity.AlertRule;
+import com.health.system.entity.SystemNotice;
+import com.health.system.service.AlertRuleService;
+import com.health.system.service.SystemNoticeService;
+
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/admin/config")
 public class AdminConfigController {
 
     private final SystemNoticeService systemNoticeService;
+    private final AlertRuleService alertRuleService;
 
-    public AdminConfigController(SystemNoticeService systemNoticeService) {
+    public AdminConfigController(SystemNoticeService systemNoticeService, AlertRuleService alertRuleService) {
         this.systemNoticeService = systemNoticeService;
+        this.alertRuleService = alertRuleService;
     }
 
     @GetMapping("/notices")
@@ -42,5 +57,22 @@ public class AdminConfigController {
     public ApiResponse<Void> delete(@PathVariable Long id) {
         systemNoticeService.deleteNotice(id);
         return ApiResponse.success("删除成功", null);
+    }
+
+    @GetMapping("/alert-rules")
+    public ApiResponse<List<AlertRule>> listRules() {
+        return ApiResponse.success(alertRuleService.listRules());
+    }
+
+    @PostMapping("/alert-rules")
+    public ApiResponse<Void> createRule(@Valid @RequestBody AlertRuleDTO dto) {
+        alertRuleService.createRule(dto);
+        return ApiResponse.success("创建成功", null);
+    }
+
+    @PutMapping("/alert-rules")
+    public ApiResponse<Void> updateRule(@Valid @RequestBody AlertRuleDTO dto) {
+        alertRuleService.updateRule(dto);
+        return ApiResponse.success("更新成功", null);
     }
 }

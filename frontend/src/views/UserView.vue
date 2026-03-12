@@ -64,13 +64,14 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, onUnmounted, reactive, ref } from 'vue'
 import { addUserApi, getUsersApi, updateUserApi, updateUserStatusApi } from '../api/modules'
 
 const users = ref([])
 const visible = ref(false)
 const form = reactive({})
 const query = reactive({ keyword: '', roleType: '', status: null })
+let timer = null
 
 const load = async () => {
   users.value = await getUsersApi(query)
@@ -101,5 +102,15 @@ const toggleStatus = async (row) => {
   await load()
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  timer = window.setInterval(load, 10000)
+})
+
+onUnmounted(() => {
+  if (timer) {
+    window.clearInterval(timer)
+    timer = null
+  }
+})
 </script>

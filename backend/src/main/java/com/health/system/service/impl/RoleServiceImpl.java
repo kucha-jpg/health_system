@@ -1,6 +1,7 @@
 package com.health.system.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.health.system.common.BusinessException;
 import com.health.system.entity.Role;
 import com.health.system.mapper.RoleMapper;
 import com.health.system.service.RoleService;
@@ -26,7 +27,7 @@ public class RoleServiceImpl implements RoleService {
     public void updatePermission(Long id, String permission) {
         Role role = roleMapper.selectById(id);
         if (role == null) {
-            throw new RuntimeException("角色不存在");
+            throw BusinessException.notFound("角色不存在");
         }
         role.setPermission(permission);
         roleMapper.updateById(role);

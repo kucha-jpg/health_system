@@ -1,9 +1,9 @@
 package com.health.system.service;
 
-import com.health.system.entity.HealthAlert;
-
 import java.util.List;
 import java.util.Map;
+
+import com.health.system.entity.HealthAlert;
 
 public interface HealthAlertService {
 

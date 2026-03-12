@@ -42,6 +42,60 @@
   - 角色列表查询成功，返回 `code=200`。
   - 更新接口返回成功，且查询结果与更新内容一致。
 
+### 场景5：同账号新登录踢掉旧登录
+- 前置条件：管理员账号可登录。
+- 步骤：
+  1. 第一次调用 `POST /api/auth/login` 获取 tokenA。
+  2. 再次调用 `POST /api/auth/login` 获取 tokenB。
+  3. 使用 tokenA 调用 `GET /api/admin/user`。
+  4. 使用 tokenB 调用 `GET /api/admin/user`。
+- 预期结果：
+  - tokenA 返回 `401`（旧登录失效）。
+  - tokenB 返回 `200`（新登录有效）。
+
+### 场景6：不同账号登录互不影响
+- 前置条件：管理员账号与医生账号均可登录。
+- 步骤：
+  1. 管理员调用 `POST /api/auth/login` 获取 tokenAdmin。
+  2. 医生调用 `POST /api/auth/login` 获取 tokenDoctor。
+  3. 使用 tokenAdmin 调用 `GET /api/admin/user`。
+  4. 使用 tokenDoctor 调用 `GET /api/doctor/alerts`。
+- 预期结果：
+  - 两次调用均返回 `200`。
+  - 登录状态互不干扰。
+
+### 场景7：管理员预警规则管理
+- 前置条件：管理员账号可登录。
+- 步骤：
+  1. 调用 `GET /api/admin/config/alert-rules` 查询规则列表。
+  2. 选择一个规则调用 `PUT /api/admin/config/alert-rules` 更新规则参数（例如保持同值更新）。
+  3. 再次调用 `GET /api/admin/config/alert-rules` 核对更新后规则可读。
+- 预期结果：
+  - 规则列表查询成功，返回 `code=200`。
+  - 规则更新成功，返回 `code=200`。
+  - 更新后规则可正常查询。
+
+### 场景8：医生查看群组患者洞察
+- 前置条件：医生账号可登录，且目标患者在该医生群组内。
+- 步骤：
+  1. 调用 `GET /api/doctor/patients/{patientUserId}/insight?indicatorType=血压&timeRange=month`。
+  2. 检查返回中是否包含患者档案、趋势数据、近期预警等字段。
+- 预期结果：
+  - 接口返回 `code=200`。
+  - 返回结构包含洞察所需核心数据。
+
+### 场景9：统一错误码断言（400/401/403/404/409）
+- 前置条件：管理员、医生、患者账号可登录；脚本可访问后端。
+- 步骤：
+  1. 触发参数校验错误（注册时 `username` 为空）验证 `code=400`。
+  2. 无 token 访问管理员接口验证 `code=401`。
+  3. 医生 token 访问管理员接口验证 `code=403`。
+  4. 医生查询不存在患者洞察验证 `code=404`。
+  5. 先注册一次唯一用户名，再重复注册同用户名验证 `code=409`。
+- 预期结果：
+  - 5 组断言全部通过。
+  - 若任一断言失败，脚本以非 0 退出并输出失败摘要。
+
 ## 二、后端单元测试覆盖
 - `UserServiceImplTest`
   - `createUser_shouldCreateUserAndRoleRelation`
@@ -50,13 +104,17 @@
   - `create_shouldInsertHealthData_whenBloodPressureValid`
   - `create_shouldThrow_whenBloodSugarOutOfRange`
   - `update_shouldThrow_whenDataNotOwnedByCurrentUser`
+- `HealthAlertServiceImplTest`
+  - `evaluateAndCreateAlert_shouldCreateHighLevelAlert_whenBloodPressureCritical`
+  - `evaluateAndCreateAlert_shouldNotCreateAlert_whenIndicatorIsNormal`
 
 ## 三、前端测试步骤（手工）
 
 ### 1. 登录/鉴权
 1. 打开 `/login`，输入正确账号密码。
-2. 验证是否跳转首页，`localStorage` 中存在 token。
+2. 验证是否跳转首页，`sessionStorage` 中存在 token。
 3. 伪造或清除 token 后访问受限页面，验证是否跳回登录页。
+4. 同账号在新标签页重新登录，验证旧标签页收到下线提示并跳转登录页。
 
 ### 2. 患者上报页面
 1. 打开“健康上报”页。
@@ -78,6 +136,37 @@
 ```bash
 chmod +x scripts/api_test.sh
 BASE_URL=http://127.0.0.1:8080/api ./scripts/api_test.sh
+```
+
+- Windows PowerShell 脚本：`scripts/api_test.ps1`
+- 用法：
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\api_test.ps1
+```
+
+指定地址示例：
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\api_test.ps1 -BaseUrl "http://127.0.0.1:9090/api"
+```
+
+说明：`api_test.sh` 与 `api_test.ps1` 已内置错误码断言；断言失败会返回非 0 退出码，便于 CI/批处理拦截。
+
+错误码门禁专用脚本：
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\api_assert.ps1 -BaseUrl "http://127.0.0.1:9090/api"
+```
+
+```bash
+BASE_URL=http://127.0.0.1:9090/api ./scripts/api_assert.sh
+```
+
+仅跑错误码断言（CASE-9）示例：
+```bash
+ASSERT_ONLY=1 BASE_URL=http://127.0.0.1:9090/api ./scripts/api_test.sh
+```
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\api_test.ps1 -BaseUrl "http://127.0.0.1:9090/api" -AssertOnly
 ```
 
 当前 Docker 默认后端端口为 `9090`，可使用：

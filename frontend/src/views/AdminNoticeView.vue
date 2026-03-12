@@ -48,7 +48,7 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, onUnmounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { createNoticeApi, deleteNoticeApi, listNoticesApi, updateNoticeApi } from '../api/modules'
 
@@ -56,6 +56,7 @@ const notices = ref([])
 const visible = ref(false)
 const form = reactive({ id: null, title: '', content: '', status: 1 })
 const query = reactive({ keyword: '', status: null })
+let timer = null
 
 const load = async () => {
   notices.value = await listNoticesApi({ includeOffline: true, keyword: query.keyword, status: query.status })
@@ -88,5 +89,15 @@ const remove = async (id) => {
   await load()
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  timer = window.setInterval(load, 10000)
+})
+
+onUnmounted(() => {
+  if (timer) {
+    window.clearInterval(timer)
+    timer = null
+  }
+})
 </script>

@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.GetMapping;
 
 import java.util.Map;
 
@@ -31,5 +32,10 @@ public class AuthController {
     public ApiResponse<Void> register(@Valid @RequestBody RegisterRequest request) {
         authService.register(request);
         return ApiResponse.success("注册成功", null);
+    }
+
+    @GetMapping("/ping")
+    public ApiResponse<Void> ping() {
+        return ApiResponse.success("ok", null);
     }
 }

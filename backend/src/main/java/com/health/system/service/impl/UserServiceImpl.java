@@ -1,6 +1,7 @@
 package com.health.system.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.health.system.common.BusinessException;
 import com.health.system.dto.UserDTO;
 import com.health.system.entity.Role;
 import com.health.system.entity.User;
@@ -54,10 +55,10 @@ public class UserServiceImpl implements UserService {
     @Override
     public void createUser(UserDTO dto) {
         if ("ADMIN".equals(dto.getRoleType())) {
-            throw new RuntimeException("不支持创建管理员账号");
+            throw BusinessException.badRequest("不支持创建管理员账号");
         }
         if (userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, dto.getUsername())) != null) {
-            throw new RuntimeException("用户名已存在");
+            throw BusinessException.conflict("用户名已存在");
         }
         User user = new User();
         user.setUsername(dto.getUsername());
@@ -66,6 +67,7 @@ public class UserServiceImpl implements UserService {
         user.setName(dto.getName());
         user.setRoleType(dto.getRoleType());
         user.setStatus(dto.getStatus());
+        user.setLoginVersion(0L);
         userMapper.insert(user);
 
         Role role = roleMapper.selectOne(new LambdaQueryWrapper<Role>().eq(Role::getRoleName, dto.getRoleType()));
@@ -79,7 +81,7 @@ public class UserServiceImpl implements UserService {
     public void updateUser(UserDTO dto) {
         User user = userMapper.selectById(dto.getId());
         if (user == null) {
-            throw new RuntimeException("用户不存在");
+            throw BusinessException.notFound("用户不存在");
         }
         user.setName(dto.getName());
         user.setPhone(dto.getPhone());
@@ -99,9 +101,14 @@ public class UserServiceImpl implements UserService {
     public void updateStatus(Long id, Integer status) {
         User user = userMapper.selectById(id);
         if (user == null) {
-            throw new RuntimeException("用户不存在");
+            throw BusinessException.notFound("用户不存在");
         }
         user.setStatus(status);
+        if (status != null && status != 1) {
+            Long currentVersionObj = user.getLoginVersion();
+            long currentVersion = currentVersionObj == null ? 0L : currentVersionObj;
+            user.setLoginVersion(currentVersion + 1L);
+        }
         userMapper.updateById(user);
     }
 }

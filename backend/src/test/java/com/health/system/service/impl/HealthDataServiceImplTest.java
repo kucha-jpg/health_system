@@ -5,6 +5,7 @@ import com.health.system.entity.HealthData;
 import com.health.system.entity.User;
 import com.health.system.mapper.HealthDataMapper;
 import com.health.system.mapper.UserMapper;
+import com.health.system.service.HealthAlertService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -28,6 +29,8 @@ class HealthDataServiceImplTest {
     private HealthDataMapper healthDataMapper;
     @Mock
     private UserMapper userMapper;
+    @Mock
+    private HealthAlertService healthAlertService;
 
     @InjectMocks
     private HealthDataServiceImpl healthDataService;
@@ -56,6 +59,7 @@ class HealthDataServiceImplTest {
         assertEquals("血压", inserted.getIndicatorType());
         assertEquals("120/80", inserted.getValue());
         assertEquals("晨起测量", inserted.getRemark());
+        verify(healthAlertService).evaluateAndCreateAlert(any(), any(), any(), any());
     }
 
     @Test

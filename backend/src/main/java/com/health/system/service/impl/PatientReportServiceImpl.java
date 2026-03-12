@@ -1,6 +1,7 @@
 package com.health.system.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.health.system.common.BusinessException;
 import com.health.system.entity.HealthAlert;
 import com.health.system.entity.HealthData;
 import com.health.system.entity.User;
@@ -32,7 +33,7 @@ public class PatientReportServiceImpl implements PatientReportService {
     public Map<String, Object> summary(String username, String range) {
         User user = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, username));
         if (user == null) {
-            throw new RuntimeException("用户不存在");
+            throw BusinessException.notFound("用户不存在");
         }
         LocalDateTime start = "month".equalsIgnoreCase(range) ? LocalDateTime.now().minusMonths(1) : LocalDateTime.now().minusWeeks(1);
 

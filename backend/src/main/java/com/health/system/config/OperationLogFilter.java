@@ -1,12 +1,12 @@
 package com.health.system.config;
 
+import com.health.system.common.RequestActor;
+import com.health.system.common.SecurityActorUtils;
 import com.health.system.service.OperationLogService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -30,12 +30,8 @@ public class OperationLogFilter extends OncePerRequestFilter {
         if (!uri.startsWith("/api/") || "GET".equalsIgnoreCase(method)) {
             return;
         }
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        String username = auth != null && auth.isAuthenticated() ? auth.getName() : "anonymous";
-        String role = auth != null && auth.getAuthorities() != null && !auth.getAuthorities().isEmpty()
-                ? auth.getAuthorities().iterator().next().getAuthority()
-                : "UNKNOWN";
+        RequestActor actor = SecurityActorUtils.currentActor();
         boolean success = response.getStatus() < 400;
-        operationLogService.save(username, role, method, uri, success, "HTTP " + response.getStatus());
+        operationLogService.save(actor.username(), actor.role(), method, uri, success, "HTTP " + response.getStatus());
     }
 }

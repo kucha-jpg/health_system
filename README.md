@@ -140,7 +140,30 @@ nginx -t && nginx -s reload
   - `UserServiceImplTest`
   - `HealthDataServiceImplTest`
 - 接口测试脚本：`scripts/api_test.sh`
+- 错误码门禁脚本：`scripts/api_assert.ps1`、`scripts/api_assert.sh`（仅执行 400/401/403/404/409 断言）
 - 前端手工测试步骤与核心场景：`docs/testing_cases.md`
+
+### 错误码断言快速执行
+PowerShell（Windows）：
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\api_assert.ps1 -BaseUrl "http://127.0.0.1:9090/api"
+```
+
+Bash（Linux/WSL/CI）：
+```bash
+BASE_URL=http://127.0.0.1:9090/api ./scripts/api_assert.sh
+```
+
+说明：若后端代码刚更新且你在使用 Docker，请先执行 `docker compose up -d --build backend`，避免旧镜像导致断言结果与源码不一致。
+
+### CI 质量门禁（GitHub Actions）
+- 工作流文件：`.github/workflows/quality-gate.yml`
+- 触发条件：`main/master` 分支的 `push` 与 `pull_request`
+- 门禁内容：
+  1. 启动 `mysql + backend` 容器并等待后端就绪
+  2. 在 Docker Maven 环境执行后端单元测试
+  3. 执行错误码断言脚本 `scripts/api_assert.sh`
+- 失败时会自动输出容器日志，便于定位问题。
 
 ## Docker 部署配置
 

@@ -14,4 +14,5 @@ public class User extends BaseEntity {
     private String phone;
     private String roleType;
     private Integer status;
+    private Long loginVersion;
 }
