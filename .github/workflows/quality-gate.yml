@@ -43,13 +43,15 @@ jobs:
           docker compose logs backend
           exit 1
 
-      - name: Backend unit tests (Docker Maven)
-        run: |
-          docker run --rm \
-            -v "${PWD}/backend:/workspace" \
-            -w /workspace \
-            docker.1ms.run/library/maven:3.9-eclipse-temurin-17 \
-            mvn -q test
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Backend unit tests
+        run: mvn -q -f backend/pom.xml test
 
       - name: API error-code assertions gate
         run: |
