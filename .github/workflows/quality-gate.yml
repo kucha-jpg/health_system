@@ -55,6 +55,15 @@ jobs:
       - name: Backend unit tests
         run: mvn -q -f backend/pom.xml test
 
+      - name: Install shellcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Shell script lint gate
+        run: |
+          shellcheck -S error scripts/api_test.sh scripts/api_assert.sh
+
       - name: API error-code assertions gate
         run: |
           chmod +x ./scripts/api_assert.sh
