@@ -10,6 +10,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 
 import org.flywaydb.core.Flyway;
+import org.flywaydb.core.api.MigrationVersion;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -100,7 +101,8 @@ class FlywayMigrationIntegrationTest {
         return Flyway.configure()
                 .dataSource(schemaJdbcUrl(schema), MYSQL.getUsername(), MYSQL.getPassword())
                 .locations("classpath:db/migration")
-                .baselineOnMigrate(false)
+                .baselineVersion(MigrationVersion.fromVersion("10"))
+                .baselineOnMigrate(true)
                 .load();
     }
 
