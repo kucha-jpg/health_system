@@ -1,5 +1,10 @@
 package com.health.system.service.impl;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.stereotype.Service;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.health.system.common.BusinessException;
 import com.health.system.dto.DoctorGroupDTO;
@@ -10,10 +15,6 @@ import com.health.system.mapper.DoctorGroupMapper;
 import com.health.system.mapper.DoctorGroupMemberMapper;
 import com.health.system.mapper.UserMapper;
 import com.health.system.service.DoctorGroupService;
-import org.springframework.stereotype.Service;
-
-import java.util.ArrayList;
-import java.util.List;
 
 @Service
 public class DoctorGroupServiceImpl implements DoctorGroupService {
