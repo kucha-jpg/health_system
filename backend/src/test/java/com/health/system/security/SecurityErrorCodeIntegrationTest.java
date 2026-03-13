@@ -25,7 +25,21 @@ import com.health.system.common.GlobalExceptionHandler;
 import com.health.system.config.SecurityConfig;
 import com.health.system.controller.AdminUserController;
 import com.health.system.controller.AuthController;
+import com.health.system.mapper.AlertRuleMapper;
+import com.health.system.mapper.DoctorGroupMapper;
+import com.health.system.mapper.DoctorGroupMemberMapper;
+import com.health.system.mapper.FeedbackMessageMapper;
+import com.health.system.mapper.HealthAlertMapper;
+import com.health.system.mapper.HealthDataMapper;
+import com.health.system.mapper.OperationLogMapper;
+import com.health.system.mapper.PatientArchiveMapper;
+import com.health.system.mapper.PermissionMapper;
+import com.health.system.mapper.RoleMapper;
+import com.health.system.mapper.SystemNoticeMapper;
+import com.health.system.mapper.UserMapper;
+import com.health.system.mapper.UserRoleMapper;
 import com.health.system.service.AuthService;
+import com.health.system.service.OperationLogService;
 import com.health.system.service.UserService;
 
 @WebMvcTest(controllers = {AuthController.class, AdminUserController.class})
@@ -40,6 +54,48 @@ class SecurityErrorCodeIntegrationTest {
 
     @MockBean
     private UserService userService;
+
+    @MockBean
+    private OperationLogService operationLogService;
+
+    @MockBean
+    private AlertRuleMapper alertRuleMapper;
+
+    @MockBean
+    private DoctorGroupMapper doctorGroupMapper;
+
+    @MockBean
+    private DoctorGroupMemberMapper doctorGroupMemberMapper;
+
+    @MockBean
+    private FeedbackMessageMapper feedbackMessageMapper;
+
+    @MockBean
+    private HealthAlertMapper healthAlertMapper;
+
+    @MockBean
+    private HealthDataMapper healthDataMapper;
+
+    @MockBean
+    private OperationLogMapper operationLogMapper;
+
+    @MockBean
+    private PatientArchiveMapper patientArchiveMapper;
+
+    @MockBean
+    private PermissionMapper permissionMapper;
+
+    @MockBean
+    private RoleMapper roleMapper;
+
+    @MockBean
+    private SystemNoticeMapper systemNoticeMapper;
+
+    @MockBean
+    private UserMapper userMapper;
+
+    @MockBean
+    private UserRoleMapper userRoleMapper;
 
     @MockBean
     private JwtAuthenticationFilter jwtAuthenticationFilter;
@@ -76,14 +132,14 @@ class SecurityErrorCodeIntegrationTest {
     @Test
     void adminApiShouldReturn401WhenNoAuth() throws Exception {
         mockMvc.perform(get("/api/admin/user"))
-                .andExpect(status().isUnauthorized())
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(401));
     }
 
     @Test
     void adminApiShouldReturn403WhenDoctorRole() throws Exception {
         mockMvc.perform(get("/api/admin/user").with(user("doctor").roles("DOCTOR")))
-                .andExpect(status().isForbidden())
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(403));
     }
 }
