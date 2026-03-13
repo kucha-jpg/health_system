@@ -52,7 +52,10 @@ jobs:
           java-version: '17'
           cache: maven
 
-      - name: Backend tests (unit + integration)
+      - name: Backend critical integration tests
+        run: mvn -q -f backend/pom.xml -Dtest=SecurityErrorCodeIntegrationTest,FlywayMigrationIntegrationTest test
+
+      - name: Backend full test suite
         run: mvn -q -f backend/pom.xml test
 
       - name: Install shellcheck
