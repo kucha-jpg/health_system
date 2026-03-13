@@ -57,6 +57,7 @@
 
 ## 6. 交付补充
 - 错误码对照文档：`docs/error_code_matrix.md`
+- CI 失败处理 SOP：`docs/ci_failure_sop.md`
 
 ## 7. 本次收尾增量（2026-03-13）
 
