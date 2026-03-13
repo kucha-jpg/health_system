@@ -96,7 +96,7 @@
   - 5 组断言全部通过。
   - 若任一断言失败，脚本以非 0 退出并输出失败摘要。
 
-## 二、后端单元测试覆盖
+## 二、后端测试覆盖（单元 + 集成）
 - `UserServiceImplTest`
   - `createUser_shouldCreateUserAndRoleRelation`
   - `createUser_shouldThrowWhenRoleIsAdmin`
