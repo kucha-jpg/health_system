@@ -63,6 +63,7 @@
 ### 7.1 CI 稳定性增强
 - 为 `quality-gate` 增加失败时上传 surefire 报告能力，便于直接下载失败明细定位。
 - 关键工作流更新：`.github/workflows/quality-gate.yml` 增加 `Upload surefire reports on failure` 步骤。
+- 后端测试门禁改为“两阶段执行”：先运行关键集成测试（`SecurityErrorCodeIntegrationTest`、`FlywayMigrationIntegrationTest`），再运行全量测试，提升失败定位速度与反馈质量。
 
 ### 7.2 Flyway 迁移回归测试修复
 - 针对 CI 环境账号权限限制（无 `CREATE DATABASE`）调整测试策略：不再依赖创建随机库。
@@ -85,6 +86,7 @@
 - 修复后 run：`23037540040`（成功）
 - 工作流增强验证 run：`23037686074`（成功）
 - 测试可维护性优化验证 run：`23038094567`（成功）
+- 关键测试优先策略验证 run：`23038298869`（成功）
 
 ## 8. 结论
 - 本轮优化已完成“可维护性提升 + 行为不变 + 全程回归验证”的目标。
