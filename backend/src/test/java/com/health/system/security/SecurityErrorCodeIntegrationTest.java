@@ -44,6 +44,21 @@ import com.health.system.service.UserService;
 
 @WebMvcTest(controllers = {AuthController.class, AdminUserController.class})
 @Import({SecurityConfig.class, GlobalExceptionHandler.class})
+@MockBean(classes = {
+    AlertRuleMapper.class,
+    DoctorGroupMapper.class,
+    DoctorGroupMemberMapper.class,
+    FeedbackMessageMapper.class,
+    HealthAlertMapper.class,
+    HealthDataMapper.class,
+    OperationLogMapper.class,
+    PatientArchiveMapper.class,
+    PermissionMapper.class,
+    RoleMapper.class,
+    SystemNoticeMapper.class,
+    UserMapper.class,
+    UserRoleMapper.class
+})
 class SecurityErrorCodeIntegrationTest {
 
     @Autowired
@@ -57,45 +72,6 @@ class SecurityErrorCodeIntegrationTest {
 
     @MockBean
     private OperationLogService operationLogService;
-
-    @MockBean
-    private AlertRuleMapper alertRuleMapper;
-
-    @MockBean
-    private DoctorGroupMapper doctorGroupMapper;
-
-    @MockBean
-    private DoctorGroupMemberMapper doctorGroupMemberMapper;
-
-    @MockBean
-    private FeedbackMessageMapper feedbackMessageMapper;
-
-    @MockBean
-    private HealthAlertMapper healthAlertMapper;
-
-    @MockBean
-    private HealthDataMapper healthDataMapper;
-
-    @MockBean
-    private OperationLogMapper operationLogMapper;
-
-    @MockBean
-    private PatientArchiveMapper patientArchiveMapper;
-
-    @MockBean
-    private PermissionMapper permissionMapper;
-
-    @MockBean
-    private RoleMapper roleMapper;
-
-    @MockBean
-    private SystemNoticeMapper systemNoticeMapper;
-
-    @MockBean
-    private UserMapper userMapper;
-
-    @MockBean
-    private UserRoleMapper userRoleMapper;
 
     @MockBean
     private JwtAuthenticationFilter jwtAuthenticationFilter;
