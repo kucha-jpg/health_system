@@ -8,7 +8,6 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.UUID;
 
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
@@ -27,10 +26,10 @@ class FlywayMigrationIntegrationTest {
 
     @Test
     void migrateShouldSucceedWhenFeedbackReplyColumnsAlreadyExist() throws SQLException {
-        String schema = uniqueSchemaName();
-        createSchema(schema);
+        String schema = MYSQL.getDatabaseName();
 
         withSchemaConnection(schema, conn -> {
+            resetFlywayTargetTables(conn);
             execute(conn, """
                 CREATE TABLE feedback_message (
                     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -65,10 +64,10 @@ class FlywayMigrationIntegrationTest {
 
     @Test
     void migrateShouldAddReplyColumnsWhenFeedbackTableExistsWithoutThem() throws SQLException {
-        String schema = uniqueSchemaName();
-        createSchema(schema);
+        String schema = MYSQL.getDatabaseName();
 
         withSchemaConnection(schema, conn -> {
+            resetFlywayTargetTables(conn);
             execute(conn, """
                 CREATE TABLE feedback_message (
                     id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -105,17 +104,6 @@ class FlywayMigrationIntegrationTest {
                 .load();
     }
 
-    private String uniqueSchemaName() {
-        return "it_flyway_" + UUID.randomUUID().toString().replace("-", "");
-    }
-
-    private void createSchema(String schema) throws SQLException {
-        try (Connection conn = DriverManager.getConnection(MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword());
-             Statement stmt = conn.createStatement()) {
-            stmt.execute("CREATE DATABASE " + schema);
-        }
-    }
-
     private void withSchemaConnection(String schema, SqlConsumer consumer) throws SQLException {
         String schemaUrl = schemaJdbcUrl(schema);
         try (Connection conn = DriverManager.getConnection(schemaUrl, MYSQL.getUsername(), MYSQL.getPassword())) {
@@ -137,6 +125,11 @@ class FlywayMigrationIntegrationTest {
         try (Statement stmt = conn.createStatement()) {
             stmt.execute(sql);
         }
+    }
+
+    private void resetFlywayTargetTables(Connection conn) throws SQLException {
+        execute(conn, "DROP TABLE IF EXISTS flyway_schema_history");
+        execute(conn, "DROP TABLE IF EXISTS feedback_message");
     }
 
     private boolean hasColumn(Connection conn, String tableName, String columnName) throws SQLException {
