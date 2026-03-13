@@ -141,6 +141,9 @@ nginx -t && nginx -s reload
 - 后端单元测试：`backend/src/test/java/com/health/system/service/impl/`
   - `UserServiceImplTest`
   - `HealthDataServiceImplTest`
+- 后端集成测试：`backend/src/test/java/com/health/system/`
+  - `migration/FlywayMigrationIntegrationTest`（Flyway 迁移回归）
+  - `security/SecurityErrorCodeIntegrationTest`（认证/错误码链路）
 - 接口测试脚本：`scripts/api_test.sh`
 - 错误码门禁脚本：`scripts/api_assert.ps1`、`scripts/api_assert.sh`（仅执行 400/401/403/404/409 断言）
 - 前端手工测试步骤与核心场景：`docs/testing_cases.md`
@@ -163,8 +166,9 @@ BASE_URL=http://127.0.0.1:9090/api ./scripts/api_assert.sh
 - 触发条件：`main/master` 分支的 `push` 与 `pull_request`
 - 门禁内容：
   1. 启动 `mysql + backend` 容器并等待后端就绪
-  2. 在 Docker Maven 环境执行后端单元测试
-  3. 执行错误码断言脚本 `scripts/api_assert.sh`
+  2. 执行后端测试（含新增集成测试）
+  3. 执行 Bash 脚本静态检查（`shellcheck`）
+  4. 执行错误码断言脚本 `scripts/api_assert.sh`
 - 失败时会自动输出容器日志，便于定位问题。
 
 ## Docker 部署配置
