@@ -76,6 +76,14 @@ jobs:
           docker compose logs mysql
           docker compose logs backend
 
+      - name: Upload surefire reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: backend/target/surefire-reports/**
+          if-no-files-found: ignore
+
       - name: Cleanup
         if: always()
         run: docker compose down -v
