@@ -11,6 +11,10 @@ public interface DoctorGroupService {
 
     List<DoctorGroup> listMyGroups(String doctorUsername);
 
+    void addDoctorToGroup(String doctorUsername, Long groupId, Long doctorUserId);
+
+    List<User> listGroupDoctors(String doctorUsername, Long groupId);
+
     void addPatientToGroup(String doctorUsername, Long groupId, Long patientUserId);
 
     List<User> listGroupPatients(String doctorUsername, Long groupId);

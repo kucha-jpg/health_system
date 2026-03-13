@@ -23,6 +23,11 @@
       </div>
     </el-card>
 
+    <el-card style="margin-bottom: 12px">
+      <template #header>风险趋势</template>
+      <div ref="riskTrendRef" class="risk-trend-chart"></div>
+    </el-card>
+
     <el-card>
       <template #header>最近上报</template>
       <el-table :data="summary.latestData || []" border>
@@ -36,15 +41,70 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { nextTick, onMounted, onUnmounted, ref } from 'vue'
+import * as echarts from 'echarts'
 import { getPatientReportSummaryApi } from '../api/modules'
 
 const summary = ref({})
 const range = ref('week')
+const riskTrendRef = ref(null)
+let riskTrendChart = null
+
+const renderRiskChart = async () => {
+  await nextTick()
+  if (!riskTrendRef.value) return
+  if (!riskTrendChart) {
+    riskTrendChart = echarts.init(riskTrendRef.value)
+  }
+
+  const rows = summary.value?.riskTrend || []
+  const xAxis = rows.map((item) => item.date)
+  const scoreSeries = rows.map((item) => item.avgRiskScore)
+  const countSeries = rows.map((item) => item.alertCount)
+
+  riskTrendChart.setOption({
+    tooltip: { trigger: 'axis' },
+    legend: { data: ['平均风险分', '预警数'] },
+    xAxis: { type: 'category', data: xAxis },
+    yAxis: [
+      { type: 'value', name: '平均风险分', min: 0, max: 100 },
+      { type: 'value', name: '预警数' }
+    ],
+    series: [
+      { name: '平均风险分', type: 'line', smooth: true, data: scoreSeries },
+      { name: '预警数', type: 'bar', yAxisIndex: 1, data: countSeries, barMaxWidth: 24 }
+    ]
+  })
+}
 
 const load = async () => {
   summary.value = await getPatientReportSummaryApi({ range: range.value })
+  await renderRiskChart()
 }
 
-onMounted(load)
+const handleResize = () => {
+  if (riskTrendChart) {
+    riskTrendChart.resize()
+  }
+}
+
+onMounted(() => {
+  load()
+  window.addEventListener('resize', handleResize)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
+  if (riskTrendChart) {
+    riskTrendChart.dispose()
+    riskTrendChart = null
+  }
+})
 </script>
+
+<style scoped>
+.risk-trend-chart {
+  width: 100%;
+  height: 320px;
+}
+</style>

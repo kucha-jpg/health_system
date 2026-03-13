@@ -16,6 +16,8 @@ public class HealthAlert extends BaseEntity {
     private String indicatorType;
     private String value;
     private String level;
+    private Integer riskScore;
+    private String riskLevel;
     private String reasonCode;
     private String reasonText;
     private String status;

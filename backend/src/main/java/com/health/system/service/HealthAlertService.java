@@ -11,7 +11,7 @@ public interface HealthAlertService {
 
     void deleteByHealthDataId(Long healthDataId);
 
-    List<HealthAlert> listOpenAlerts();
+    List<HealthAlert> listOpenAlerts(String doctorUsername, String riskLevel, Integer minRiskScore, String sortBy);
 
     List<HealthAlert> listMyAlerts(String username, String status);
 

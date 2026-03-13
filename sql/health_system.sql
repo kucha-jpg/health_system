@@ -77,6 +77,8 @@ CREATE TABLE IF NOT EXISTS health_alert (
     indicator_type VARCHAR(20) NOT NULL,
     value VARCHAR(64) NOT NULL,
     level VARCHAR(10) NOT NULL COMMENT 'HIGH/MEDIUM',
+    risk_score INT NOT NULL DEFAULT 60 COMMENT '风险评分(0-100)',
+    risk_level VARCHAR(10) NOT NULL DEFAULT 'MEDIUM' COMMENT '风险等级(LOW/MEDIUM/HIGH)',
     reason VARCHAR(255) NOT NULL,
     status VARCHAR(10) NOT NULL DEFAULT 'OPEN' COMMENT 'OPEN/CLOSED',
     handled_by BIGINT,
@@ -117,6 +119,18 @@ CREATE TABLE IF NOT EXISTS alert_rule (
     update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted TINYINT NOT NULL DEFAULT 0,
     UNIQUE KEY uk_indicator_type (indicator_type)
+);
+
+CREATE TABLE IF NOT EXISTS doctor_group_doctor_member (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    group_id BIGINT NOT NULL,
+    doctor_user_id BIGINT NOT NULL,
+    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted TINYINT NOT NULL DEFAULT 0,
+    UNIQUE KEY uk_group_doctor (group_id, doctor_user_id),
+    INDEX idx_group_id (group_id),
+    INDEX idx_doctor_user_id (doctor_user_id)
 );
 
 INSERT INTO sys_permission (perm_name, perm_code) VALUES

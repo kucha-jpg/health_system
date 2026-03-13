@@ -31,12 +31,14 @@ export const listHealthDataApi = (params) => http.get('/patient/data', { params 
 export const updateHealthDataApi = (id, payload) => http.put(`/patient/data/${id}`, payload)
 export const deleteHealthDataApi = (id) => http.delete(`/patient/data/${id}`)
 
-export const getDoctorAlertsApi = () => http.get('/doctor/alerts')
+export const getDoctorAlertsApi = (params) => http.get('/doctor/alerts', { params })
 export const handleDoctorAlertApi = (id, payload) => http.post(`/doctor/alerts/${id}/handle`, payload)
 export const getDoctorGroupsApi = () => http.get('/doctor/groups')
 export const createDoctorGroupApi = (payload) => http.post('/doctor/groups', payload)
 export const addDoctorGroupPatientApi = (id, payload) => http.post(`/doctor/groups/${id}/patients`, payload)
 export const listDoctorGroupPatientsApi = (id) => http.get(`/doctor/groups/${id}/patients`)
+export const addDoctorGroupDoctorApi = (id, payload) => http.post(`/doctor/groups/${id}/doctors`, payload)
+export const listDoctorGroupDoctorsApi = (id) => http.get(`/doctor/groups/${id}/doctors`)
 
 export const getPatientAlertsApi = (params) => http.get('/patient/alerts', { params })
 export const getPatientReportSummaryApi = (params) => http.get('/patient/reports/summary', { params })

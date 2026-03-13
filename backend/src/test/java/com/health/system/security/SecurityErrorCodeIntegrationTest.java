@@ -27,6 +27,7 @@ import com.health.system.controller.AdminUserController;
 import com.health.system.controller.AuthController;
 import com.health.system.mapper.AlertRuleMapper;
 import com.health.system.mapper.DoctorGroupMapper;
+import com.health.system.mapper.DoctorGroupDoctorMemberMapper;
 import com.health.system.mapper.DoctorGroupMemberMapper;
 import com.health.system.mapper.FeedbackMessageMapper;
 import com.health.system.mapper.HealthAlertMapper;
@@ -47,6 +48,7 @@ import com.health.system.service.UserService;
 @MockBean(classes = {
     AlertRuleMapper.class,
     DoctorGroupMapper.class,
+    DoctorGroupDoctorMemberMapper.class,
     DoctorGroupMemberMapper.class,
     FeedbackMessageMapper.class,
     HealthAlertMapper.class,

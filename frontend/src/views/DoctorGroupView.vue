@@ -11,9 +11,10 @@
       <el-table-column prop="id" label="ID" width="80" />
       <el-table-column prop="groupName" label="群组名称" />
       <el-table-column prop="description" label="描述" />
-      <el-table-column label="操作" width="280">
+      <el-table-column label="操作" width="360">
         <template #default="scope">
           <el-button link type="primary" @click="showPatients(scope.row)">查看成员</el-button>
+          <el-button link type="warning" @click="showDoctors(scope.row)">协作医生</el-button>
           <el-button link type="success" @click="addPatient(scope.row)">添加患者</el-button>
         </template>
       </el-table-column>
@@ -33,18 +34,40 @@
       </el-table-column>
     </el-table>
   </el-dialog>
+
+  <el-dialog v-model="doctorDialogVisible" title="协作医生">
+    <div style="margin-bottom: 12px">
+      <el-button type="primary" @click="addDoctor" :disabled="!activeGroup">添加协作医生</el-button>
+    </div>
+    <el-table :data="doctors" border>
+      <el-table-column prop="id" label="医生ID" width="100" />
+      <el-table-column prop="username" label="用户名" />
+      <el-table-column prop="name" label="姓名" />
+      <el-table-column prop="phone" label="手机号" />
+    </el-table>
+  </el-dialog>
 </template>
 
 <script setup>
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { addDoctorGroupPatientApi, createDoctorGroupApi, getDoctorGroupsApi, listDoctorGroupPatientsApi } from '../api/modules'
+import {
+  addDoctorGroupDoctorApi,
+  addDoctorGroupPatientApi,
+  createDoctorGroupApi,
+  getDoctorGroupsApi,
+  listDoctorGroupDoctorsApi,
+  listDoctorGroupPatientsApi
+} from '../api/modules'
 
 const router = useRouter()
 const groups = ref([])
 const patients = ref([])
+const doctors = ref([])
+const activeGroup = ref(null)
 const patientDialogVisible = ref(false)
+const doctorDialogVisible = ref(false)
 
 const load = async () => {
   groups.value = await getDoctorGroupsApi()
@@ -63,10 +86,24 @@ const showPatients = async (row) => {
   patientDialogVisible.value = true
 }
 
+const showDoctors = async (row) => {
+  activeGroup.value = row
+  doctors.value = await listDoctorGroupDoctorsApi(row.id)
+  doctorDialogVisible.value = true
+}
+
 const addPatient = async (row) => {
   const result = await ElMessageBox.prompt('请输入患者用户ID', `添加到群组: ${row.groupName}`)
   await addDoctorGroupPatientApi(row.id, { patientUserId: Number(result.value) })
   ElMessage.success('添加成功')
+}
+
+const addDoctor = async () => {
+  if (!activeGroup.value) return
+  const result = await ElMessageBox.prompt('请输入医生用户ID', `添加到群组: ${activeGroup.value.groupName}`)
+  await addDoctorGroupDoctorApi(activeGroup.value.id, { doctorUserId: Number(result.value) })
+  ElMessage.success('添加成功')
+  doctors.value = await listDoctorGroupDoctorsApi(activeGroup.value.id)
 }
 
 const goPatientInsight = (row) => {

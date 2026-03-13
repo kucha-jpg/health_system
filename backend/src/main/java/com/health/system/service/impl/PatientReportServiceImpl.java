@@ -12,8 +12,10 @@ import com.health.system.service.PatientReportService;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Service
@@ -46,6 +48,11 @@ public class PatientReportServiceImpl implements PatientReportService {
                 .eq(HealthAlert::getUserId, user.getId())
                 .ge(HealthAlert::getCreateTime, start));
 
+        List<HealthAlert> alerts = healthAlertMapper.selectList(new LambdaQueryWrapper<HealthAlert>()
+            .eq(HealthAlert::getUserId, user.getId())
+            .ge(HealthAlert::getCreateTime, start)
+            .orderByAsc(HealthAlert::getCreateTime));
+
         Map<String, Integer> byType = new HashMap<>();
         for (HealthData data : dataList) {
             byType.put(data.getIndicatorType(), byType.getOrDefault(data.getIndicatorType(), 0) + 1);
@@ -57,6 +64,34 @@ public class PatientReportServiceImpl implements PatientReportService {
         result.put("alertCount", alertCount);
         result.put("byType", byType);
         result.put("latestData", dataList.stream().limit(10).toList());
+        result.put("riskTrend", buildRiskTrend(alerts));
         return result;
+    }
+
+    private List<Map<String, Object>> buildRiskTrend(List<HealthAlert> alerts) {
+        Map<String, int[]> agg = new LinkedHashMap<>();
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        for (HealthAlert alert : alerts) {
+            if (alert.getCreateTime() == null) {
+                continue;
+            }
+            Integer scoreObj = alert.getRiskScore();
+            int score = scoreObj == null ? 60 : scoreObj;
+            String day = alert.getCreateTime().format(fmt);
+            int[] stat = agg.computeIfAbsent(day, k -> new int[]{0, 0});
+            stat[0] += score;
+            stat[1] += 1;
+        }
+
+        return agg.entrySet().stream().map(entry -> {
+            int total = entry.getValue()[0];
+            int count = entry.getValue()[1];
+            int avg = count == 0 ? 0 : (int) Math.round((double) total / count);
+            Map<String, Object> row = new HashMap<>();
+            row.put("date", entry.getKey());
+            row.put("avgRiskScore", avg);
+            row.put("alertCount", count);
+            return row;
+        }).toList();
     }
 }

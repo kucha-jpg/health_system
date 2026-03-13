@@ -14,6 +14,8 @@
       <el-table-column prop="indicatorType" label="指标" width="100" />
       <el-table-column prop="value" label="数值" width="120" />
       <el-table-column prop="level" label="等级" width="100" />
+      <el-table-column prop="riskLevel" label="风险级别" width="110" />
+      <el-table-column prop="riskScore" label="风险分" width="90" />
       <el-table-column prop="reasonText" label="预警原因" />
       <el-table-column prop="status" label="状态" width="100" />
       <el-table-column prop="createTime" label="触发时间" width="180" />

@@ -1,20 +1,30 @@
 package com.health.system.service.impl;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.health.system.common.BusinessException;
 import com.health.system.entity.AlertRule;
+import com.health.system.entity.DoctorGroup;
+import com.health.system.entity.DoctorGroupDoctorMember;
+import com.health.system.entity.DoctorGroupMember;
 import com.health.system.entity.HealthAlert;
 import com.health.system.entity.HealthData;
 import com.health.system.entity.User;
 import com.health.system.mapper.AlertRuleMapper;
+import com.health.system.mapper.DoctorGroupDoctorMemberMapper;
+import com.health.system.mapper.DoctorGroupMapper;
+import com.health.system.mapper.DoctorGroupMemberMapper;
 import com.health.system.mapper.HealthAlertMapper;
 import com.health.system.mapper.HealthDataMapper;
 import com.health.system.mapper.UserMapper;
@@ -27,15 +37,24 @@ public class HealthAlertServiceImpl implements HealthAlertService {
     private final HealthDataMapper healthDataMapper;
     private final UserMapper userMapper;
     private final AlertRuleMapper alertRuleMapper;
+    private final DoctorGroupMapper doctorGroupMapper;
+    private final DoctorGroupDoctorMemberMapper doctorGroupDoctorMemberMapper;
+    private final DoctorGroupMemberMapper doctorGroupMemberMapper;
 
     public HealthAlertServiceImpl(HealthAlertMapper healthAlertMapper,
                                   HealthDataMapper healthDataMapper,
                                   UserMapper userMapper,
-                                  AlertRuleMapper alertRuleMapper) {
+                                  AlertRuleMapper alertRuleMapper,
+                                  DoctorGroupMapper doctorGroupMapper,
+                                  DoctorGroupDoctorMemberMapper doctorGroupDoctorMemberMapper,
+                                  DoctorGroupMemberMapper doctorGroupMemberMapper) {
         this.healthAlertMapper = healthAlertMapper;
         this.healthDataMapper = healthDataMapper;
         this.userMapper = userMapper;
         this.alertRuleMapper = alertRuleMapper;
+        this.doctorGroupMapper = doctorGroupMapper;
+        this.doctorGroupDoctorMemberMapper = doctorGroupDoctorMemberMapper;
+        this.doctorGroupMemberMapper = doctorGroupMemberMapper;
     }
 
     @Override
@@ -50,6 +69,8 @@ public class HealthAlertServiceImpl implements HealthAlertService {
         alert.setIndicatorType(indicatorType);
         alert.setValue(value);
         alert.setLevel(decision.level());
+        alert.setRiskScore(decision.riskScore());
+        alert.setRiskLevel(decision.riskLevel());
         alert.setReasonCode(decision.reasonCode());
         alert.setReasonText(decision.reasonText());
         alert.setStatus("OPEN");
@@ -62,10 +83,36 @@ public class HealthAlertServiceImpl implements HealthAlertService {
     }
 
     @Override
-    public List<HealthAlert> listOpenAlerts() {
-        return healthAlertMapper.selectList(new LambdaQueryWrapper<HealthAlert>()
+    public List<HealthAlert> listOpenAlerts(String doctorUsername, String riskLevel, Integer minRiskScore, String sortBy) {
+        User doctor = resolveDoctor(doctorUsername);
+        Set<Long> patientIds = resolveAccessiblePatientIds(doctor.getId());
+        if (patientIds.isEmpty()) {
+            return List.of();
+        }
+
+        LambdaQueryWrapper<HealthAlert> wrapper = new LambdaQueryWrapper<HealthAlert>()
                 .eq(HealthAlert::getStatus, "OPEN")
-                .orderByDesc(HealthAlert::getCreateTime));
+                .in(HealthAlert::getUserId, patientIds);
+
+        if (StringUtils.hasText(riskLevel)) {
+            wrapper.eq(HealthAlert::getRiskLevel, riskLevel.trim().toUpperCase());
+        }
+
+        if (minRiskScore != null) {
+            int safeScore = Math.max(0, Math.min(minRiskScore, 100));
+            wrapper.ge(HealthAlert::getRiskScore, safeScore);
+        }
+
+        String normalizedSort = StringUtils.hasText(sortBy) ? sortBy.trim().toLowerCase() : "risk_desc";
+        if ("time_desc".equals(normalizedSort)) {
+            wrapper.orderByDesc(HealthAlert::getCreateTime)
+                    .orderByDesc(HealthAlert::getRiskScore);
+        } else {
+            wrapper.orderByDesc(HealthAlert::getRiskScore)
+                    .orderByDesc(HealthAlert::getCreateTime);
+        }
+
+        return healthAlertMapper.selectList(wrapper);
     }
 
     @Override
@@ -85,14 +132,12 @@ public class HealthAlertServiceImpl implements HealthAlertService {
 
     @Override
     public void handleAlert(String doctorUsername, Long id, String handleRemark) {
-        User doctor = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, doctorUsername));
-        if (doctor == null) {
-            throw BusinessException.notFound("医生不存在");
-        }
+        User doctor = resolveDoctor(doctorUsername);
         HealthAlert alert = healthAlertMapper.selectById(id);
         if (alert == null) {
             throw BusinessException.notFound("预警不存在");
         }
+        assertDoctorCanAccessPatient(doctor.getId(), alert.getUserId());
         if (!"OPEN".equals(alert.getStatus())) {
             throw BusinessException.conflict("预警已处理");
         }
@@ -155,10 +200,18 @@ public class HealthAlertServiceImpl implements HealthAlertService {
         }
 
         if (systolic >= highSystolic || diastolic >= highDiastolic) {
-            return new AlertDecision("HIGH", "BP_CRITICAL", "血压达到危急阈值，建议立即就医");
+            int score = severeScore(
+                    ratio(systolic, highSystolic),
+                    ratio(diastolic, highDiastolic)
+            );
+            return new AlertDecision("HIGH", score, riskLevel(score), "BP_CRITICAL", "血压达到危急阈值，建议立即就医");
         }
         if (systolic >= mediumSystolic || diastolic >= mediumDiastolic) {
-            return new AlertDecision("MEDIUM", "BP_HIGH", "血压偏高，建议复测并医生随访");
+            int score = mediumScore(
+                    ratio(systolic, mediumSystolic),
+                    ratio(diastolic, mediumDiastolic)
+            );
+            return new AlertDecision("MEDIUM", score, riskLevel(score), "BP_HIGH", "血压偏高，建议复测并医生随访");
         }
         return null;
     }
@@ -168,10 +221,12 @@ public class HealthAlertServiceImpl implements HealthAlertService {
         BigDecimal high = parseDecimalRule(rule == null ? null : rule.getHighRule(), BigDecimal.valueOf(16.7));
         BigDecimal medium = parseDecimalRule(rule == null ? null : rule.getMediumRule(), BigDecimal.valueOf(11.1));
         if (bloodSugar.compareTo(high) >= 0) {
-            return new AlertDecision("HIGH", "GLUCOSE_CRITICAL", "血糖显著升高，建议尽快干预");
+            int score = severeScore(ratio(bloodSugar, high));
+            return new AlertDecision("HIGH", score, riskLevel(score), "GLUCOSE_CRITICAL", "血糖显著升高，建议尽快干预");
         }
         if (bloodSugar.compareTo(medium) >= 0) {
-            return new AlertDecision("MEDIUM", "GLUCOSE_HIGH", "血糖偏高，建议重点观察");
+            int score = mediumScore(ratio(bloodSugar, medium));
+            return new AlertDecision("MEDIUM", score, riskLevel(score), "GLUCOSE_HIGH", "血糖偏高，建议重点观察");
         }
         return null;
     }
@@ -180,9 +235,65 @@ public class HealthAlertServiceImpl implements HealthAlertService {
         BigDecimal weight = new BigDecimal(value);
         BigDecimal high = parseDecimalRule(rule == null ? null : rule.getHighRule(), BigDecimal.valueOf(200));
         if (weight.compareTo(high) >= 0) {
-            return new AlertDecision("MEDIUM", "WEIGHT_HIGH", "体重异常偏高，建议医生评估");
+            int score = mediumScore(ratio(weight, high));
+            return new AlertDecision("MEDIUM", score, riskLevel(score), "WEIGHT_HIGH", "体重异常偏高，建议医生评估");
         }
         return null;
+    }
+
+    private int mediumScore(BigDecimal... ratios) {
+        BigDecimal maxRatio = maxRatio(ratios);
+        BigDecimal extra = maxRatio.subtract(BigDecimal.ONE).max(BigDecimal.ZERO)
+                .multiply(BigDecimal.valueOf(120));
+        int score = BigDecimal.valueOf(50).add(extra).setScale(0, RoundingMode.HALF_UP).intValue();
+        return clamp(score, 50, 79);
+    }
+
+    private int severeScore(BigDecimal... ratios) {
+        BigDecimal maxRatio = maxRatio(ratios);
+        BigDecimal extra = maxRatio.subtract(BigDecimal.ONE).max(BigDecimal.ZERO)
+                .multiply(BigDecimal.valueOf(180));
+        int score = BigDecimal.valueOf(80).add(extra).setScale(0, RoundingMode.HALF_UP).intValue();
+        return clamp(score, 80, 100);
+    }
+
+    private BigDecimal maxRatio(BigDecimal... ratios) {
+        BigDecimal max = BigDecimal.ZERO;
+        for (BigDecimal ratio : ratios) {
+            if (ratio != null && ratio.compareTo(max) > 0) {
+                max = ratio;
+            }
+        }
+        return max;
+    }
+
+    private BigDecimal ratio(int value, int threshold) {
+        if (threshold <= 0) {
+            return BigDecimal.ONE;
+        }
+        return BigDecimal.valueOf(value)
+                .divide(BigDecimal.valueOf(threshold), 4, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal ratio(BigDecimal value, BigDecimal threshold) {
+        if (threshold == null || threshold.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ONE;
+        }
+        return value.divide(threshold, 4, RoundingMode.HALF_UP);
+    }
+
+    private int clamp(int score, int min, int max) {
+        return Math.max(min, Math.min(max, score));
+    }
+
+    private String riskLevel(int score) {
+        if (score >= 80) {
+            return "HIGH";
+        }
+        if (score >= 50) {
+            return "MEDIUM";
+        }
+        return "LOW";
     }
 
     private int[] parsePressure(String rule, int defaultSystolic, int defaultDiastolic) {
@@ -211,6 +322,56 @@ public class HealthAlertServiceImpl implements HealthAlertService {
         }
     }
 
-    private record AlertDecision(String level, String reasonCode, String reasonText) {
+    private User resolveDoctor(String doctorUsername) {
+        User doctor = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, doctorUsername));
+        if (doctor == null || !"DOCTOR".equals(doctor.getRoleType())) {
+            throw BusinessException.notFound("医生不存在");
+        }
+        return doctor;
+    }
+
+    private void assertDoctorCanAccessPatient(Long doctorId, Long patientUserId) {
+        Set<Long> patientIds = resolveAccessiblePatientIds(doctorId);
+        if (!patientIds.contains(patientUserId)) {
+            throw BusinessException.forbidden("预警不在您的可处理范围内");
+        }
+    }
+
+    private Set<Long> resolveAccessiblePatientIds(Long doctorId) {
+        Set<Long> groupIds = resolveAccessibleGroupIds(doctorId);
+        if (groupIds.isEmpty()) {
+            return Set.of();
+        }
+        List<DoctorGroupMember> patientMembers = doctorGroupMemberMapper.selectList(new LambdaQueryWrapper<DoctorGroupMember>()
+                .in(DoctorGroupMember::getGroupId, groupIds));
+        if (patientMembers.isEmpty()) {
+            return Set.of();
+        }
+        Set<Long> patientIds = new HashSet<>();
+        for (DoctorGroupMember item : patientMembers) {
+            patientIds.add(item.getPatientUserId());
+        }
+        return patientIds;
+    }
+
+    private Set<Long> resolveAccessibleGroupIds(Long doctorId) {
+        List<DoctorGroup> ownerGroups = doctorGroupMapper.selectList(new LambdaQueryWrapper<DoctorGroup>()
+                .eq(DoctorGroup::getDoctorId, doctorId));
+        List<DoctorGroupDoctorMember> collaborativeGroups = doctorGroupDoctorMemberMapper.selectList(
+                new LambdaQueryWrapper<DoctorGroupDoctorMember>()
+                        .eq(DoctorGroupDoctorMember::getDoctorUserId, doctorId)
+        );
+
+        Set<Long> groupIds = new HashSet<>();
+        for (DoctorGroup item : ownerGroups) {
+            groupIds.add(item.getId());
+        }
+        for (DoctorGroupDoctorMember item : collaborativeGroups) {
+            groupIds.add(item.getGroupId());
+        }
+        return groupIds;
+    }
+
+    private record AlertDecision(String level, int riskScore, String riskLevel, String reasonCode, String reasonText) {
     }
 }

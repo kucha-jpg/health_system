@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.health.system.common.ApiResponse;
+import com.health.system.dto.DoctorGroupAddDoctorDTO;
 import com.health.system.dto.AlertHandleDTO;
 import com.health.system.dto.DoctorGroupAddPatientDTO;
 import com.health.system.dto.DoctorGroupDTO;
@@ -42,8 +43,11 @@ public class DoctorController {
     }
 
     @GetMapping("/alerts")
-    public ApiResponse<List<HealthAlert>> openAlerts() {
-        return ApiResponse.success(healthAlertService.listOpenAlerts());
+    public ApiResponse<List<HealthAlert>> openAlerts(Authentication authentication,
+                                                     @RequestParam(required = false) String riskLevel,
+                                                     @RequestParam(required = false) Integer minRiskScore,
+                                                     @RequestParam(defaultValue = "risk_desc") String sortBy) {
+        return ApiResponse.success(healthAlertService.listOpenAlerts(authentication.getName(), riskLevel, minRiskScore, sortBy));
     }
 
     @PostMapping("/alerts/{id}/handle")
@@ -71,9 +75,22 @@ public class DoctorController {
         return ApiResponse.success("添加成功", null);
     }
 
+    @PostMapping("/groups/{id}/doctors")
+    public ApiResponse<Void> addDoctor(Authentication authentication,
+                                       @PathVariable Long id,
+                                       @Valid @RequestBody DoctorGroupAddDoctorDTO dto) {
+        doctorGroupService.addDoctorToGroup(authentication.getName(), id, dto.getDoctorUserId());
+        return ApiResponse.success("添加成功", null);
+    }
+
     @GetMapping("/groups/{id}/patients")
     public ApiResponse<List<User>> listGroupPatients(Authentication authentication, @PathVariable Long id) {
         return ApiResponse.success(doctorGroupService.listGroupPatients(authentication.getName(), id));
+    }
+
+    @GetMapping("/groups/{id}/doctors")
+    public ApiResponse<List<User>> listGroupDoctors(Authentication authentication, @PathVariable Long id) {
+        return ApiResponse.success(doctorGroupService.listGroupDoctors(authentication.getName(), id));
     }
 
     @GetMapping("/patients/{patientUserId}/insight")

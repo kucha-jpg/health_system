@@ -38,6 +38,11 @@
 - 服药：仅支持 `已服药/未服药/1/0`
 - 所有患者接口均按当前登录用户ID做数据隔离：只能操作自己的档案和健康数据
 
+## 风险评分与预警分层
+- 预警在规则触发后会计算 `riskScore(0-100)` 与 `riskLevel(LOW/MEDIUM/HIGH)`。
+- 医生预警工作台支持按 `riskLevel`、`minRiskScore` 过滤，并支持按风险优先或按时间优先排序。
+- 患者周报/月报新增 `riskTrend`（按天统计平均风险分与预警数量）。
+
 ## 权限控制逻辑
 1. 登录成功后签发 JWT，前端存 `localStorage.token`。
 2. Axios 请求头统一携带 `Authorization: Bearer <token>`。

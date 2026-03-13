@@ -3,12 +3,14 @@ package com.health.system.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.health.system.common.BusinessException;
 import com.health.system.entity.DoctorGroup;
+import com.health.system.entity.DoctorGroupDoctorMember;
 import com.health.system.entity.DoctorGroupMember;
 import com.health.system.entity.HealthAlert;
 import com.health.system.entity.HealthData;
 import com.health.system.entity.PatientArchive;
 import com.health.system.entity.User;
 import com.health.system.mapper.DoctorGroupMapper;
+import com.health.system.mapper.DoctorGroupDoctorMemberMapper;
 import com.health.system.mapper.DoctorGroupMemberMapper;
 import com.health.system.mapper.HealthAlertMapper;
 import com.health.system.mapper.HealthDataMapper;
@@ -28,6 +30,7 @@ public class DoctorPatientInsightServiceImpl implements DoctorPatientInsightServ
 
     private final UserMapper userMapper;
     private final DoctorGroupMapper doctorGroupMapper;
+    private final DoctorGroupDoctorMemberMapper doctorGroupDoctorMemberMapper;
     private final DoctorGroupMemberMapper doctorGroupMemberMapper;
     private final PatientArchiveMapper patientArchiveMapper;
     private final HealthDataMapper healthDataMapper;
@@ -35,12 +38,14 @@ public class DoctorPatientInsightServiceImpl implements DoctorPatientInsightServ
 
     public DoctorPatientInsightServiceImpl(UserMapper userMapper,
                                            DoctorGroupMapper doctorGroupMapper,
+                                           DoctorGroupDoctorMemberMapper doctorGroupDoctorMemberMapper,
                                            DoctorGroupMemberMapper doctorGroupMemberMapper,
                                            PatientArchiveMapper patientArchiveMapper,
                                            HealthDataMapper healthDataMapper,
                                            HealthAlertMapper healthAlertMapper) {
         this.userMapper = userMapper;
         this.doctorGroupMapper = doctorGroupMapper;
+        this.doctorGroupDoctorMemberMapper = doctorGroupDoctorMemberMapper;
         this.doctorGroupMemberMapper = doctorGroupMemberMapper;
         this.patientArchiveMapper = patientArchiveMapper;
         this.healthDataMapper = healthDataMapper;
@@ -103,14 +108,24 @@ public class DoctorPatientInsightServiceImpl implements DoctorPatientInsightServ
     }
 
     private void validateMembership(Long doctorId, Long patientUserId) {
-        List<DoctorGroup> myGroups = doctorGroupMapper.selectList(new LambdaQueryWrapper<DoctorGroup>()
+        List<DoctorGroup> ownerGroups = doctorGroupMapper.selectList(new LambdaQueryWrapper<DoctorGroup>()
                 .eq(DoctorGroup::getDoctorId, doctorId));
-        if (myGroups.isEmpty()) {
+
+        List<DoctorGroupDoctorMember> memberships = doctorGroupDoctorMemberMapper.selectList(
+            new LambdaQueryWrapper<DoctorGroupDoctorMember>()
+                .eq(DoctorGroupDoctorMember::getDoctorUserId, doctorId)
+        );
+
+        List<Long> groupIds = ownerGroups.stream().map(DoctorGroup::getId).toList();
+        List<Long> memberGroupIds = memberships.stream().map(DoctorGroupDoctorMember::getGroupId).toList();
+        List<Long> accessibleGroupIds = new java.util.ArrayList<>(groupIds);
+        accessibleGroupIds.addAll(memberGroupIds);
+
+        if (accessibleGroupIds.isEmpty()) {
             throw BusinessException.forbidden("该患者不在您的群组中");
         }
-        List<Long> groupIds = myGroups.stream().map(DoctorGroup::getId).toList();
         Long count = doctorGroupMemberMapper.selectCount(new LambdaQueryWrapper<DoctorGroupMember>()
-                .in(DoctorGroupMember::getGroupId, groupIds)
+            .in(DoctorGroupMember::getGroupId, accessibleGroupIds)
                 .eq(DoctorGroupMember::getPatientUserId, patientUserId));
         if (count == null || count == 0) {
             throw BusinessException.forbidden("该患者不在您的群组中");

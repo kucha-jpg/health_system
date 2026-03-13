@@ -1,11 +1,36 @@
 <template>
   <el-card>
-    <template #header>医生预警工作台</template>
+    <template #header>
+      <div class="toolbar">
+        <span>医生预警工作台</span>
+        <div class="filters">
+          <el-select v-model="query.riskLevel" clearable placeholder="风险级别" style="width: 140px" @change="loadData">
+            <el-option label="全部" value="" />
+            <el-option label="高风险" value="HIGH" />
+            <el-option label="中风险" value="MEDIUM" />
+            <el-option label="低风险" value="LOW" />
+          </el-select>
+          <el-input-number v-model="query.minRiskScore" :min="0" :max="100" :step="5" @change="loadData" />
+          <el-select v-model="query.sortBy" style="width: 170px" @change="loadData">
+            <el-option label="按风险分优先" value="risk_desc" />
+            <el-option label="按最新时间优先" value="time_desc" />
+          </el-select>
+          <el-button type="danger" plain @click="applyHighRiskPreset">高风险快捷视图</el-button>
+          <el-button @click="resetFilters">重置</el-button>
+        </div>
+      </div>
+    </template>
     <el-table :data="alerts" v-loading="loading" border>
       <el-table-column prop="userId" label="患者ID" width="90" />
       <el-table-column prop="indicatorType" label="指标" width="90" />
       <el-table-column prop="value" label="数值" width="120" />
       <el-table-column prop="level" label="等级" width="90" />
+      <el-table-column label="风险级别" width="110">
+        <template #default="scope">
+          <el-tag :type="riskTagType(scope.row.riskLevel)">{{ scope.row.riskLevel }}</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column prop="riskScore" label="风险分" width="90" />
       <el-table-column label="原因">
         <template #default="scope">
           {{ scope.row.reasonText || scope.row.reason }}
@@ -27,16 +52,45 @@ import { getDoctorAlertsApi, handleDoctorAlertApi } from '../api/modules'
 
 const loading = ref(false)
 const alerts = ref([])
+const query = ref({
+  riskLevel: '',
+  minRiskScore: 0,
+  sortBy: 'risk_desc'
+})
 let timer = null
 
 const loadData = async () => {
   loading.value = true
   try {
-    const res = await getDoctorAlertsApi()
+    const res = await getDoctorAlertsApi(query.value)
     alerts.value = res || []
   } finally {
     loading.value = false
   }
+}
+
+const resetFilters = () => {
+  query.value = {
+    riskLevel: '',
+    minRiskScore: 0,
+    sortBy: 'risk_desc'
+  }
+  loadData()
+}
+
+const applyHighRiskPreset = () => {
+  query.value = {
+    riskLevel: 'HIGH',
+    minRiskScore: 80,
+    sortBy: 'risk_desc'
+  }
+  loadData()
+}
+
+const riskTagType = (level) => {
+  if (level === 'HIGH') return 'danger'
+  if (level === 'MEDIUM') return 'warning'
+  return 'info'
 }
 
 const handle = async (row) => {
@@ -58,3 +112,18 @@ onUnmounted(() => {
   }
 })
 </script>
+
+<style scoped>
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+</style>
