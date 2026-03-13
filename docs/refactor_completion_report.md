@@ -58,6 +58,34 @@
 ## 6. 交付补充
 - 错误码对照文档：`docs/error_code_matrix.md`
 
-## 7. 结论
+## 7. 本次收尾增量（2026-03-13）
+
+### 7.1 CI 稳定性增强
+- 为 `quality-gate` 增加失败时上传 surefire 报告能力，便于直接下载失败明细定位。
+- 关键工作流更新：`.github/workflows/quality-gate.yml` 增加 `Upload surefire reports on failure` 步骤。
+
+### 7.2 Flyway 迁移回归测试修复
+- 针对 CI 环境账号权限限制（无 `CREATE DATABASE`）调整测试策略：不再依赖创建随机库。
+- 迁移回归测试改为在容器默认测试库执行，并清理目标表后重建场景。
+- 针对“非空 schema 无历史表”场景，测试侧启用 baseline，版本固定为 `10`，确保回归焦点聚焦 `V11/V12`。
+
+### 7.3 安全集成测试可维护性优化
+- `SecurityErrorCodeIntegrationTest` 将大量逐字段 mapper mock 收敛为类级批量 `@MockBean(classes = {...})`。
+- 保持断言语义与接口行为不变，降低测试样板代码与后续维护成本。
+
+### 7.4 关键提交（最近）
+- `27aad46` test: simplify security integration mapper mocks
+- `c56bc85` docs: document flyway integration test baseline rationale
+- `f8bffef` ci: upload surefire reports on gate failure
+- `e1c77ab` test: baseline flyway migration integration schema
+- `300ce9c` test: avoid create database in flyway migration integration test
+
+### 7.5 质量门禁证据
+- 失败修复前 run：`23037249791`（失败，定位到后端测试阶段 Flyway 用例）
+- 修复后 run：`23037540040`（成功）
+- 工作流增强验证 run：`23037686074`（成功）
+- 测试可维护性优化验证 run：`23038094567`（成功）
+
+## 8. 结论
 - 本轮优化已完成“可维护性提升 + 行为不变 + 全程回归验证”的目标。
 - 系统当前已达到“可继续扩展、可持续重构、可证据化交付”的稳定状态。
