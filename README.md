@@ -1,5 +1,7 @@
 # 健康管理系统模块（Spring Boot + Vue）
 
+[![quality-gate](https://github.com/kucha-jpg/health_system/actions/workflows/quality-gate.yml/badge.svg)](https://github.com/kucha-jpg/health_system/actions/workflows/quality-gate.yml)
+
 ## 技术栈
 - 后端：Spring Boot 3.x + Java 17 + Spring Security 6 + JWT + MyBatis-Plus + MySQL 8
 - 前端：Vue 3 + Element Plus + Axios
