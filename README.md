@@ -144,6 +144,7 @@ nginx -t && nginx -s reload
 - 后端集成测试：`backend/src/test/java/com/health/system/`
   - `migration/FlywayMigrationIntegrationTest`（Flyway 迁移回归）
   - `security/SecurityErrorCodeIntegrationTest`（认证/错误码链路）
+  - 说明：`FlywayMigrationIntegrationTest` 使用 Testcontainers，在无 Docker 环境时会自动跳过（`@Testcontainers(disabledWithoutDocker = true)`）
 - 接口测试脚本：`scripts/api_test.sh`
 - 错误码门禁脚本：`scripts/api_assert.ps1`、`scripts/api_assert.sh`（仅执行 400/401/403/404/409 断言）
 - 前端手工测试步骤与核心场景：`docs/testing_cases.md`

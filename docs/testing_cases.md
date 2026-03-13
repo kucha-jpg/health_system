@@ -183,3 +183,5 @@ Flyway 迁移回归测试（Docker Maven）示例：
 ```bash
 docker run --rm -v "${PWD}/backend:/workspace" -w /workspace maven:3.9-eclipse-temurin-17 mvn -q -Dtest=FlywayMigrationIntegrationTest test
 ```
+
+说明：该用例使用 Testcontainers；若当前执行环境不可访问 Docker（例如容器内缺少 Docker Socket），测试会自动跳过，不会导致整套测试误报失败。
