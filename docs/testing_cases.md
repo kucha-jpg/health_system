@@ -185,3 +185,9 @@ docker run --rm -v "${PWD}/backend:/workspace" -w /workspace maven:3.9-eclipse-t
 ```
 
 说明：该用例使用 Testcontainers；若当前执行环境不可访问 Docker（例如容器内缺少 Docker Socket），测试会自动跳过，不会导致整套测试误报失败。
+
+设计说明（关键约束与取舍）：
+- Flyway 用例在容器默认测试库内执行，不再依赖 `CREATE DATABASE` 创建随机 schema，避免 CI 环境下测试账号缺少建库权限导致失败。
+- 由于测试前会预建 `feedback_message` 表，schema 在迁移前属于“非空”；为保证 Flyway 可继续执行后续版本迁移，测试配置启用了 `baselineOnMigrate=true`。
+- baseline 版本固定为 `10`，使迁移从 `V11` / `V12` 开始执行，正好覆盖“回复字段幂等补齐”这一回归目标。
+- 用例断言聚焦在 `V11` / `V12` 执行结果（字段存在与版本记录），不改变生产迁移链路，仅作为回归保护网。
