@@ -76,3 +76,6 @@ git push origin main
 - 最新 `quality-gate` 为 `success`。
 - 对应修复已合并到 `main`。
 - 必要时已在 `docs/testing_cases.md` 或 `docs/refactor_completion_report.md` 追加经验。
+
+## 6. 配套演练
+- 可控故障演练脚本：`docs/ci_failure_drill.md`
