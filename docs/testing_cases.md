@@ -107,6 +107,11 @@
 - `HealthAlertServiceImplTest`
   - `evaluateAndCreateAlert_shouldCreateHighLevelAlert_whenBloodPressureCritical`
   - `evaluateAndCreateAlert_shouldNotCreateAlert_whenIndicatorIsNormal`
+- `FlywayMigrationIntegrationTest`
+  - `migrateShouldSucceedWhenFeedbackReplyColumnsAlreadyExist`
+  - `migrateShouldAddReplyColumnsWhenFeedbackTableExistsWithoutThem`
+
+说明：上述 Flyway 回归测试用于防止 `feedback_message` 在“列已存在/列缺失”两种数据库状态下迁移失败。
 
 ## 三、前端测试步骤（手工）
 
@@ -172,4 +177,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\api_test.ps1 -BaseUrl "http:/
 当前 Docker 默认后端端口为 `9090`，可使用：
 ```bash
 BASE_URL=http://127.0.0.1:9090/api ./scripts/api_test.sh
+```
+
+Flyway 迁移回归测试（Docker Maven）示例：
+```bash
+docker run --rm -v "${PWD}/backend:/workspace" -w /workspace maven:3.9-eclipse-temurin-17 mvn -q -Dtest=FlywayMigrationIntegrationTest test
 ```
