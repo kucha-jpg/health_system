@@ -140,7 +140,7 @@
 - 用法：
 ```bash
 chmod +x scripts/api_test.sh
-BASE_URL=http://127.0.0.1:8080/api ./scripts/api_test.sh
+BASE_URL=http://127.0.0.1:9090/api ./scripts/api_test.sh
 ```
 
 - Windows PowerShell 脚本：`scripts/api_test.ps1`
