@@ -147,7 +147,7 @@ if [[ "${ASSERT_ONLY}" != "1" ]]; then
   else
     REPORT_RESP=$(post_json "/patient/data" '{"indicatorType":"血压","value":"135/88","remark":"接口测试上报"}' "$PATIENT_TOKEN")
     echo "[REPORT] ${REPORT_RESP}"
-    LIST_RESP=$(curl -sS -H "Authorization: Bearer ${PATIENT_TOKEN}" "${BASE_URL}/patient/data?indicator_type=血压&timeRange=week")
+    LIST_RESP=$(curl -sS -H "Authorization: Bearer ${PATIENT_TOKEN}" "${BASE_URL}/patient/data?indicator_type=%E8%A1%80%E5%8E%8B&timeRange=week")
     echo "[LIST] ${LIST_RESP}"
   fi
 
@@ -179,13 +179,13 @@ if [[ "${ASSERT_ONLY}" != "1" ]]; then
     GROUP_LIST=$(curl -sS -H "Authorization: Bearer ${DOCTOR_TOKEN}" "${BASE_URL}/doctor/groups")
     echo "[GROUP_LIST] ${GROUP_LIST}"
     GROUP_ID=$(echo "$GROUP_LIST" | GROUP_NAME="$GROUP_NAME" "$PYTHON_BIN" -c 'import json,sys,os
-  name=os.environ.get("GROUP_NAME", "")
-  raw=sys.stdin.read()
-  try:
+name=os.environ.get("GROUP_NAME", "")
+raw=sys.stdin.read()
+try:
     data=json.loads(raw).get("data", [])
     target=next((x for x in data if x.get("groupName") == name), None)
     print(target.get("id") if target else "")
-  except Exception:
+except Exception:
     print("")')
     if [[ -n "$GROUP_ID" && -n "$PATIENT_USER_ID" ]]; then
       GROUP_ADD=$(post_json "/doctor/groups/${GROUP_ID}/patients" "{\"patientUserId\":${PATIENT_USER_ID}}" "$DOCTOR_TOKEN" || true)
@@ -200,16 +200,16 @@ if [[ "${ASSERT_ONLY}" != "1" ]]; then
   echo "\n[CASE-4] 管理员角色权限管理"
   ROLE_LIST=$(curl -sS -H "Authorization: Bearer ${ADMIN_TOKEN}" "${BASE_URL}/admin/roles")
   echo "[ROLE_LIST] ${ROLE_LIST}"
-    ROLE_PAYLOAD=$(echo "$ROLE_LIST" | "$PYTHON_BIN" -c 'import json,sys
-  raw=sys.stdin.read()
-  try:
+  ROLE_PAYLOAD=$(echo "$ROLE_LIST" | "$PYTHON_BIN" -c 'import json,sys
+raw=sys.stdin.read()
+try:
     arr=json.loads(raw).get("data", [])
     if not arr:
-      print("")
+        print("")
     else:
-      r=arr[0]
-      print(json.dumps({"id": r.get("id"), "permission": r.get("permission")}, ensure_ascii=False))
-  except Exception:
+        r=arr[0]
+        print(json.dumps({"id": r.get("id"), "permission": r.get("permission")}, ensure_ascii=False))
+except Exception:
     print("")')
   if [[ -n "$ROLE_PAYLOAD" ]]; then
     ROLE_UPDATE=$(curl -sS -H "Content-Type: application/json" -H "Authorization: Bearer ${ADMIN_TOKEN}" -X PUT "${BASE_URL}/admin/roles" -d "$ROLE_PAYLOAD")
