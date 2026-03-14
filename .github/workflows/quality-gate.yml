@@ -55,6 +55,8 @@ jobs:
           cache: maven
 
       - name: Backend critical integration tests
+        env:
+          TESTCONTAINERS_RYUK_DISABLED: "true"
         run: mvn -q -f backend/pom.xml -Dtest=SecurityErrorCodeIntegrationTest,FlywayMigrationIntegrationTest test
 
       - name: Backend full test suite
