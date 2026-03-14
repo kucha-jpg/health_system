@@ -130,3 +130,25 @@ CI gate file:
 
 As of 2026-03-14, the repository is report-ready with traceable evidence.
 Remaining risk is operational only (local Bash runtime not available on this Windows host), not a code-function gap.
+
+## 7. Frozen baseline evidence (latest)
+
+- Stable tag:
+  - `v2026.03.14-ci-green`
+  - points to commit `d56d663d1e946bf1f614068c84b16310435d5916`
+
+- Key fix commits in final closure:
+  - `b45951388ad790393db1613ccf10342017162128` (cap Flyway regression target to v12)
+  - `28098e55f53525d89b7462e342a66b3ac5a05207` (fix api_test.sh indentation error and query encoding)
+  - `f7defcf021ae34c5dbde72ff7d5f2e9ed5c5e5e8` (update quality-gate evidence run id)
+  - `d56d663d1e946bf1f614068c84b16310435d5916` (add CI SOP playbook for this failure pattern)
+
+- Latest quality-gate success runs:
+  - `23086231786` (post-fix run for `28098e55...`)
+  - `23086581631` (post-doc-evidence update run for `f7defcf...`)
+  - `23087863763` (post-SOP update run for `d56d663...`)
+
+- Demo smoke result on local Windows host:
+  - `docker compose up -d --build` completed, services healthy (`mysql`, `backend`, `frontend`).
+  - `powershell -ExecutionPolicy Bypass -File .\scripts\api_test.ps1 -BaseUrl "http://127.0.0.1:9090/api"` passed.
+  - Output summary: `[ASSERT-SUMMARY] all passed`.
