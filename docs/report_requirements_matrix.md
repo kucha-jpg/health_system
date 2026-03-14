@@ -1,64 +1,68 @@
 # 报告要求-系统实现对照表
 
 ## 使用说明
+
 - 本表用于将开题/中期/结题报告中的“拟实现功能”与当前代码证据进行一一映射。
 - 证据分为四类：后端接口、前端页面、数据库结构、测试结果。
-- 验收建议：按“核心场景1-8”执行 `scripts/api_test.ps1`，再结合前端手工步骤复核。
+- 验收建议：按“核心场景1-11”执行 `scripts/api_test.ps1` 或 `scripts/api_test.sh`，再结合前端手工步骤复核。
 
 ## 一、研究内容与功能模块对照
 
-| 报告要求 | 已实现能力 | 后端证据 | 前端证据 | 数据/测试证据 |
-|---|---|---|---|---|
-| 患者注册/登录与个人中心 | 支持患者注册登录，支持档案管理与会话校验 | `/api/auth/*`、`/api/patient/archive` | 登录页、注册页、患者档案页 | `sys_user`、`patient_archive` |
-| 健康数据持续上报与查询 | 支持血压/血糖/体重/服药上报、筛选查询、编辑删除 | `/api/patient/data` | 健康上报页、历史数据页 | `health_data`，核心场景1 |
-| 异常预警与主动干预 | 上报后实时评估并生成预警，支持风险评分/分层与医生闭环处理 | `/api/doctor/alerts`、`/api/doctor/alerts/{id}/handle` | 医生预警工作台、患者预警详情 | `health_alert`，核心场景2/10 |
-| 医生群组化协作管理 | 支持群组创建、添加患者、查看群组成员、添加协作医生 | `/api/doctor/groups`、`/api/doctor/groups/{id}/doctors` | 医生群组管理页（含协作医生弹窗） | `doctor_group`、`doctor_group_member`、`doctor_group_doctor_member`，核心场景3 |
-| 医生查看群组患者档案与趋势 | 支持群组内患者档案、趋势数据、近期预警洞察 | `/api/doctor/patients/{id}/insight` | 医生患者洞察页 | 核心场景8 |
-| 管理员用户管理 | 支持患者/医生账号增改查与启停用 | `/api/admin/user` | 账号管理页 | 核心场景5/6 |
-| 管理员角色权限管理 | 支持角色权限查询与更新 | `/api/admin/roles` | 角色权限管理页 | 核心场景4 |
-| 管理员基础数据管理（公告） | 支持公告增删改查与筛选 | `/api/admin/config/notices` | 系统公告页 | `system_notice` |
-| 管理员基础数据管理（预警规则） | 支持预警规则查询/新增/更新；预警判定优先读规则 | `/api/admin/config/alert-rules` | 预警规则管理页 | `alert_rule`，核心场景7 |
-| 系统监控与日志 | 支持监控概览、日志分页筛选与导出 | `/api/admin/monitor/overview`、`/api/admin/logs/*` | 系统监控页、操作日志页 | `operation_log` |
-| 平台沟通反馈闭环 | 支持反馈提交、处理、回复、统计、批量处理与导出 | `/api/feedback/*`、`/api/admin/feedback/*` | 反馈通道页、管理员反馈页 | `feedback_message` |
-| 患者周报/月报风险趋势 | 支持按天聚合的风险趋势（平均风险分+预警数） | `/api/patient/reports/summary` 返回 `riskTrend` | 患者周报/月报页风险趋势图 | 场景10联动验证 |
+| 报告要求                           | 已实现能力                                                      | 后端证据                                                | 前端证据                         | 数据/测试证据                                                                  |
+| ---------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------ |
+| 患者注册/登录与个人中心            | 支持患者注册登录，支持档案管理与会话校验                        | `/api/auth/*`、`/api/patient/archive`                   | 登录页、注册页、患者档案页       | `sys_user`、`patient_archive`                                                  |
+| 健康数据持续上报与查询             | 支持血压/血糖/体重/服药上报、筛选查询、编辑删除                 | `/api/patient/data`                                     | 健康上报页、历史数据页           | `health_data`，核心场景1                                                       |
+| 异常预警与主动干预                 | 上报后实时评估并生成预警，支持风险评分/分层与医生闭环处理       | `/api/doctor/alerts`、`/api/doctor/alerts/{id}/handle`  | 医生预警工作台、患者预警详情     | `health_alert`，核心场景2/10                                                   |
+| 医生群组化协作管理                 | 支持群组创建、添加患者、查看群组成员、添加协作医生              | `/api/doctor/groups`、`/api/doctor/groups/{id}/doctors` | 医生群组管理页（含协作医生弹窗） | `doctor_group`、`doctor_group_member`、`doctor_group_doctor_member`，核心场景3 |
+| 医生查看群组患者档案与趋势         | 支持群组内患者档案、趋势数据、近期预警洞察                      | `/api/doctor/patients/{id}/insight`                     | 医生患者洞察页                   | 核心场景8                                                                      |
+| 管理员用户管理                     | 支持患者/医生账号增改查与启停用                                 | `/api/admin/user`                                       | 账号管理页                       | 核心场景5/6                                                                    |
+| 管理员角色权限管理                 | 支持角色权限查询与更新                                          | `/api/admin/roles`                                      | 角色权限管理页                   | 核心场景4                                                                      |
+| 管理员基础数据管理（公告）         | 支持公告增删改查与筛选                                          | `/api/admin/config/notices`                             | 系统公告页                       | `system_notice`                                                                |
+| 管理员基础数据管理（预警规则）     | 支持预警规则查询/新增/更新；预警判定优先读规则                  | `/api/admin/config/alert-rules`                         | 预警规则管理页                   | `alert_rule`，核心场景7                                                        |
+| 管理员基础数据管理（健康指标类型） | 当前采用固定指标枚举（血压/血糖/体重/服药），并在前后端统一校验 | `HealthDataServiceImpl` 校验逻辑                        | 患者上报页指标选项               | 核心场景1/2（后续可扩展为后台可配置）                                          |
+| 系统监控与日志                     | 支持监控概览、日志分页筛选与导出                                | `/api/admin/monitor/overview`、`/api/admin/logs/*`      | 系统监控页、操作日志页           | `operation_log`                                                                |
+| 平台沟通反馈闭环                   | 支持反馈提交、处理、回复、统计、批量处理与导出                  | `/api/feedback/*`、`/api/admin/feedback/*`              | 反馈通道页、管理员反馈页         | `feedback_message`                                                             |
+| 患者周报/月报风险趋势              | 支持按天聚合的风险趋势（平均风险分+预警数）                     | `/api/patient/reports/summary` 返回 `riskTrend`         | 患者周报/月报页风险趋势图        | 场景8/10联动验证                                                               |
 
 ## 二、关键非功能要求对照
 
-| 报告要求 | 实现现状 | 证据 |
-|---|---|---|
-| 安全与权限控制 | 已实现 JWT 鉴权、按角色路由隔离（ADMIN/DOCTOR/PATIENT） | `SecurityConfig`、`JwtAuthenticationFilter` |
-| 异常处理与错误码规范 | 已实现统一异常出口与错误码分层（400/401/403/404/409/500） | `ErrorCode`、`BusinessException`、`GlobalExceptionHandler`、`docs/error_code_matrix.md` |
-| 同账号互斥登录 | 已实现 loginVersion 令牌版本机制，旧 token 自动失效 | 认证服务与过滤器实现，核心场景5 |
-| 不同账号互不影响 | 已验证管理员与医生并发登录独立有效 | 核心场景6 |
-| 团队协作可扩展性 | 已实现“群组创建者 + 协作医生”共享患者管理与洞察访问 | `doctor_group_doctor_member`、`/api/doctor/groups/{id}/doctors` |
-| 风险分层能力 | 已实现 `riskScore(0-100)` 与 `riskLevel`，并支持风险优先排序/筛选 | `HealthAlertServiceImpl`、`DoctorAlertsView` |
-| 可扩展性 | 前后端分离 + MyBatis-Plus + Flyway 迁移结构，规则和洞察已模块化扩展 | `db/migration`、service 分层 |
+| 报告要求             | 实现现状                                                            | 证据                                                                                    |
+| -------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| 安全与权限控制       | 已实现 JWT 鉴权、按角色路由隔离（ADMIN/DOCTOR/PATIENT）             | `SecurityConfig`、`JwtAuthenticationFilter`                                             |
+| 异常处理与错误码规范 | 已实现统一异常出口与错误码分层（400/401/403/404/409/500）           | `ErrorCode`、`BusinessException`、`GlobalExceptionHandler`、`docs/error_code_matrix.md` |
+| 同账号互斥登录       | 已实现 loginVersion 令牌版本机制，旧 token 自动失效                 | 认证服务与过滤器实现，核心场景5                                                         |
+| 不同账号互不影响     | 已验证管理员与医生并发登录独立有效                                  | 核心场景6                                                                               |
+| 团队协作可扩展性     | 已实现“群组创建者 + 协作医生”共享患者管理与洞察访问                 | `doctor_group_doctor_member`、`/api/doctor/groups/{id}/doctors`                         |
+| 风险分层能力         | 已实现 `riskScore(0-100)` 与 `riskLevel`，并支持风险优先排序/筛选   | `HealthAlertServiceImpl`、`DoctorAlertsView`                                            |
+| 可扩展性             | 前后端分离 + MyBatis-Plus + Flyway 迁移结构，规则和洞察已模块化扩展 | `db/migration`、service 分层                                                            |
 
 ## 三、核心验收脚本覆盖矩阵
 
-| 场景 | 脚本标签 | 结论口径 |
-|---|---|---|
-| 场景1 患者上报闭环 | CASE-1 | 登录、上报、列表查询成功 |
-| 场景2 异常预警 | CASE-2 | 异常上报成功，医生可见预警 |
-| 场景3 医生群组管理 | CASE-3 | 群组创建、加患者、查成员成功 |
-| 场景4 角色权限管理 | CASE-4 | 角色查询与更新成功 |
-| 场景5 同账号踢旧 | CASE-5 | 旧 token 401，新 token 200 |
-| 场景6 不同账号不互踢 | CASE-6 | 两端接口均 200 |
-| 新增场景7 规则管理 | CASE-7 | 规则列表与更新成功 |
-| 新增场景8 医生患者洞察 | CASE-8 | 洞察接口 200 且返回趋势/预警 |
-| 新增场景10 医生风险筛选 | CASE-10 | 高风险筛选与风险排序正确 |
+| 场景                    | 脚本标签 | 结论口径                                     |
+| ----------------------- | -------- | -------------------------------------------- |
+| 场景1 患者上报闭环      | CASE-1   | 登录、上报、列表查询成功                     |
+| 场景2 异常预警          | CASE-2   | 异常上报成功，医生可见预警                   |
+| 场景3 医生群组管理      | CASE-3   | 群组创建、加患者、查成员成功                 |
+| 场景4 角色权限管理      | CASE-4   | 角色查询与更新成功                           |
+| 场景5 同账号踢旧        | CASE-5   | 旧 token 401，新 token 200                   |
+| 场景6 不同账号不互踢    | CASE-6   | 两端接口均 200                               |
+| 新增场景7 规则管理      | CASE-7   | 规则列表与更新成功                           |
+| 新增场景8 医生患者洞察  | CASE-8   | 洞察接口 200 且返回趋势/预警                 |
+| 新增场景10 医生风险筛选 | CASE-10  | 高风险筛选与风险排序正确                     |
+| 新增场景11 团队隔离验证 | CASE-11  | 医生仅可访问团队内患者预警，越权处理返回 403 |
 
 ## 四、CI 与测试证据补充（2026-03-13）
 
-| 证据类型 | 结果 | 证据编号 |
-|---|---|---|
-| quality-gate 门禁 | 成功 | run `23041157624` |
-| 服务层单测 | 成功 | `HealthAlertServiceImplTest`（风险评分相关） |
-| 协作管理单测 | 成功 | `DoctorGroupServiceImplTest` |
-| 控制器参数契约单测 | 成功 | `DoctorControllerTest` |
-| 安全错误码集成测试 | 成功 | `SecurityErrorCodeIntegrationTest` |
+| 证据类型           | 结果 | 证据编号                                     |
+| ------------------ | ---- | -------------------------------------------- |
+| quality-gate 门禁  | 成功 | run `23041157624`                            |
+| 服务层单测         | 成功 | `HealthAlertServiceImplTest`（风险评分相关） |
+| 协作管理单测       | 成功 | `DoctorGroupServiceImplTest`                 |
+| 控制器参数契约单测 | 成功 | `DoctorControllerTest`                       |
+| 安全错误码集成测试 | 成功 | `SecurityErrorCodeIntegrationTest`           |
 
 ## 五、当前结论（可写入报告）
+
 - 系统已形成“患者上报-规则评估-医生干预-管理员治理”闭环。
 - 报告中提出的三端功能与关键技术路线已落地，并具备可回归的接口验收脚本。
 - 在原有基础上已补齐“协作医生共享群组”和“风险评分/风险趋势可视化”，系统满足报告要求且证据链完整。

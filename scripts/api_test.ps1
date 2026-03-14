@@ -8,6 +8,7 @@ param(
   [string]$AdminPass = "123456",
   [string]$DoctorUser = "doctor_demo_01",
   [string]$DoctorPass = "123456",
+  [string]$RunTag = "",
   [switch]$AssertOnly
 )
 
@@ -105,8 +106,43 @@ function Get-Token($resp) {
   return [string]$resp.data.token
 }
 
+function Ensure-AdminManagedUser([string]$AdminToken, [string]$Username, [string]$RoleType, [string]$Name, [string]$Phone, [string]$Password = "123456") {
+  if (-not $AdminToken) { return }
+  $createBody = @{ username = $Username; password = $Password; phone = $Phone; name = $Name; roleType = $RoleType; status = 1 }
+  [void](Invoke-ApiPostRaw "/admin/user" $createBody $AdminToken)
+}
+
+function Get-AdminUserByUsername([string]$AdminToken, [string]$Username) {
+  if (-not $AdminToken) { return $null }
+  try {
+    $resp = Invoke-RestMethod -Method Get -Uri ("$BaseUrl/admin/user?keyword=$Username") -Headers @{ "Authorization" = "Bearer $AdminToken" }
+    if ($resp -and $resp.data) {
+      return $resp.data | Where-Object { $_.username -eq $Username } | Select-Object -First 1
+    }
+  } catch {
+    return $null
+  }
+  return $null
+}
+
 Write-Host "[INFO] BASE_URL=$BaseUrl"
 Write-Host "[INFO] ASSERT_ONLY=$($AssertOnly.IsPresent)"
+if (-not $RunTag) {
+  $RunTag = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds().ToString()
+}
+$safeRunTag = ($RunTag -replace '[^a-zA-Z0-9]', '').ToLower()
+if (-not $safeRunTag) {
+  $safeRunTag = "run"
+}
+if ($safeRunTag.Length -gt 16) {
+  $safeRunTag = $safeRunTag.Substring(0, 16)
+}
+$tagNum = [Math]::Abs($safeRunTag.GetHashCode()) % 100000000
+$doctorScopeUser = "doctor_scope_b_$safeRunTag"
+$patientScopeUser = "patient_scope_b_$safeRunTag"
+$doctorScopePhone = "138{0:D8}" -f $tagNum
+$patientScopePhone = "139{0:D8}" -f (($tagNum + 1) % 100000000)
+Write-Host "[INFO] RUN_TAG=$safeRunTag"
 $indicatorBloodPressure = [string]([char]0x8840) + [char]0x538b
 
 $doctorToken2 = ""
@@ -148,6 +184,7 @@ if (-not $AssertOnly) {
   Write-Title "CASE-2 patient abnormal report -> doctor alerts"
   $adminLogin = Invoke-ApiPost "/auth/login" @{ username = $AdminUser; password = $AdminPass }
   $adminToken = Get-Token $adminLogin
+  Ensure-AdminManagedUser $adminToken $DoctorUser "DOCTOR" "doctor demo" "13800006666"
   $doctorLogin = Invoke-ApiPost "/auth/login" @{ username = $DoctorUser; password = $DoctorPass }
   $doctorToken = Get-Token $doctorLogin
   if (-not $adminToken) {
@@ -273,8 +310,102 @@ if (-not $AssertOnly) {
   } else {
     Write-Host "[WARN] doctor token or patient id missing, skip CASE-8"
   }
+
+  Write-Title "CASE-10 doctor risk filter and sort"
+  if ($doctorToken2) {
+    $riskRes = Invoke-ApiGetRaw "/doctor/alerts?riskLevel=HIGH&minRiskScore=80&sortBy=risk_desc" $doctorToken2
+    Write-Host "[CASE-10] status=$($riskRes.status)"
+    Write-Host "[CASE-10-BODY] $($riskRes.body)"
+    $case10Ok = $false
+    try {
+      $riskObj = $riskRes.body | ConvertFrom-Json
+      $riskList = @($riskObj.data)
+      $allMatch = $true
+      $prev = 101
+      foreach ($item in $riskList) {
+        $level = [string]$item.riskLevel
+        $score = [int]$item.riskScore
+        if ($level -ne "HIGH" -or $score -lt 80 -or $score -gt $prev) {
+          $allMatch = $false
+          break
+        }
+        $prev = $score
+      }
+      $case10Ok = ($riskRes.status -eq 200 -and $allMatch)
+    } catch {
+      $case10Ok = $false
+    }
+    Assert-Equal "CASE-10 filter-sort pass" "True" ([string]$case10Ok)
+  } else {
+    Write-Host "[WARN] doctor token missing, skip CASE-10"
+  }
+
+  Write-Title "CASE-11 doctor scope isolation"
+  if ($adminToken2 -and $doctorToken2) {
+    $doctorBUser = $doctorScopeUser
+    $patientBUser = $patientScopeUser
+    Ensure-AdminManagedUser $adminToken2 $doctorBUser "DOCTOR" "doctor scope b" $doctorScopePhone
+    Ensure-AdminManagedUser $adminToken2 $patientBUser "PATIENT" "patient scope b" $patientScopePhone
+
+    $doctorB = Get-AdminUserByUsername $adminToken2 $doctorBUser
+    $patientB = Get-AdminUserByUsername $adminToken2 $patientBUser
+    $doctorBLogin = Invoke-ApiPost "/auth/login" @{ username = $doctorBUser; password = "123456" }
+    $doctorBToken = Get-Token $doctorBLogin
+    $patientBLogin = Invoke-ApiPost "/auth/login" @{ username = $patientBUser; password = "123456" }
+    $patientBToken = Get-Token $patientBLogin
+
+    if ($doctorB -and $patientB -and $doctorBToken -and $patientBToken) {
+      $groupNameB = "scope_b_group_$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
+      [void](Invoke-ApiPost "/doctor/groups" @{ groupName = $groupNameB; description = "scope b" } $doctorBToken)
+      $groupListB = Invoke-RestMethod -Method Get -Uri ("$BaseUrl/doctor/groups") -Headers @{ "Authorization" = "Bearer $doctorBToken" }
+      $groupB = $null
+      if ($groupListB -and $groupListB.data) {
+        $groupB = $groupListB.data | Where-Object { $_.groupName -eq $groupNameB } | Select-Object -First 1
+      }
+
+      if ($groupB) {
+        [void](Invoke-ApiPost "/doctor/groups/$($groupB.id)/patients" @{ patientUserId = [int64]$patientB.id } $doctorBToken)
+        $alertPayloadB = '{"indicatorType":"\u8840\u538b","value":"190/120","remark":"scope case"}'
+        [void](Invoke-RestMethod -Method Post -Uri ("$BaseUrl/patient/data") -Headers @{ "Content-Type" = "application/json; charset=utf-8"; "Authorization" = "Bearer $patientBToken" } -Body $alertPayloadB)
+
+        $doctorBAlertsRaw = Invoke-ApiGetRaw "/doctor/alerts" $doctorBToken
+        $targetAlertId = $null
+        try {
+          $doctorBAlertsObj = $doctorBAlertsRaw.body | ConvertFrom-Json
+          $target = @($doctorBAlertsObj.data) | Where-Object { [int64]$_.userId -eq [int64]$patientB.id } | Select-Object -First 1
+          if ($target) { $targetAlertId = [int64]$target.id }
+        } catch {
+          $targetAlertId = $null
+        }
+
+        $doctorAAlertsRaw = Invoke-ApiGetRaw "/doctor/alerts" $doctorToken2
+        $containsForeignPatient = $false
+        try {
+          $doctorAAlertsObj = $doctorAAlertsRaw.body | ConvertFrom-Json
+          $containsForeignPatient = (@($doctorAAlertsObj.data) | Where-Object { [int64]$_.userId -eq [int64]$patientB.id }).Count -gt 0
+        } catch {
+          $containsForeignPatient = $true
+        }
+        Assert-Equal "CASE-11 list isolation" "False" ([string]$containsForeignPatient)
+
+        if ($targetAlertId) {
+          $forbiddenHandle = Invoke-ApiPostRaw "/doctor/alerts/$targetAlertId/handle" @{ handleRemark = "out-of-scope test" } $doctorToken2
+          $forbiddenCode = Get-BodyCode $forbiddenHandle.body
+          Assert-Equal "CASE-11 forbidden handle" "403" $forbiddenCode
+        } else {
+          Write-Host "[WARN] cannot locate scope-B alert, skip CASE-11 handle assertion"
+        }
+      } else {
+        Write-Host "[WARN] scope-B group not found, skip CASE-11"
+      }
+    } else {
+      Write-Host "[WARN] scope-B accounts/token unavailable, skip CASE-11"
+    }
+  } else {
+    Write-Host "[WARN] admin or doctor token missing, skip CASE-11"
+  }
 } else {
-  Write-Host "[INFO] assert-only mode enabled, skip CASE-1..CASE-8"
+  Write-Host "[INFO] assert-only mode enabled, skip CASE-1..CASE-11"
 }
 
 Write-Title "CASE-9 error-code assertions (400/401/403/404/409)"

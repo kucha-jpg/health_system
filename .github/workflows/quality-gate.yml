@@ -51,7 +51,7 @@ jobs:
         uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
           cache: maven
 
       - name: Backend critical integration tests
@@ -68,6 +68,11 @@ jobs:
       - name: Shell script lint gate
         run: |
           shellcheck -S error scripts/api_test.sh scripts/api_assert.sh
+
+      - name: API full regression gate
+        run: |
+          chmod +x ./scripts/api_test.sh
+          BASE_URL=http://127.0.0.1:9090/api ./scripts/api_test.sh
 
       - name: API error-code assertions gate
         run: |

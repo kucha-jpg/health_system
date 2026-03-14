@@ -13,6 +13,18 @@ ADMIN_USER="${ADMIN_USER:-admin}"
 ADMIN_PASS="${ADMIN_PASS:-123456}"
 DOCTOR_USER="${DOCTOR_USER:-doctor_demo_01}"
 DOCTOR_PASS="${DOCTOR_PASS:-123456}"
+RUN_TAG="${RUN_TAG:-$(date +%s)}"
+
+RUN_TAG_SAFE=$(printf "%s" "$RUN_TAG" | tr -cd '[:alnum:]' | tr '[:upper:]' '[:lower:]')
+if [[ -z "$RUN_TAG_SAFE" ]]; then
+  RUN_TAG_SAFE="run"
+fi
+RUN_TAG_SAFE="${RUN_TAG_SAFE:0:16}"
+TAG_NUM=$(printf "%s" "$RUN_TAG_SAFE" | cksum | awk '{print $1}')
+DOCTOR_SCOPE_USER="doctor_scope_b_${RUN_TAG_SAFE}"
+PATIENT_SCOPE_USER="patient_scope_b_${RUN_TAG_SAFE}"
+DOCTOR_SCOPE_PHONE=$(printf "138%08d" $((TAG_NUM % 100000000)))
+PATIENT_SCOPE_PHONE=$(printf "139%08d" $(((TAG_NUM + 1) % 100000000)))
 
 PYTHON_BIN="python3"
 if ! command -v "$PYTHON_BIN" >/dev/null 2>&1; then
@@ -21,6 +33,7 @@ fi
 
 echo "[INFO] BASE_URL=${BASE_URL}"
 echo "[INFO] ASSERT_ONLY=${ASSERT_ONLY}"
+echo "[INFO] RUN_TAG=${RUN_TAG_SAFE}"
 
 PATIENT_TOKEN=""
 PATIENT_USER_ID=""
@@ -92,6 +105,34 @@ except Exception:
     print("")'
 }
 
+ensure_admin_managed_user() {
+  local admin_token="$1"
+  local username="$2"
+  local role_type="$3"
+  local name="$4"
+  local phone="$5"
+  local password="${6:-123456}"
+  [[ -z "$admin_token" ]] && return 0
+  post_json "/admin/user" "{\"username\":\"${username}\",\"password\":\"${password}\",\"phone\":\"${phone}\",\"name\":\"${name}\",\"roleType\":\"${role_type}\",\"status\":1}" "$admin_token" >/dev/null || true
+}
+
+get_admin_user_id_by_username() {
+  local admin_token="$1"
+  local username="$2"
+  [[ -z "$admin_token" ]] && { echo ""; return 0; }
+  local raw
+  raw=$(curl -sS -H "Authorization: Bearer ${admin_token}" "${BASE_URL}/admin/user?keyword=${username}")
+  echo "$raw" | TARGET_USER="$username" "$PYTHON_BIN" -c 'import json,sys,os
+u=os.environ.get("TARGET_USER","")
+raw=sys.stdin.read()
+try:
+    arr=json.loads(raw).get("data",[])
+    target=next((x for x in arr if x.get("username")==u), None)
+    print(target.get("id") if target else "")
+except Exception:
+    print("")'
+}
+
 if [[ "${ASSERT_ONLY}" != "1" ]]; then
   echo "\n[CASE-1] 患者注册 -> 登录 -> 上报血压 -> 查看数据"
   REGISTER_RESP=$(post_json "/auth/register" "{\"username\":\"${PATIENT_USER}\",\"password\":\"${PATIENT_PASS}\",\"phone\":\"${PATIENT_PHONE}\",\"name\":\"${PATIENT_NAME}\"}")
@@ -113,6 +154,7 @@ if [[ "${ASSERT_ONLY}" != "1" ]]; then
   echo "\n[CASE-2] 患者上报异常指标 -> 医生收到预警"
   ADMIN_LOGIN=$(post_json "/auth/login" "{\"username\":\"${ADMIN_USER}\",\"password\":\"${ADMIN_PASS}\"}")
   ADMIN_TOKEN=$(echo "$ADMIN_LOGIN" | extract_token)
+  ensure_admin_managed_user "$ADMIN_TOKEN" "$DOCTOR_USER" "DOCTOR" "doctor demo" "13800006666"
   DOCTOR_LOGIN=$(post_json "/auth/login" "{\"username\":\"${DOCTOR_USER}\",\"password\":\"${DOCTOR_PASS}\"}")
   DOCTOR_TOKEN=$(echo "$DOCTOR_LOGIN" | extract_token)
   if [[ -z "$ADMIN_TOKEN" ]]; then
@@ -215,8 +257,110 @@ if [[ "${ASSERT_ONLY}" != "1" ]]; then
   else
     echo "[WARN] 缺少 DOCTOR_TOKEN_2 或 PATIENT_USER_ID，CASE-8 部分跳过。"
   fi
+
+  echo "\n[CASE-10] 医生按风险筛选与排序"
+  if [[ -n "$DOCTOR_TOKEN_2" ]]; then
+    CASE10_RAW=$(curl -sS -H "Authorization: Bearer ${DOCTOR_TOKEN_2}" "${BASE_URL}/doctor/alerts?riskLevel=HIGH&minRiskScore=80&sortBy=risk_desc")
+    echo "[CASE-10-BODY] ${CASE10_RAW}"
+    CASE10_OK=$(echo "$CASE10_RAW" | "$PYTHON_BIN" -c 'import json,sys
+raw=sys.stdin.read()
+try:
+    obj=json.loads(raw)
+    if obj.get("code") != 200:
+        print("False")
+        raise SystemExit
+    arr=obj.get("data",[]) or []
+    prev=10**9
+    ok=True
+    for it in arr:
+        lv=(it.get("riskLevel") or "")
+        sc=int(it.get("riskScore") or 0)
+        if lv != "HIGH" or sc < 80 or sc > prev:
+            ok=False
+            break
+        prev=sc
+    print("True" if ok else "False")
+except Exception:
+    print("False")')
+    assert_equal "CASE-10 filter-sort pass" "True" "$CASE10_OK"
+  else
+    echo "[WARN] 缺少 DOCTOR_TOKEN_2，跳过 CASE-10"
+  fi
+
+  echo "\n[CASE-11] 医生团队隔离与越权处理"
+  if [[ -n "$ADMIN_TOKEN" && -n "$DOCTOR_TOKEN_2" ]]; then
+    DOCTOR_B_USER="$DOCTOR_SCOPE_USER"
+    PATIENT_B_USER="$PATIENT_SCOPE_USER"
+    ensure_admin_managed_user "$ADMIN_TOKEN" "$DOCTOR_B_USER" "DOCTOR" "doctor scope b" "$DOCTOR_SCOPE_PHONE"
+    ensure_admin_managed_user "$ADMIN_TOKEN" "$PATIENT_B_USER" "PATIENT" "patient scope b" "$PATIENT_SCOPE_PHONE"
+
+    DOCTOR_B_ID=$(get_admin_user_id_by_username "$ADMIN_TOKEN" "$DOCTOR_B_USER")
+    PATIENT_B_ID=$(get_admin_user_id_by_username "$ADMIN_TOKEN" "$PATIENT_B_USER")
+
+    DOCTOR_B_LOGIN=$(post_json "/auth/login" "{\"username\":\"${DOCTOR_B_USER}\",\"password\":\"123456\"}")
+    DOCTOR_B_TOKEN=$(echo "$DOCTOR_B_LOGIN" | extract_token)
+    PATIENT_B_LOGIN=$(post_json "/auth/login" "{\"username\":\"${PATIENT_B_USER}\",\"password\":\"123456\"}")
+    PATIENT_B_TOKEN=$(echo "$PATIENT_B_LOGIN" | extract_token)
+
+    if [[ -n "$DOCTOR_B_ID" && -n "$PATIENT_B_ID" && -n "$DOCTOR_B_TOKEN" && -n "$PATIENT_B_TOKEN" ]]; then
+      GROUP_NAME_B="scope_b_group_$(date +%s)"
+      post_json "/doctor/groups" "{\"groupName\":\"${GROUP_NAME_B}\",\"description\":\"scope b\"}" "$DOCTOR_B_TOKEN" >/dev/null || true
+      GROUP_LIST_B=$(curl -sS -H "Authorization: Bearer ${DOCTOR_B_TOKEN}" "${BASE_URL}/doctor/groups")
+      GROUP_B_ID=$(echo "$GROUP_LIST_B" | GROUP_NAME="$GROUP_NAME_B" "$PYTHON_BIN" -c 'import json,sys,os
+name=os.environ.get("GROUP_NAME", "")
+raw=sys.stdin.read()
+try:
+    arr=json.loads(raw).get("data",[])
+    target=next((x for x in arr if x.get("groupName")==name), None)
+    print(target.get("id") if target else "")
+except Exception:
+    print("")')
+
+      if [[ -n "$GROUP_B_ID" ]]; then
+        post_json "/doctor/groups/${GROUP_B_ID}/patients" "{\"patientUserId\":${PATIENT_B_ID}}" "$DOCTOR_B_TOKEN" >/dev/null || true
+        post_json "/patient/data" '{"indicatorType":"血压","value":"190/120","remark":"scope case"}' "$PATIENT_B_TOKEN" >/dev/null || true
+
+        DOCTOR_B_ALERTS=$(curl -sS -H "Authorization: Bearer ${DOCTOR_B_TOKEN}" "${BASE_URL}/doctor/alerts")
+        TARGET_ALERT_ID=$(echo "$DOCTOR_B_ALERTS" | TARGET_UID="$PATIENT_B_ID" "$PYTHON_BIN" -c 'import json,sys,os
+uid=int(os.environ.get("TARGET_UID","0") or 0)
+raw=sys.stdin.read()
+try:
+    arr=json.loads(raw).get("data",[])
+    target=next((x for x in arr if int(x.get("userId") or 0)==uid), None)
+    print(target.get("id") if target else "")
+except Exception:
+    print("")')
+
+        DOCTOR_A_ALERTS=$(curl -sS -H "Authorization: Bearer ${DOCTOR_TOKEN_2}" "${BASE_URL}/doctor/alerts")
+        CASE11_LIST_OK=$(echo "$DOCTOR_A_ALERTS" | TARGET_UID="$PATIENT_B_ID" "$PYTHON_BIN" -c 'import json,sys,os
+uid=int(os.environ.get("TARGET_UID","0") or 0)
+raw=sys.stdin.read()
+try:
+    arr=json.loads(raw).get("data",[])
+    contains=any(int(x.get("userId") or 0)==uid for x in arr)
+    print("False" if contains else "True")
+except Exception:
+    print("False")')
+        assert_equal "CASE-11 list isolation" "True" "$CASE11_LIST_OK"
+
+        if [[ -n "$TARGET_ALERT_ID" ]]; then
+          FORBIDDEN_RAW=$(post_json "/doctor/alerts/${TARGET_ALERT_ID}/handle" '{"handleRemark":"out-of-scope test"}' "$DOCTOR_TOKEN_2")
+          FORBIDDEN_CODE=$(echo "$FORBIDDEN_RAW" | extract_code)
+          assert_equal "CASE-11 forbidden handle" "403" "$FORBIDDEN_CODE"
+        else
+          echo "[WARN] 未找到 scope-B 预警，跳过 CASE-11 越权处理断言"
+        fi
+      else
+        echo "[WARN] 未找到 scope-B 群组，跳过 CASE-11"
+      fi
+    else
+      echo "[WARN] scope-B 账号或 token 不完整，跳过 CASE-11"
+    fi
+  else
+    echo "[WARN] 缺少 ADMIN_TOKEN 或 DOCTOR_TOKEN_2，跳过 CASE-11"
+  fi
 else
-  echo "[INFO] assert-only mode enabled, skip CASE-1..CASE-8"
+  echo "[INFO] assert-only mode enabled, skip CASE-1..CASE-11"
 fi
 
 echo "\n[CASE-9] 错误码断言（400/401/403/404/409）"
