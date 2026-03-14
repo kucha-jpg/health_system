@@ -103,6 +103,8 @@ class FlywayMigrationIntegrationTest {
                 .locations("classpath:db/migration")
                 .baselineVersion(MigrationVersion.fromVersion("10"))
                 .baselineOnMigrate(true)
+                // This regression test only verifies V11/V12 feedback reply column migrations.
+                .target(MigrationVersion.fromVersion("12"))
                 .load();
     }
 
