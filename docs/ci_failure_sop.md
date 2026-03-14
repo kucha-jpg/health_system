@@ -98,6 +98,13 @@ git push origin main
 - CI 门禁顺序：
   - 先关键测试（`SecurityErrorCodeIntegrationTest`、`FlywayMigrationIntegrationTest`）再全量测试。
   - 脚本门禁顺序：先 `api_test.sh`（场景1-11）再 `api_assert.sh`（错误码断言）。
+- API 回归脚本内联 Python 缩进异常：
+  - 典型症状：`backend-and-api-gate` 在 `API full regression gate` 失败，日志出现 `IndentationError: unexpected indent`。
+  - 快速定位：在 `scripts/api_test.sh` 搜索 `"$PYTHON_BIN" -c 'import`，检查内联 Python 是否有顶层多余空格。
+  - 修复要点：
+    - 顶层语句必须左对齐（函数体内语句才缩进）。
+    - 请求参数中的中文值建议 URL 编码（例如 `indicator_type=%E8%A1%80%E5%8E%8B`），避免 400 干扰排障。
+  - 已验证样例：run `23085915196` 失败 -> 修复后 run `23086231786` 成功。
 
 ## 5. 退出条件
 
