@@ -39,7 +39,14 @@
     </aside>
     <main class="main-content">
       <div class="topbar">
-        <span>{{ name }}（{{ role }}）</span>
+        <div class="topbar-left">
+          <el-button v-if="!isHome" size="small" plain @click="goBack">返回</el-button>
+          <span v-else class="topbar-back-spacer" aria-hidden="true"></span>
+          <span class="topbar-user">
+            <span>👤</span>
+            <span>{{ name }}（{{ role }}）</span>
+          </span>
+        </div>
         <el-button size="small" @click="logout">退出</el-button>
       </div>
       <router-view />
@@ -48,18 +55,20 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { authStore } from '../stores/auth'
 import { getPendingFeedbackCountApi, getUnreadFeedbackCountApi, validateSessionApi } from '../api/modules'
 
 const router = useRouter()
+const route = useRoute()
 const role = authStore.role
 const name = authStore.name || '用户'
 let sessionTimer = null
 let feedbackTimer = null
 const pendingFeedbackCount = ref(0)
 const unreadFeedbackCount = ref(0)
+const isHome = computed(() => route.path === '/home')
 
 const checkSession = async () => {
   if (!authStore.token) return
@@ -84,6 +93,14 @@ const handleVisibilityChange = () => {
 const logout = () => {
   authStore.clear()
   router.push('/login')
+}
+
+const goBack = () => {
+  if (window.history.length > 1) {
+    router.back()
+    return
+  }
+  router.push('/home')
 }
 
 const loadPendingFeedbackCount = async () => {

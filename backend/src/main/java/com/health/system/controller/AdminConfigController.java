@@ -14,10 +14,13 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.health.system.common.ApiResponse;
 import com.health.system.dto.AlertRuleDTO;
+import com.health.system.dto.HealthIndicatorTypeDTO;
 import com.health.system.dto.SystemNoticeDTO;
 import com.health.system.entity.AlertRule;
+import com.health.system.entity.HealthIndicatorType;
 import com.health.system.entity.SystemNotice;
 import com.health.system.service.AlertRuleService;
+import com.health.system.service.HealthIndicatorTypeService;
 import com.health.system.service.SystemNoticeService;
 
 import jakarta.validation.Valid;
@@ -28,10 +31,14 @@ public class AdminConfigController {
 
     private final SystemNoticeService systemNoticeService;
     private final AlertRuleService alertRuleService;
+    private final HealthIndicatorTypeService healthIndicatorTypeService;
 
-    public AdminConfigController(SystemNoticeService systemNoticeService, AlertRuleService alertRuleService) {
+    public AdminConfigController(SystemNoticeService systemNoticeService,
+                                 AlertRuleService alertRuleService,
+                                 HealthIndicatorTypeService healthIndicatorTypeService) {
         this.systemNoticeService = systemNoticeService;
         this.alertRuleService = alertRuleService;
+        this.healthIndicatorTypeService = healthIndicatorTypeService;
     }
 
     @GetMapping("/notices")
@@ -73,6 +80,24 @@ public class AdminConfigController {
     @PutMapping("/alert-rules")
     public ApiResponse<Void> updateRule(@Valid @RequestBody AlertRuleDTO dto) {
         alertRuleService.updateRule(dto);
+        return ApiResponse.success("更新成功", null);
+    }
+
+    @GetMapping("/indicator-types")
+    public ApiResponse<List<HealthIndicatorType>> listIndicatorTypes(
+            @RequestParam(defaultValue = "true") boolean includeDisabled) {
+        return ApiResponse.success(healthIndicatorTypeService.listTypes(includeDisabled));
+    }
+
+    @PostMapping("/indicator-types")
+    public ApiResponse<Void> createIndicatorType(@Valid @RequestBody HealthIndicatorTypeDTO dto) {
+        healthIndicatorTypeService.createType(dto);
+        return ApiResponse.success("创建成功", null);
+    }
+
+    @PutMapping("/indicator-types")
+    public ApiResponse<Void> updateIndicatorType(@Valid @RequestBody HealthIndicatorTypeDTO dto) {
+        healthIndicatorTypeService.updateType(dto);
         return ApiResponse.success("更新成功", null);
     }
 }

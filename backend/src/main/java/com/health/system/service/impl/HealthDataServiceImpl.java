@@ -9,6 +9,7 @@ import com.health.system.mapper.HealthDataMapper;
 import com.health.system.mapper.UserMapper;
 import com.health.system.service.HealthAlertService;
 import com.health.system.service.HealthDataService;
+import com.health.system.service.HealthIndicatorTypeService;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -22,11 +23,16 @@ public class HealthDataServiceImpl implements HealthDataService {
     private final HealthDataMapper healthDataMapper;
     private final UserMapper userMapper;
     private final HealthAlertService healthAlertService;
+    private final HealthIndicatorTypeService healthIndicatorTypeService;
 
-    public HealthDataServiceImpl(HealthDataMapper healthDataMapper, UserMapper userMapper, HealthAlertService healthAlertService) {
+    public HealthDataServiceImpl(HealthDataMapper healthDataMapper,
+                                 UserMapper userMapper,
+                                 HealthAlertService healthAlertService,
+                                 HealthIndicatorTypeService healthIndicatorTypeService) {
         this.healthDataMapper = healthDataMapper;
         this.userMapper = userMapper;
         this.healthAlertService = healthAlertService;
+        this.healthIndicatorTypeService = healthIndicatorTypeService;
     }
 
     @Override
@@ -102,6 +108,9 @@ public class HealthDataServiceImpl implements HealthDataService {
         if (!StringUtils.hasText(indicatorType) || !StringUtils.hasText(value)) {
             throw BusinessException.badRequest("指标类型和值不能为空");
         }
+        if (!healthIndicatorTypeService.isEnabledType(indicatorType)) {
+            throw BusinessException.badRequest("指标类型未启用或不存在");
+        }
         switch (indicatorType) {
             case "血压" -> {
                 if (!value.matches("^[1-9]\\d{1,2}/[1-9]\\d{1,2}$")) {
@@ -125,7 +134,9 @@ public class HealthDataServiceImpl implements HealthDataService {
                     throw BusinessException.badRequest("服药值仅支持 已服药/未服药/1/0");
                 }
             }
-            default -> throw BusinessException.badRequest("不支持的指标类型");
+            default -> {
+                // Extensible indicator types can be configured by admin and use relaxed value validation.
+            }
         }
     }
 

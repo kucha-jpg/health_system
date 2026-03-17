@@ -114,6 +114,29 @@
   - 列表接口返回 `code=200` 且不包含 B 团队患者预警。
   - 处理越权预警时返回 `code=403`。
 
+  ### 场景12：健康指标类型配置联动校验
+
+  - 前置条件：管理员账号可登录，患者账号可登录。
+  - 步骤：
+    1. 管理员调用 `GET /api/admin/config/indicator-types?includeDisabled=true` 获取指标列表。
+    2. 管理员调用 `PUT /api/admin/config/indicator-types` 将某个指标 `enabled` 设为 `0`。
+    3. 患者调用 `POST /api/patient/data` 使用该禁用指标上报。
+    4. 管理员调用 `PUT /api/admin/config/indicator-types` 将该指标恢复 `enabled=1`。
+  - 预期结果：
+    - 步骤2更新成功，返回 `code=200`。
+    - 步骤3业务返回 `code=400`，提示“指标类型未启用或不存在”。
+    - 步骤4恢复成功，避免影响后续用例。
+
+  ### 场景13：血压连续3天高阈值主动预警
+
+  - 前置条件：患者账号可登录，医生对该患者有访问权限。
+  - 步骤：
+    1. 患者连续3天上报中风险以上血压（如 `150/95`，分别写入当天、前1天、前2天时间点）。
+    2. 查询 `GET /api/doctor/alerts` 或数据库 `health_alert` 最新记录。
+  - 预期结果：
+    - 生成 `reasonCode=BP_PERSISTENT_HIGH` 的预警记录。
+    - 预警 `riskLevel=MEDIUM`，且风险分高于普通单次中风险预警基线。
+
 ### 场景9：统一错误码断言（400/401/403/404/409）
 
 - 前置条件：管理员、医生、患者账号可登录；脚本可访问后端。
@@ -208,7 +231,13 @@ RUN_TAG=demo01 BASE_URL=http://127.0.0.1:9090/api ./scripts/api_test.sh
 
 说明：`api_test.sh` 与 `api_test.ps1` 已内置错误码断言；断言失败会返回非 0 退出码，便于 CI/批处理拦截。
 
-补充：`api_test.ps1` 与 `api_test.sh` 已覆盖场景1-11（含场景10风险筛选、场景11团队隔离与越权处理403断言）。
+补充：`api_test.ps1` 与 `api_test.sh` 已覆盖场景1-13（含场景10风险筛选、场景11团队隔离与越权处理403断言、场景12指标启停联动、场景13连续3天主动预警）。
+
+排障补充（场景12 常见问题）：
+
+- 若 CASE-12 出现 `401`：优先检查 CASE-5 后是否继续使用旧管理员 token。
+- 若 CASE-12 出现 `500` 且报 `Data too long for column 'indicator_type'`：优先检查临时指标名长度，需保证不超过 `health_data.indicator_type` 的 `VARCHAR(20)` 上限。
+- 跨平台建议：Windows 与 Linux 保持同一临时指标命名策略（短名），避免单平台通过、另一平台失败。
 
 错误码门禁专用脚本：
 

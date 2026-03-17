@@ -1,4 +1,6 @@
-FROM node:20-alpine AS builder
+ARG IMAGE_PREFIX=docker.m.daocloud.io/library/
+
+FROM ${IMAGE_PREFIX}node:20-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
 RUN npm install

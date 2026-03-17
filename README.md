@@ -227,6 +227,24 @@ BASE_URL=http://127.0.0.1:9090/api ./scripts/api_assert.sh
 docker compose up -d --build
 ```
 
+如需切换镜像源，可通过 `IMAGE_PREFIX` 覆盖默认前缀：
+
+```bash
+# Bash: 使用官方 Docker Hub
+IMAGE_PREFIX=docker.io/library/ docker compose up -d --build
+
+# Bash: 使用当前默认加速源（与未设置时一致）
+IMAGE_PREFIX=docker.m.daocloud.io/library/ docker compose up -d --build
+```
+
+```powershell
+# PowerShell: 使用官方 Docker Hub
+$env:IMAGE_PREFIX='docker.io/library/'; docker compose up -d --build
+
+# PowerShell: 使用当前默认加速源（与未设置时一致）
+$env:IMAGE_PREFIX='docker.m.daocloud.io/library/'; docker compose up -d --build
+```
+
 如遇 `open //./pipe/dockerDesktopLinuxEngine` 错误，请先启动 Docker Desktop 再执行上面命令。
 
 访问地址：
@@ -274,6 +292,12 @@ docker compose up -d --build
 ```bash
 docker compose up -d --build
 docker compose ps
+```
+
+也可在验收前指定镜像前缀：
+
+```bash
+IMAGE_PREFIX=docker.m.daocloud.io/library/ docker compose up -d --build
 ```
 
 访问：

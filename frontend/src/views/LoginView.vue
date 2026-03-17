@@ -1,16 +1,25 @@
 <template>
   <div class="login-page">
-    <el-card class="login-card">
-      <h2>健康管理系统登录</h2>
-      <el-form :model="form" @submit.prevent>
-        <el-form-item><el-input v-model="form.username" placeholder="用户名" /></el-form-item>
-        <el-form-item><el-input v-model="form.password" type="password" show-password placeholder="密码" /></el-form-item>
-        <el-button type="primary" class="w-full" @click="onLogin">登录</el-button>
-        <div style="margin-top: 12px; text-align: center">
-          <router-link to="/register">患者注册</router-link>
-        </div>
-      </el-form>
-    </el-card>
+    <div class="auth-stage" :data-auth-caption="copy.caption">
+      <el-card class="login-card auth-panel">
+        <p class="auth-panel-kicker">{{ copy.kicker }}</p>
+        <h2 class="auth-panel-title">{{ copy.title }}</h2>
+        <p class="auth-panel-desc">{{ copy.desc }}</p>
+        <el-form :model="form" class="auth-form" @submit.prevent>
+          <el-form-item>
+            <el-input v-model="form.username" :placeholder="copy.usernamePlaceholder" @keyup.enter="onLogin" />
+          </el-form-item>
+          <el-form-item>
+            <el-input v-model="form.password" type="password" show-password :placeholder="copy.passwordPlaceholder" @keyup.enter="onLogin" />
+          </el-form-item>
+          <el-button type="primary" class="w-full auth-submit" @click="onLogin">{{ copy.submitText }}</el-button>
+          <div class="auth-footer">
+            <span>{{ copy.footerPrefix }}</span>
+            <router-link to="/register">{{ copy.footerLinkText }}</router-link>
+          </div>
+        </el-form>
+      </el-card>
+    </div>
   </div>
 </template>
 
@@ -20,10 +29,12 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { loginApi } from '../api/modules'
 import { authStore } from '../stores/auth'
+import { AUTH_UI_COPY } from '../constants/auth-ui'
 
 const router = useRouter()
 const route = useRoute()
 const form = reactive({ username: '', password: '' })
+const copy = AUTH_UI_COPY.login
 
 const onLogin = async () => {
   const data = await loginApi(form)

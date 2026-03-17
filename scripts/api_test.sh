@@ -3,6 +3,7 @@ set -euo pipefail
 
 ASSERT_FAILED=0
 ASSERT_ONLY="${ASSERT_ONLY:-0}"
+CLEANUP="${CLEANUP:-0}"
 
 BASE_URL="${BASE_URL:-http://127.0.0.1:9090/api}"
 PATIENT_USER="${PATIENT_USER:-patient_test_01}"
@@ -14,6 +15,8 @@ ADMIN_PASS="${ADMIN_PASS:-123456}"
 DOCTOR_USER="${DOCTOR_USER:-doctor_demo_01}"
 DOCTOR_PASS="${DOCTOR_PASS:-123456}"
 RUN_TAG="${RUN_TAG:-$(date +%s)}"
+BP_INDICATOR="血压"
+BP_INDICATOR_ENCODED="%E8%A1%80%E5%8E%8B"
 
 RUN_TAG_SAFE=$(printf "%s" "$RUN_TAG" | tr -cd '[:alnum:]' | tr '[:upper:]' '[:lower:]')
 if [[ -z "$RUN_TAG_SAFE" ]]; then
@@ -33,13 +36,17 @@ fi
 
 echo "[INFO] BASE_URL=${BASE_URL}"
 echo "[INFO] ASSERT_ONLY=${ASSERT_ONLY}"
+echo "[INFO] CLEANUP=${CLEANUP}"
 echo "[INFO] RUN_TAG=${RUN_TAG_SAFE}"
+RUN_MARK="rt_${RUN_TAG_SAFE}"
 
 PATIENT_TOKEN=""
 PATIENT_USER_ID=""
 ADMIN_TOKEN=""
 TOKEN_B=""
 DOCTOR_TOKEN_2=""
+DOCTOR_B_TOKEN=""
+PATIENT_B_TOKEN=""
 
 post_json() {
   local path="$1"
@@ -60,6 +67,16 @@ put_json_raw() {
     curl -sS -X PUT -H "Content-Type: application/json" -H "Authorization: Bearer ${token}" "${BASE_URL}${path}" -d "$payload"
   else
     curl -sS -X PUT -H "Content-Type: application/json" "${BASE_URL}${path}" -d "$payload"
+  fi
+}
+
+delete_raw() {
+  local path="$1"
+  local token="${2:-}"
+  if [[ -n "$token" ]]; then
+    curl -sS -X DELETE -H "Authorization: Bearer ${token}" "${BASE_URL}${path}"
+  else
+    curl -sS -X DELETE "${BASE_URL}${path}"
   fi
 }
 
@@ -105,6 +122,12 @@ except Exception:
     print("")'
 }
 
+url_encode() {
+  "$PYTHON_BIN" -c 'import sys, urllib.parse
+s=sys.stdin.read().strip()
+print(urllib.parse.quote(s, safe=""))'
+}
+
 ensure_admin_managed_user() {
   local admin_token="$1"
   local username="$2"
@@ -133,7 +156,80 @@ except Exception:
     print("")'
 }
 
+cleanup_patient_data_and_alerts() {
+  local patient_token="$1"
+  local doctor_token="$2"
+  local run_mark="$3"
+  local label="$4"
+  [[ -z "$patient_token" ]] && return 0
+
+  local data_raw
+  data_raw=$(curl -sS -H "Authorization: Bearer ${patient_token}" "${BASE_URL}/patient/data?timeRange=month")
+  local data_ids
+  data_ids=$(echo "$data_raw" | RUN_MARK="$run_mark" "$PYTHON_BIN" -c 'import json,sys,os
+mark=os.environ.get("RUN_MARK", "")
+raw=sys.stdin.read()
+try:
+    arr=json.loads(raw).get("data",[]) or []
+    ids=[str(x.get("id")) for x in arr if mark and mark in str(x.get("remark") or "") and x.get("id") is not None]
+    print(" ".join(ids))
+except Exception:
+    print("")')
+
+  if [[ -z "$data_ids" ]]; then
+    echo "[CLEANUP] ${label}: no tagged data found"
+    return 0
+  fi
+
+  for id in $data_ids; do
+    delete_raw "/patient/data/${id}" "$patient_token" >/dev/null || true
+  done
+  echo "[CLEANUP] ${label}: deleted data ids=${data_ids}"
+
+  if [[ -z "$doctor_token" ]]; then
+    return 0
+  fi
+
+  local alerts_raw
+  alerts_raw=$(curl -sS -H "Authorization: Bearer ${doctor_token}" "${BASE_URL}/doctor/alerts")
+  local alert_ids
+  alert_ids=$(echo "$alerts_raw" | DATA_IDS="$data_ids" "$PYTHON_BIN" -c 'import json,sys,os
+raw=sys.stdin.read()
+ids=set((os.environ.get("DATA_IDS","") or "").split())
+try:
+    arr=json.loads(raw).get("data",[]) or []
+    out=[str(x.get("id")) for x in arr if str(x.get("healthDataId")) in ids and str(x.get("status") or "")=="OPEN" and x.get("id") is not None]
+    print(" ".join(out))
+except Exception:
+    print("")')
+
+  for aid in $alert_ids; do
+    post_json "/doctor/alerts/${aid}/handle" '{"handleRemark":"cleanup by api_test.sh"}' "$doctor_token" >/dev/null || true
+  done
+  if [[ -n "$alert_ids" ]]; then
+    echo "[CLEANUP] ${label}: handled alert ids=${alert_ids}"
+  fi
+}
+
 if [[ "${ASSERT_ONLY}" != "1" ]]; then
+  PRE_ADMIN_LOGIN=$(post_json "/auth/login" "{\"username\":\"${ADMIN_USER}\",\"password\":\"${ADMIN_PASS}\"}" || true)
+  PRE_ADMIN_TOKEN=$(echo "$PRE_ADMIN_LOGIN" | extract_token)
+  if [[ -n "$PRE_ADMIN_TOKEN" ]]; then
+    PRE_RULES=$(curl -sS -H "Authorization: Bearer ${PRE_ADMIN_TOKEN}" "${BASE_URL}/admin/config/alert-rules" || true)
+    BP_FROM_RULE=$(echo "$PRE_RULES" | "$PYTHON_BIN" -c 'import json,sys
+raw=sys.stdin.read()
+try:
+    arr=json.loads(raw).get("data",[]) or []
+    r=next((x for x in arr if "/" in str(x.get("highRule") or "")), None)
+    print(r.get("indicatorType") if r else "")
+except Exception:
+    print("")')
+    if [[ -n "$BP_FROM_RULE" ]]; then
+      BP_INDICATOR="$BP_FROM_RULE"
+    fi
+  fi
+  BP_INDICATOR_ENCODED=$(printf "%s" "$BP_INDICATOR" | url_encode)
+
   echo "\n[CASE-1] 患者注册 -> 登录 -> 上报血压 -> 查看数据"
   REGISTER_RESP=$(post_json "/auth/register" "{\"username\":\"${PATIENT_USER}\",\"password\":\"${PATIENT_PASS}\",\"phone\":\"${PATIENT_PHONE}\",\"name\":\"${PATIENT_NAME}\"}")
   echo "[REGISTER] ${REGISTER_RESP}"
@@ -145,9 +241,9 @@ if [[ "${ASSERT_ONLY}" != "1" ]]; then
   if [[ -z "$PATIENT_TOKEN" ]]; then
     echo "[WARN] 患者登录未获取到 token，请检查接口返回。"
   else
-    REPORT_RESP=$(post_json "/patient/data" '{"indicatorType":"血压","value":"135/88","remark":"接口测试上报"}' "$PATIENT_TOKEN")
+    REPORT_RESP=$(post_json "/patient/data" "{\"indicatorType\":\"${BP_INDICATOR}\",\"value\":\"135/88\",\"remark\":\"api test ${RUN_MARK}\"}" "$PATIENT_TOKEN")
     echo "[REPORT] ${REPORT_RESP}"
-    LIST_RESP=$(curl -sS -H "Authorization: Bearer ${PATIENT_TOKEN}" "${BASE_URL}/patient/data?indicator_type=%E8%A1%80%E5%8E%8B&timeRange=week")
+    LIST_RESP=$(curl -sS -H "Authorization: Bearer ${PATIENT_TOKEN}" "${BASE_URL}/patient/data?indicator_type=${BP_INDICATOR_ENCODED}&timeRange=week")
     echo "[LIST] ${LIST_RESP}"
   fi
 
@@ -163,7 +259,7 @@ if [[ "${ASSERT_ONLY}" != "1" ]]; then
   fi
 
   if [[ -n "$PATIENT_TOKEN" ]]; then
-    ALERT_REPORT=$(post_json "/patient/data" '{"indicatorType":"血压","value":"190/120","remark":"alert case"}' "$PATIENT_TOKEN" || true)
+    ALERT_REPORT=$(post_json "/patient/data" "{\"indicatorType\":\"${BP_INDICATOR}\",\"value\":\"190/120\",\"remark\":\"alert case ${RUN_MARK}\"}" "$PATIENT_TOKEN" || true)
     echo "[ALERT_REPORT] ${ALERT_REPORT}"
     if [[ -n "$DOCTOR_TOKEN" ]]; then
       DOCTOR_ALERTS=$(curl -sS -H "Authorization: Bearer ${DOCTOR_TOKEN}" "${BASE_URL}/doctor/alerts")
@@ -225,6 +321,7 @@ except Exception:
   if [[ -z "$TOKEN_A" || -z "$TOKEN_B" ]]; then
     echo "[WARN] 同账号重复登录未获取到 token，跳过 CASE-3。"
   else
+    ADMIN_TOKEN="$TOKEN_B"
     OLD_HTTP=$(curl -sS -o /tmp/case3_old.json -w "%{http_code}" -H "Authorization: Bearer ${TOKEN_A}" "${BASE_URL}/admin/user")
     NEW_HTTP=$(curl -sS -o /tmp/case3_new.json -w "%{http_code}" -H "Authorization: Bearer ${TOKEN_B}" "${BASE_URL}/admin/user")
     echo "[CASE-5] oldTokenHttp=${OLD_HTTP}, newTokenHttp=${NEW_HTTP}"
@@ -252,7 +349,7 @@ except Exception:
 
   echo "\n[CASE-8] 医生患者洞察"
   if [[ -n "$DOCTOR_TOKEN_2" && -n "$PATIENT_USER_ID" ]]; then
-    INSIGHT=$(curl -sS -H "Authorization: Bearer ${DOCTOR_TOKEN_2}" "${BASE_URL}/doctor/patients/${PATIENT_USER_ID}/insight?indicatorType=%E8%A1%80%E5%8E%8B&timeRange=month")
+    INSIGHT=$(curl -sS -H "Authorization: Bearer ${DOCTOR_TOKEN_2}" "${BASE_URL}/doctor/patients/${PATIENT_USER_ID}/insight?indicatorType=${BP_INDICATOR_ENCODED}&timeRange=month")
     echo "[PATIENT_INSIGHT] ${INSIGHT}"
   else
     echo "[WARN] 缺少 DOCTOR_TOKEN_2 或 PATIENT_USER_ID，CASE-8 部分跳过。"
@@ -318,7 +415,7 @@ except Exception:
 
       if [[ -n "$GROUP_B_ID" ]]; then
         post_json "/doctor/groups/${GROUP_B_ID}/patients" "{\"patientUserId\":${PATIENT_B_ID}}" "$DOCTOR_B_TOKEN" >/dev/null || true
-        post_json "/patient/data" '{"indicatorType":"血压","value":"190/120","remark":"scope case"}' "$PATIENT_B_TOKEN" >/dev/null || true
+        post_json "/patient/data" "{\"indicatorType\":\"${BP_INDICATOR}\",\"value\":\"190/120\",\"remark\":\"scope case ${RUN_MARK}\"}" "$PATIENT_B_TOKEN" >/dev/null || true
 
         DOCTOR_B_ALERTS=$(curl -sS -H "Authorization: Bearer ${DOCTOR_B_TOKEN}" "${BASE_URL}/doctor/alerts")
         TARGET_ALERT_ID=$(echo "$DOCTOR_B_ALERTS" | TARGET_UID="$PATIENT_B_ID" "$PYTHON_BIN" -c 'import json,sys,os
@@ -359,8 +456,119 @@ except Exception:
   else
     echo "[WARN] 缺少 ADMIN_TOKEN 或 DOCTOR_TOKEN_2，跳过 CASE-11"
   fi
+
+  echo "\n[CASE-12] 指标类型启停联动"
+  if [[ -n "$ADMIN_TOKEN" ]]; then
+    if [[ ${#RUN_TAG_SAFE} -gt 8 ]]; then
+      TEMP_SUFFIX="${RUN_TAG_SAFE: -8}"
+    else
+      TEMP_SUFFIX="${RUN_TAG_SAFE}"
+    fi
+    TEMP_TYPE="c12_${TEMP_SUFFIX}"
+    TEMP_CREATE=$(post_json "/admin/config/indicator-types" "{\"indicatorType\":\"${TEMP_TYPE}\",\"displayName\":\"${TEMP_TYPE}\",\"enabled\":1}" "$ADMIN_TOKEN")
+    TEMP_CREATE_CODE=$(echo "$TEMP_CREATE" | extract_code)
+    if [[ "$TEMP_CREATE_CODE" != "200" && "$TEMP_CREATE_CODE" != "409" ]]; then
+      assert_equal "CASE-12 create temp indicator" "200" "$TEMP_CREATE_CODE"
+    fi
+
+    TYPES_ALL=$(curl -sS -H "Authorization: Bearer ${ADMIN_TOKEN}" "${BASE_URL}/admin/config/indicator-types?includeDisabled=true")
+    TYPE_JSON=$(echo "$TYPES_ALL" | TEMP_TYPE="$TEMP_TYPE" "$PYTHON_BIN" -c 'import json,sys,os
+raw=sys.stdin.read()
+target=os.environ.get("TEMP_TYPE", "")
+try:
+    arr=json.loads(raw).get("data",[]) or []
+    t=next((x for x in arr if str(x.get("indicatorType") or "")==target), None)
+    if not t:
+        print("")
+    else:
+        print(json.dumps({"id":t.get("id"),"indicatorType":t.get("indicatorType"),"displayName":t.get("displayName")}, ensure_ascii=False))
+except Exception:
+    print("")')
+
+    if [[ -n "$TYPE_JSON" ]]; then
+      TYPE_DISABLE=$(echo "$TYPE_JSON" | "$PYTHON_BIN" -c 'import json,sys
+t=json.loads(sys.stdin.read())
+t["enabled"]=0
+print(json.dumps(t, ensure_ascii=False))')
+      DISABLE_RAW=$(put_json_raw "/admin/config/indicator-types" "$TYPE_DISABLE" "$ADMIN_TOKEN")
+      DISABLE_CODE=$(echo "$DISABLE_RAW" | extract_code)
+      assert_equal "CASE-12 disable indicator" "200" "$DISABLE_CODE"
+
+      if [[ -n "$PATIENT_TOKEN" ]]; then
+        TYPE_FOR_REPORT=$(echo "$TYPE_JSON" | "$PYTHON_BIN" -c 'import json,sys
+print(json.loads(sys.stdin.read()).get("indicatorType", ""))')
+        BLOCKED_RAW=$(post_json "/patient/data" "{\"indicatorType\":\"${TYPE_FOR_REPORT}\",\"value\":\"123\",\"remark\":\"case12 disabled ${RUN_MARK}\"}" "$PATIENT_TOKEN")
+        BLOCKED_CODE=$(echo "$BLOCKED_RAW" | extract_code)
+        assert_equal "CASE-12 report blocked" "400" "$BLOCKED_CODE"
+      else
+        echo "[WARN] 缺少 PATIENT_TOKEN，CASE-12 部分跳过"
+      fi
+
+      TYPE_ENABLE=$(echo "$TYPE_JSON" | "$PYTHON_BIN" -c 'import json,sys
+t=json.loads(sys.stdin.read())
+t["enabled"]=1
+print(json.dumps(t, ensure_ascii=False))')
+      ENABLE_RAW=$(put_json_raw "/admin/config/indicator-types" "$TYPE_ENABLE" "$ADMIN_TOKEN")
+      ENABLE_CODE=$(echo "$ENABLE_RAW" | extract_code)
+      assert_equal "CASE-12 restore indicator" "200" "$ENABLE_CODE"
+
+      if [[ -n "$PATIENT_TOKEN" ]]; then
+        RESTORE_RAW=$(post_json "/patient/data" "{\"indicatorType\":\"${TYPE_FOR_REPORT}\",\"value\":\"123\",\"remark\":\"case12 enabled ${RUN_MARK}\"}" "$PATIENT_TOKEN")
+        RESTORE_CODE=$(echo "$RESTORE_RAW" | extract_code)
+        assert_equal "CASE-12 report allowed after restore" "200" "$RESTORE_CODE"
+      fi
+    else
+      echo "[WARN] 未找到临时指标，跳过 CASE-12"
+    fi
+  else
+    echo "[WARN] 缺少 ADMIN_TOKEN，跳过 CASE-12"
+  fi
+
+  echo "\n[CASE-13] 血压连续3天主动预警"
+  if [[ -n "$PATIENT_TOKEN" && -n "$DOCTOR_TOKEN_2" && -n "$ADMIN_TOKEN" ]]; then
+    RULES13=$(curl -sS -H "Authorization: Bearer ${ADMIN_TOKEN}" "${BASE_URL}/admin/config/alert-rules")
+    BP_INDICATOR=$(echo "$RULES13" | "$PYTHON_BIN" -c 'import json,sys
+raw=sys.stdin.read()
+try:
+    arr=json.loads(raw).get("data",[]) or []
+    r=next((x for x in arr if "/" in str(x.get("highRule") or "")), None)
+    print(r.get("indicatorType") if r else "")
+except Exception:
+    print("")')
+    if [[ -z "$BP_INDICATOR" ]]; then
+      echo "[WARN] 未找到血压指标类型，跳过 CASE-13"
+    else
+    now_ts=$(date +%s)
+    ts1=$((now_ts - 172800))
+    ts2=$((now_ts - 86400))
+    ts3=$now_ts
+    rt1=$(date -d "@${ts1}" +"%Y-%m-%dT%H:%M:%S")
+    rt2=$(date -d "@${ts2}" +"%Y-%m-%dT%H:%M:%S")
+    rt3=$(date -d "@${ts3}" +"%Y-%m-%dT%H:%M:%S")
+
+    R1=$(post_json "/patient/data" "{\"indicatorType\":\"${BP_INDICATOR}\",\"value\":\"150/95\",\"reportTime\":\"${rt1}\",\"remark\":\"case13 ${RUN_MARK}\"}" "$PATIENT_TOKEN")
+    R2=$(post_json "/patient/data" "{\"indicatorType\":\"${BP_INDICATOR}\",\"value\":\"150/95\",\"reportTime\":\"${rt2}\",\"remark\":\"case13 ${RUN_MARK}\"}" "$PATIENT_TOKEN")
+    R3=$(post_json "/patient/data" "{\"indicatorType\":\"${BP_INDICATOR}\",\"value\":\"150/95\",\"reportTime\":\"${rt3}\",\"remark\":\"case13 ${RUN_MARK}\"}" "$PATIENT_TOKEN")
+    assert_equal "CASE-13 report accepted #1" "200" "$(echo "$R1" | extract_code)"
+    assert_equal "CASE-13 report accepted #2" "200" "$(echo "$R2" | extract_code)"
+    assert_equal "CASE-13 report accepted #3" "200" "$(echo "$R3" | extract_code)"
+
+    ALERTS13=$(curl -sS -H "Authorization: Bearer ${DOCTOR_TOKEN_2}" "${BASE_URL}/doctor/alerts")
+    CASE13_OK=$(echo "$ALERTS13" | "$PYTHON_BIN" -c 'import json,sys
+raw=sys.stdin.read()
+try:
+    arr=json.loads(raw).get("data",[]) or []
+    ok=any((x.get("reasonCode") or "")=="BP_PERSISTENT_HIGH" for x in arr)
+    print("True" if ok else "False")
+except Exception:
+    print("False")')
+    assert_equal "CASE-13 persistent alert generated" "True" "$CASE13_OK"
+    fi
+  else
+    echo "[WARN] 缺少 PATIENT_TOKEN / DOCTOR_TOKEN_2 / ADMIN_TOKEN，跳过 CASE-13"
+  fi
 else
-  echo "[INFO] assert-only mode enabled, skip CASE-1..CASE-11"
+  echo "[INFO] assert-only mode enabled, skip CASE-1..CASE-13"
 fi
 
 echo "\n[CASE-9] 错误码断言（400/401/403/404/409）"
@@ -392,7 +600,7 @@ fi
 
 # 404: not found (doctor queries non-existent patient insight)
 if [[ -n "$DOCTOR_TOKEN_ASSERT" ]]; then
-  NOT_FOUND=$(curl -sS -H "Authorization: Bearer ${DOCTOR_TOKEN_ASSERT}" "${BASE_URL}/doctor/patients/99999999/insight?indicatorType=%E8%A1%80%E5%8E%8B&timeRange=month")
+  NOT_FOUND=$(curl -sS -H "Authorization: Bearer ${DOCTOR_TOKEN_ASSERT}" "${BASE_URL}/doctor/patients/99999999/insight?indicatorType=${BP_INDICATOR_ENCODED}&timeRange=month")
   NOT_FOUND_CODE=$(echo "$NOT_FOUND" | extract_code)
   assert_equal "404 notFound body.code" "404" "$NOT_FOUND_CODE"
 else
@@ -407,6 +615,12 @@ post_json "/auth/register" "{\"username\":\"${CONFLICT_USER}\",\"password\":\"12
 CONFLICT=$(post_json "/auth/register" "{\"username\":\"${CONFLICT_USER}\",\"password\":\"123456\",\"phone\":\"${CONFLICT_PHONE}\",\"name\":\"dup user\"}")
 CONFLICT_CODE=$(echo "$CONFLICT" | extract_code)
 assert_equal "409 conflict body.code" "409" "$CONFLICT_CODE"
+
+if [[ "${ASSERT_ONLY}" != "1" && "${CLEANUP}" == "1" ]]; then
+  echo "\n[CLEANUP] marker=${RUN_MARK}"
+  cleanup_patient_data_and_alerts "$PATIENT_TOKEN" "$DOCTOR_TOKEN_2" "$RUN_MARK" "patient-main"
+  cleanup_patient_data_and_alerts "$PATIENT_B_TOKEN" "$DOCTOR_B_TOKEN" "$RUN_MARK" "patient-scope-b"
+fi
 
 if [[ "$ASSERT_FAILED" -gt 0 ]]; then
   echo "[ASSERT-SUMMARY] failed=${ASSERT_FAILED}"

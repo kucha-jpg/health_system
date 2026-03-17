@@ -1,6 +1,6 @@
 services:
   mysql:
-    image: mysql:8.0
+    image: ${IMAGE_PREFIX:-docker.m.daocloud.io/library/}mysql:8.0
     container_name: health-mysql
     environment:
       MYSQL_ROOT_PASSWORD: root
@@ -21,6 +21,8 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        IMAGE_PREFIX: ${IMAGE_PREFIX:-docker.m.daocloud.io/library/}
     container_name: health-backend
     environment:
       SPRING_PROFILES_ACTIVE: prod
@@ -42,6 +44,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        IMAGE_PREFIX: ${IMAGE_PREFIX:-docker.m.daocloud.io/library/}
     container_name: health-frontend
     environment:
       VITE_API_TARGET: http://backend:9090

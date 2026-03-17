@@ -2,6 +2,7 @@ package com.health.system.service.impl;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.HashMap;
@@ -59,8 +60,25 @@ public class HealthAlertServiceImpl implements HealthAlertService {
 
     @Override
     public void evaluateAndCreateAlert(Long userId, Long healthDataId, String indicatorType, String value) {
-        AlertDecision decision = evaluate(indicatorType, value);
+        AlertDecision decision = evaluate(userId, indicatorType, value);
         if (decision == null) {
+            return;
+        }
+        HealthAlert existing = healthAlertMapper.selectOne(new LambdaQueryWrapper<HealthAlert>()
+                .eq(HealthAlert::getUserId, userId)
+                .eq(HealthAlert::getIndicatorType, indicatorType)
+                .eq(HealthAlert::getReasonCode, decision.reasonCode())
+                .eq(HealthAlert::getStatus, "OPEN")
+                .orderByDesc(HealthAlert::getCreateTime)
+                .last("limit 1"));
+        if (existing != null) {
+            existing.setHealthDataId(healthDataId);
+            existing.setValue(value);
+            existing.setLevel(decision.level());
+            existing.setRiskScore(decision.riskScore());
+            existing.setRiskLevel(decision.riskLevel());
+            existing.setReasonText(decision.reasonText());
+            healthAlertMapper.updateById(existing);
             return;
         }
         HealthAlert alert = new HealthAlert();
@@ -165,20 +183,20 @@ public class HealthAlertServiceImpl implements HealthAlertService {
         return result;
     }
 
-    private AlertDecision evaluate(String indicatorType, String value) {
+    private AlertDecision evaluate(Long userId, String indicatorType, String value) {
         AlertRule rule = alertRuleMapper.selectOne(new LambdaQueryWrapper<AlertRule>()
                 .eq(AlertRule::getIndicatorType, indicatorType)
                 .eq(AlertRule::getEnabled, 1)
                 .last("limit 1"));
         return switch (indicatorType) {
-            case "血压" -> evaluateBloodPressure(value, rule);
+            case "血压" -> evaluateBloodPressure(userId, value, rule);
             case "血糖" -> evaluateBloodSugar(value, rule);
             case "体重" -> evaluateWeight(value, rule);
             default -> null;
         };
     }
 
-    private AlertDecision evaluateBloodPressure(String value, AlertRule rule) {
+    private AlertDecision evaluateBloodPressure(Long userId, String value, AlertRule rule) {
         String[] arr = value.split("/");
         if (arr.length != 2) {
             return null;
@@ -207,6 +225,13 @@ public class HealthAlertServiceImpl implements HealthAlertService {
             return new AlertDecision("HIGH", score, riskLevel(score), "BP_CRITICAL", "血压达到危急阈值，建议立即就医");
         }
         if (systolic >= mediumSystolic || diastolic >= mediumDiastolic) {
+            if (isThreeDayPersistentPressureHigh(userId, mediumSystolic, mediumDiastolic)) {
+                int score = Math.min(79, mediumScore(
+                        ratio(systolic, mediumSystolic),
+                        ratio(diastolic, mediumDiastolic)
+                ) + 8);
+                return new AlertDecision("MEDIUM", score, riskLevel(score), "BP_PERSISTENT_HIGH", "血压连续3天高于阈值，建议尽快随访干预");
+            }
             int score = mediumScore(
                     ratio(systolic, mediumSystolic),
                     ratio(diastolic, mediumDiastolic)
@@ -214,6 +239,43 @@ public class HealthAlertServiceImpl implements HealthAlertService {
             return new AlertDecision("MEDIUM", score, riskLevel(score), "BP_HIGH", "血压偏高，建议复测并医生随访");
         }
         return null;
+    }
+
+    private boolean isThreeDayPersistentPressureHigh(Long userId, int systolicThreshold, int diastolicThreshold) {
+        LocalDateTime begin = LocalDateTime.now().minusDays(7);
+        List<HealthData> bloodPressureData = healthDataMapper.selectList(new LambdaQueryWrapper<HealthData>()
+                .eq(HealthData::getUserId, userId)
+                .eq(HealthData::getIndicatorType, "血压")
+                .ge(HealthData::getReportTime, begin)
+                .orderByDesc(HealthData::getReportTime));
+        if (bloodPressureData.isEmpty()) {
+            return false;
+        }
+
+        Set<LocalDate> highDays = new HashSet<>();
+        for (HealthData item : bloodPressureData) {
+            String[] arr = item.getValue() == null ? new String[0] : item.getValue().split("/");
+            if (arr.length != 2) {
+                continue;
+            }
+            try {
+                int s = Integer.parseInt(arr[0]);
+                int d = Integer.parseInt(arr[1]);
+                if (s >= systolicThreshold || d >= diastolicThreshold) {
+                    LocalDate day = item.getReportTime() == null ? null : item.getReportTime().toLocalDate();
+                    if (day != null) {
+                        highDays.add(day);
+                    }
+                }
+            } catch (NumberFormatException ignore) {
+                // Ignore malformed historical rows and continue checking other records.
+            }
+        }
+
+        LocalDate today = LocalDate.now();
+        return highDays.contains(today)
+                && highDays.contains(today.minusDays(1))
+                && highDays.contains(today.minusDays(2));
     }
 
     private AlertDecision evaluateBloodSugar(String value, AlertRule rule) {

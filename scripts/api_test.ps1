@@ -9,7 +9,8 @@ param(
   [string]$DoctorUser = "doctor_demo_01",
   [string]$DoctorPass = "123456",
   [string]$RunTag = "",
-  [switch]$AssertOnly
+  [switch]$AssertOnly,
+  [switch]$Cleanup
 )
 
 $ErrorActionPreference = "Stop"
@@ -34,15 +35,15 @@ function Invoke-ApiGetRaw([string]$Path, [string]$Token = "") {
   }
 
   try {
-    $resp = Invoke-WebRequest -Method Get -Uri ("$BaseUrl$Path") -Headers $headers -ErrorAction Stop
-    return @{ status = [int]$resp.StatusCode; body = $resp.Content }
+    $obj = Invoke-RestMethod -Method Get -Uri ("$BaseUrl$Path") -Headers $headers -ErrorAction Stop
+    return @{ status = 200; body = ($obj | ConvertTo-Json -Depth 20 -Compress) }
   } catch {
     if ($_.Exception.Response) {
       $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
       $body = $reader.ReadToEnd()
       return @{ status = [int]$_.Exception.Response.StatusCode.value__; body = $body }
     }
-    throw
+    return @{ status = -1; body = '{"code":-1,"msg":"transport_error","data":null}' }
   }
 }
 
@@ -52,15 +53,15 @@ function Invoke-ApiPostRaw([string]$Path, [hashtable]$Payload, [string]$Token = 
     $headers["Authorization"] = "Bearer $Token"
   }
   try {
-    $resp = Invoke-WebRequest -Method Post -Uri ("$BaseUrl$Path") -Headers $headers -Body ($Payload | ConvertTo-Json -Depth 8) -ErrorAction Stop
-    return @{ status = [int]$resp.StatusCode; body = $resp.Content }
+    $obj = Invoke-RestMethod -Method Post -Uri ("$BaseUrl$Path") -Headers $headers -Body ($Payload | ConvertTo-Json -Depth 8) -ErrorAction Stop
+    return @{ status = 200; body = ($obj | ConvertTo-Json -Depth 20 -Compress) }
   } catch {
     if ($_.Exception.Response) {
       $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
       $body = $reader.ReadToEnd()
       return @{ status = [int]$_.Exception.Response.StatusCode.value__; body = $body }
     }
-    throw
+    return @{ status = -1; body = '{"code":-1,"msg":"transport_error","data":null}' }
   }
 }
 
@@ -70,16 +71,45 @@ function Invoke-ApiPutRaw([string]$Path, [hashtable]$Payload, [string]$Token = "
     $headers["Authorization"] = "Bearer $Token"
   }
   try {
-    $resp = Invoke-WebRequest -Method Put -Uri ("$BaseUrl$Path") -Headers $headers -Body ($Payload | ConvertTo-Json -Depth 8) -ErrorAction Stop
-    return @{ status = [int]$resp.StatusCode; body = $resp.Content }
+    $obj = Invoke-RestMethod -Method Put -Uri ("$BaseUrl$Path") -Headers $headers -Body ($Payload | ConvertTo-Json -Depth 8) -ErrorAction Stop
+    return @{ status = 200; body = ($obj | ConvertTo-Json -Depth 20 -Compress) }
   } catch {
     if ($_.Exception.Response) {
       $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
       $body = $reader.ReadToEnd()
       return @{ status = [int]$_.Exception.Response.StatusCode.value__; body = $body }
     }
-    return @{ status = -1; body = "" }
+    return @{ status = -1; body = '{"code":-1,"msg":"transport_error","data":null}' }
   }
+}
+
+function Invoke-ApiDeleteRaw([string]$Path, [string]$Token = "") {
+  $headers = @{}
+  if ($Token) {
+    $headers["Authorization"] = "Bearer $Token"
+  }
+  try {
+    $obj = Invoke-RestMethod -Method Delete -Uri ("$BaseUrl$Path") -Headers $headers -ErrorAction Stop
+    $body = if ($null -eq $obj) { "" } else { $obj | ConvertTo-Json -Depth 20 -Compress }
+    return @{ status = 200; body = $body }
+  } catch {
+    if ($_.Exception.Response) {
+      $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
+      $body = $reader.ReadToEnd()
+      return @{ status = [int]$_.Exception.Response.StatusCode.value__; body = $body }
+    }
+    return @{ status = -1; body = '{"code":-1,"msg":"transport_error","data":null}' }
+  }
+}
+
+function Normalize-AssertText([object]$Value) {
+  if ($null -eq $Value) { return "" }
+  $s = [string]$Value
+  $s = $s.Replace("`r", " ").Replace("`n", " ")
+  if ($s.Length -gt 200) {
+    $s = $s.Substring(0, 200)
+  }
+  return $s
 }
 
 function Get-BodyCode([string]$RawBody) {
@@ -93,12 +123,16 @@ function Get-BodyCode([string]$RawBody) {
 }
 
 function Assert-Equal([string]$Label, [string]$Expected, [string]$Actual) {
-  if ($Expected -eq $Actual) {
-    Write-Host "[ASSERT-OK] $Label expected=$Expected actual=$Actual"
+  $expectedText = Normalize-AssertText $Expected
+  $actualText = Normalize-AssertText $Actual
+  if ($expectedText -eq $actualText) {
+    $okMsg = "[ASSERT-OK] {0} expected={1} actual={2}" -f $Label, $expectedText, $actualText
+    [Console]::WriteLine($okMsg)
     return
   }
   $script:AssertFailed++
-  Write-Host "[ASSERT-FAIL] $Label expected=$Expected actual=$Actual"
+  $failMsg = "[ASSERT-FAIL] {0} expected={1} actual={2}" -f $Label, $expectedText, $actualText
+  [Console]::WriteLine($failMsg)
 }
 
 function Get-Token($resp) {
@@ -127,6 +161,7 @@ function Get-AdminUserByUsername([string]$AdminToken, [string]$Username) {
 
 Write-Host "[INFO] BASE_URL=$BaseUrl"
 Write-Host "[INFO] ASSERT_ONLY=$($AssertOnly.IsPresent)"
+Write-Host "[INFO] CLEANUP=$($Cleanup.IsPresent)"
 if (-not $RunTag) {
   $RunTag = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds().ToString()
 }
@@ -144,10 +179,33 @@ $doctorScopePhone = "138{0:D8}" -f $tagNum
 $patientScopePhone = "139{0:D8}" -f (($tagNum + 1) % 100000000)
 Write-Host "[INFO] RUN_TAG=$safeRunTag"
 $indicatorBloodPressure = [string]([char]0x8840) + [char]0x538b
+$bpIndicatorType = $indicatorBloodPressure
+$bpIndicatorTypeEncoded = [System.Uri]::EscapeDataString($bpIndicatorType)
+$runMark = "rt_$safeRunTag"
 
 $doctorToken2 = ""
+$doctorBTokenForCleanup = ""
+$patientBTokenForCleanup = ""
 
 if (-not $AssertOnly) {
+  # Resolve blood-pressure indicator from alert rules; fallback to default literal.
+  try {
+    $preAdminLogin = Invoke-ApiPost "/auth/login" @{ username = $AdminUser; password = $AdminPass }
+    $preAdminToken = Get-Token $preAdminLogin
+    if ($preAdminToken) {
+      $preRuleList = Invoke-RestMethod -Method Get -Uri ("$BaseUrl/admin/config/alert-rules") -Headers @{ "Authorization" = "Bearer $preAdminToken" }
+      if ($preRuleList -and $preRuleList.data) {
+        $preBpRule = $preRuleList.data | Where-Object { [string]$_.highRule -like '*/*' } | Select-Object -First 1
+        if ($preBpRule -and $preBpRule.indicatorType) {
+          $bpIndicatorType = [string]$preBpRule.indicatorType
+          $bpIndicatorTypeEncoded = [System.Uri]::EscapeDataString($bpIndicatorType)
+        }
+      }
+    }
+  } catch {
+    # Keep fallback indicator type when prefetch fails.
+  }
+
   Write-Title "CASE-1 patient register -> login -> report -> list"
   try {
     $register = Invoke-ApiPost "/auth/register" @{
@@ -170,11 +228,9 @@ if (-not $AssertOnly) {
   }
 
   if ($patientToken) {
-    $reportHeaders = @{ "Content-Type" = "application/json; charset=utf-8"; "Authorization" = "Bearer $patientToken" }
-    $reportPayload = '{"indicatorType":"\u8840\u538b","value":"135/88","remark":"api test"}'
-    $report = Invoke-RestMethod -Method Post -Uri ("$BaseUrl/patient/data") -Headers $reportHeaders -Body $reportPayload
+    $report = Invoke-ApiPost "/patient/data" @{ indicatorType = $bpIndicatorType; value = "135/88"; remark = "api test $runMark" } $patientToken
     Write-Host "[REPORT]" ($report | ConvertTo-Json -Depth 6)
-    $list = Invoke-ApiGetRaw "/patient/data?indicator_type=%E8%A1%80%E5%8E%8B&timeRange=week" $patientToken
+    $list = Invoke-ApiGetRaw "/patient/data?indicator_type=$bpIndicatorTypeEncoded&timeRange=week" $patientToken
     Write-Host "[LIST] status=$($list.status)"
     Write-Host "[LIST-BODY] $($list.body)"
   } else {
@@ -191,9 +247,7 @@ if (-not $AssertOnly) {
     Write-Host "[WARN] admin login failed, stop CASE-2"
   } else {
     if ($patientToken) {
-      $alertHeaders = @{ "Content-Type" = "application/json; charset=utf-8"; "Authorization" = "Bearer $patientToken" }
-      $alertPayload = '{"indicatorType":"\u8840\u538b","value":"190/120","remark":"alert case"}'
-      $alertCase = Invoke-RestMethod -Method Post -Uri ("$BaseUrl/patient/data") -Headers $alertHeaders -Body $alertPayload
+      $alertCase = Invoke-ApiPost "/patient/data" @{ indicatorType = $bpIndicatorType; value = "190/120"; remark = "alert case $runMark" } $patientToken
       Write-Host "[ALERT_REPORT]" ($alertCase | ConvertTo-Json -Depth 6)
       if ($doctorToken) {
         $doctorAlerts = Invoke-ApiGetRaw "/doctor/alerts" $doctorToken
@@ -303,7 +357,7 @@ if (-not $AssertOnly) {
 
   Write-Title "CASE-8 doctor patient insight"
   if ($doctorToken2 -and $patientUserId) {
-    $insightPath = "/doctor/patients/$patientUserId/insight?indicatorType=%E8%A1%80%E5%8E%8B&timeRange=month"
+    $insightPath = "/doctor/patients/$patientUserId/insight?indicatorType=$bpIndicatorTypeEncoded&timeRange=month"
     $insight = Invoke-ApiGetRaw $insightPath $doctorToken2
     Write-Host "[PATIENT_INSIGHT] status=$($insight.status)"
     Write-Host "[PATIENT_INSIGHT-BODY] $($insight.body)"
@@ -351,8 +405,10 @@ if (-not $AssertOnly) {
     $patientB = Get-AdminUserByUsername $adminToken2 $patientBUser
     $doctorBLogin = Invoke-ApiPost "/auth/login" @{ username = $doctorBUser; password = "123456" }
     $doctorBToken = Get-Token $doctorBLogin
+    $doctorBTokenForCleanup = $doctorBToken
     $patientBLogin = Invoke-ApiPost "/auth/login" @{ username = $patientBUser; password = "123456" }
     $patientBToken = Get-Token $patientBLogin
+    $patientBTokenForCleanup = $patientBToken
 
     if ($doctorB -and $patientB -and $doctorBToken -and $patientBToken) {
       $groupNameB = "scope_b_group_$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
@@ -365,8 +421,7 @@ if (-not $AssertOnly) {
 
       if ($groupB) {
         [void](Invoke-ApiPost "/doctor/groups/$($groupB.id)/patients" @{ patientUserId = [int64]$patientB.id } $doctorBToken)
-        $alertPayloadB = '{"indicatorType":"\u8840\u538b","value":"190/120","remark":"scope case"}'
-        [void](Invoke-RestMethod -Method Post -Uri ("$BaseUrl/patient/data") -Headers @{ "Content-Type" = "application/json; charset=utf-8"; "Authorization" = "Bearer $patientBToken" } -Body $alertPayloadB)
+        [void](Invoke-ApiPost "/patient/data" @{ indicatorType = $indicatorBloodPressure; value = "190/120"; remark = "scope case $runMark" } $patientBToken)
 
         $doctorBAlertsRaw = Invoke-ApiGetRaw "/doctor/alerts" $doctorBToken
         $targetAlertId = $null
@@ -404,8 +459,115 @@ if (-not $AssertOnly) {
   } else {
     Write-Host "[WARN] admin or doctor token missing, skip CASE-11"
   }
+
+  Write-Title "CASE-12 indicator type enable/disable linkage"
+  if ($adminToken2) {
+    try {
+      $tempSuffix = if ($safeRunTag.Length -gt 8) { $safeRunTag.Substring($safeRunTag.Length - 8, 8) } else { $safeRunTag }
+      $tempType = "c12_$tempSuffix"
+      $createTemp = Invoke-ApiPostRaw "/admin/config/indicator-types" @{ indicatorType = $tempType; displayName = $tempType; enabled = 1 } $adminToken2
+      $createTempCode = Get-BodyCode $createTemp.body
+      if ($createTempCode -ne "200" -and $createTempCode -ne "409") {
+        Assert-Equal "CASE-12 create temp indicator" "200|409" $createTempCode
+      }
+
+      $typesResp = Invoke-RestMethod -Method Get -Uri ("$BaseUrl/admin/config/indicator-types?includeDisabled=true") -Headers @{ "Authorization" = "Bearer $adminToken2" }
+      $type = $null
+      if ($typesResp -and $typesResp.data) {
+        $type = $typesResp.data | Where-Object { $_.indicatorType -eq $tempType } | Select-Object -First 1
+      }
+
+      if ($type) {
+        $disableBody = @{ id = $type.id; indicatorType = $type.indicatorType; displayName = $type.displayName; enabled = 0 }
+        $disableRes = Invoke-ApiPutRaw "/admin/config/indicator-types" $disableBody $adminToken2
+        $disableCode = Get-BodyCode $disableRes.body
+        Assert-Equal "CASE-12 disable indicator" "200" $disableCode
+
+        if (-not $patientToken) {
+          $patientLogin2 = Invoke-ApiPost "/auth/login" @{ username = $PatientUser; password = $PatientPass }
+          $patientToken = Get-Token $patientLogin2
+        }
+
+        if ($patientToken) {
+          $blockedRes = Invoke-ApiPostRaw "/patient/data" @{ indicatorType = $type.indicatorType; value = "123"; remark = "case12 disabled $runMark" } $patientToken
+          $blockedCode = Get-BodyCode $blockedRes.body
+          Assert-Equal "CASE-12 report blocked" "400" $blockedCode
+        } else {
+          Write-Host "[WARN] patient token missing, CASE-12 partial"
+        }
+
+        $enableBody = @{ id = $type.id; indicatorType = $type.indicatorType; displayName = $type.displayName; enabled = 1 }
+        $enableRes = Invoke-ApiPutRaw "/admin/config/indicator-types" $enableBody $adminToken2
+        $enableCode = Get-BodyCode $enableRes.body
+        Assert-Equal "CASE-12 restore indicator" "200" $enableCode
+
+        if ($patientToken) {
+          $restoredRes = Invoke-ApiPostRaw "/patient/data" @{ indicatorType = $type.indicatorType; value = "123"; remark = "case12 enabled $runMark" } $patientToken
+          $restoredCode = Get-BodyCode $restoredRes.body
+          Assert-Equal "CASE-12 report allowed after restore" "200" $restoredCode
+        }
+      } else {
+        Write-Host "[WARN] temp indicator type not found, skip CASE-12"
+      }
+    } catch {
+      Write-Host "[WARN] CASE-12 failed:" $_.Exception.Message
+      $script:AssertFailed++
+    }
+  } else {
+    Write-Host "[WARN] admin token missing, skip CASE-12"
+  }
+
+  Write-Title "CASE-13 three-day persistent blood pressure alert"
+  if ($patientToken -and $doctorToken2 -and $adminToken2) {
+    $bpIndicatorType = $null
+    try {
+      $ruleList2 = Invoke-RestMethod -Method Get -Uri ("$BaseUrl/admin/config/alert-rules") -Headers @{ "Authorization" = "Bearer $adminToken2" }
+      if ($ruleList2 -and $ruleList2.data) {
+        $bpRule = $ruleList2.data | Where-Object { [string]$_.highRule -like '*/*' } | Select-Object -First 1
+        if ($bpRule) {
+          $bpIndicatorType = [string]$bpRule.indicatorType
+        }
+      }
+    } catch {
+      $bpIndicatorType = $null
+    }
+
+    if (-not $bpIndicatorType) {
+      Write-Host "[WARN] blood-pressure indicator type not found, skip CASE-13"
+    } else {
+    $times = @(
+      (Get-Date).AddDays(-2),
+      (Get-Date).AddDays(-1),
+      (Get-Date)
+    )
+
+    foreach ($t in $times) {
+      $payloadObj = @{
+        indicatorType = $bpIndicatorType
+        value = "150/95"
+        reportTime = $t.ToString("yyyy-MM-ddTHH:mm:ss")
+        remark = "case13 $runMark"
+      }
+      $postRes = Invoke-ApiPostRaw "/patient/data" $payloadObj $patientToken
+      $postCode = Get-BodyCode $postRes.body
+      Assert-Equal "CASE-13 report accepted" "200" $postCode
+    }
+
+    $alertsRaw = Invoke-ApiGetRaw "/doctor/alerts" $doctorToken2
+    $case13Ok = $false
+    try {
+      $alertsObj = $alertsRaw.body | ConvertFrom-Json
+      $case13Ok = (@($alertsObj.data) | Where-Object { $_.reasonCode -eq "BP_PERSISTENT_HIGH" }).Count -gt 0
+    } catch {
+      $case13Ok = $false
+    }
+    Assert-Equal "CASE-13 persistent alert generated" "True" ([string]$case13Ok)
+    }
+  } else {
+    Write-Host "[WARN] patient/doctor/admin token missing, skip CASE-13"
+  }
 } else {
-  Write-Host "[INFO] assert-only mode enabled, skip CASE-1..CASE-11"
+  Write-Host "[INFO] assert-only mode enabled, skip CASE-1..CASE-13"
 }
 
 Write-Title "CASE-9 error-code assertions (400/401/403/404/409)"
@@ -436,7 +598,7 @@ if ($doctorTokenForAssert) {
 
 # 404: not found (doctor queries non-existent patient insight)
 if ($doctorTokenForAssert) {
-  $notFound = Invoke-ApiGetRaw "/doctor/patients/99999999/insight?indicatorType=%E8%A1%80%E5%8E%8B&timeRange=month" $doctorTokenForAssert
+  $notFound = Invoke-ApiGetRaw "/doctor/patients/99999999/insight?indicatorType=$bpIndicatorTypeEncoded&timeRange=month" $doctorTokenForAssert
   $notFoundCode = Get-BodyCode $notFound.body
   Assert-Equal "404 notFound body.code" "404" $notFoundCode
 } else {
@@ -450,6 +612,57 @@ $conflictUser = "dup_case_$dupSeed"
 $conflict = Invoke-ApiPostRaw "/auth/register" @{ username = $conflictUser; password = "123456"; phone = "139$($dupSeed.ToString().PadLeft(8, '0').Substring(0,8))"; name = "dup user" }
 $conflictCode = Get-BodyCode $conflict.body
 Assert-Equal "409 conflict body.code" "409" $conflictCode
+
+if (-not $AssertOnly -and $Cleanup) {
+  Write-Title "CLEANUP marker-based test data"
+
+  function Cleanup-PatientDataAndAlerts([string]$patientTokenArg, [string]$doctorTokenArg, [string]$marker, [string]$label) {
+    if (-not $patientTokenArg) {
+      Write-Host "[CLEANUP] $label skipped: missing patient token"
+      return
+    }
+    $dataRaw = Invoke-ApiGetRaw "/patient/data?timeRange=month" $patientTokenArg
+    $dataIds = @()
+    try {
+      $dataObj = $dataRaw.body | ConvertFrom-Json
+      $dataIds = @($dataObj.data | Where-Object { [string]$_.remark -like "*$marker*" } | ForEach-Object { [int64]$_.id })
+    } catch {
+      $dataIds = @()
+    }
+    if ($dataIds.Count -eq 0) {
+      Write-Host "[CLEANUP] $label no tagged data"
+      return
+    }
+
+    foreach ($id in $dataIds) {
+      [void](Invoke-ApiDeleteRaw "/patient/data/$id" $patientTokenArg)
+    }
+    Write-Host "[CLEANUP] $label deleted data ids=$($dataIds -join ',')"
+
+    if (-not $doctorTokenArg) {
+      return
+    }
+    $alertsRaw = Invoke-ApiGetRaw "/doctor/alerts" $doctorTokenArg
+    $alertIds = @()
+    try {
+      $alertsObj = $alertsRaw.body | ConvertFrom-Json
+      $set = New-Object 'System.Collections.Generic.HashSet[long]'
+      foreach ($d in $dataIds) { [void]$set.Add([int64]$d) }
+      $alertIds = @($alertsObj.data | Where-Object { $_.status -eq 'OPEN' -and $set.Contains([int64]$_.healthDataId) } | ForEach-Object { [int64]$_.id })
+    } catch {
+      $alertIds = @()
+    }
+    foreach ($aid in $alertIds) {
+      [void](Invoke-ApiPostRaw "/doctor/alerts/$aid/handle" @{ handleRemark = "cleanup by api_test.ps1" } $doctorTokenArg)
+    }
+    if ($alertIds.Count -gt 0) {
+      Write-Host "[CLEANUP] $label handled alerts ids=$($alertIds -join ',')"
+    }
+  }
+
+  Cleanup-PatientDataAndAlerts $patientToken $doctorToken2 $runMark "patient-main"
+  Cleanup-PatientDataAndAlerts $patientBTokenForCleanup $doctorBTokenForCleanup $runMark "patient-scope-b"
+}
 
 if ($script:AssertFailed -gt 0) {
   Write-Host "[ASSERT-SUMMARY] failed=$($script:AssertFailed)"

@@ -105,6 +105,19 @@ git push origin main
     - 顶层语句必须左对齐（函数体内语句才缩进）。
     - 请求参数中的中文值建议 URL 编码（例如 `indicator_type=%E8%A1%80%E5%8E%8B`），避免 400 干扰排障。
   - 已验证样例：run `23085915196` 失败 -> 修复后 run `23086231786` 成功。
+- API 全量回归 CASE-12 在 Linux 下失败（401/500）：
+  - 典型症状：
+    - CASE-7 或 CASE-12 返回 `401`。
+    - CASE-12 `report allowed after restore` 返回 `500`。
+  - 快速定位：
+    1. 先看 CASE-5 后是否继续复用旧管理员 token（同账号二次登录后旧 token 会失效）。
+    2. 查看 500 报错体是否包含 `Data too long for column 'indicator_type'`。
+  - 根因与修复：
+    - 根因1：CASE-5 后未更新 `ADMIN_TOKEN`，后续管理员接口使用旧 token。
+    - 修复1：CASE-5 成功后把 `ADMIN_TOKEN` 更新为新登录 token。
+    - 根因2：临时指标类型名过长，写入 `health_data.indicator_type VARCHAR(20)` 触发截断异常。
+    - 修复2：CASE-12 临时指标名统一改为短格式（例如 `c12_xxxxxxxx`，长度不超过 20）。
+  - 已验证结果：Windows PowerShell 与 Linux 容器全量回归均 `all passed`。
 
 ## 5. 退出条件
 
