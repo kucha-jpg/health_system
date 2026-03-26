@@ -10,11 +10,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.health.system.common.BusinessException;
+import com.health.system.common.CacheNames;
 import com.health.system.entity.AlertRule;
 import com.health.system.entity.DoctorGroup;
 import com.health.system.entity.DoctorGroupDoctorMember;
@@ -59,6 +62,7 @@ public class HealthAlertServiceImpl implements HealthAlertService {
     }
 
     @Override
+    @CacheEvict(cacheNames = CacheNames.PATIENT_REPORT_SUMMARY, allEntries = true)
     public void evaluateAndCreateAlert(Long userId, Long healthDataId, String indicatorType, String value) {
         AlertDecision decision = evaluate(userId, indicatorType, value);
         if (decision == null) {
@@ -96,16 +100,24 @@ public class HealthAlertServiceImpl implements HealthAlertService {
     }
 
     @Override
+    @CacheEvict(cacheNames = CacheNames.PATIENT_REPORT_SUMMARY, allEntries = true)
     public void deleteByHealthDataId(Long healthDataId) {
         healthAlertMapper.delete(new LambdaQueryWrapper<HealthAlert>().eq(HealthAlert::getHealthDataId, healthDataId));
     }
 
     @Override
-    public List<HealthAlert> listOpenAlerts(String doctorUsername, String riskLevel, Integer minRiskScore, String sortBy) {
+    public Map<String, Object> listOpenAlerts(String doctorUsername,
+                                              String riskLevel,
+                                              Integer minRiskScore,
+                                              String sortBy,
+                                              Integer pageNo,
+                                              Integer pageSize) {
         User doctor = resolveDoctor(doctorUsername);
         Set<Long> patientIds = resolveAccessiblePatientIds(doctor.getId());
+        int safePageNo = Math.max(pageNo == null ? 1 : pageNo, 1);
+        int safePageSize = Math.min(Math.max(pageSize == null ? 20 : pageSize, 1), 100);
         if (patientIds.isEmpty()) {
-            return List.of();
+            return pagedResult(List.of(), 0, safePageNo, safePageSize);
         }
 
         LambdaQueryWrapper<HealthAlert> wrapper = new LambdaQueryWrapper<HealthAlert>()
@@ -130,25 +142,31 @@ public class HealthAlertServiceImpl implements HealthAlertService {
                     .orderByDesc(HealthAlert::getCreateTime);
         }
 
-        return healthAlertMapper.selectList(wrapper);
+        Page<HealthAlert> page = healthAlertMapper.selectPage(new Page<>(safePageNo, safePageSize), wrapper);
+        return pagedResult(page.getRecords(), page.getTotal(), safePageNo, safePageSize);
     }
 
     @Override
-    public List<HealthAlert> listMyAlerts(String username, String status) {
+    public Map<String, Object> listMyAlerts(String username, String status, Integer pageNo, Integer pageSize) {
         User user = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, username));
         if (user == null) {
             throw BusinessException.notFound("用户不存在");
         }
+        int safePageNo = Math.max(pageNo == null ? 1 : pageNo, 1);
+        int safePageSize = Math.min(Math.max(pageSize == null ? 20 : pageSize, 1), 100);
+
         LambdaQueryWrapper<HealthAlert> wrapper = new LambdaQueryWrapper<HealthAlert>()
                 .eq(HealthAlert::getUserId, user.getId())
                 .orderByDesc(HealthAlert::getCreateTime);
         if (status != null && !status.isBlank()) {
             wrapper.eq(HealthAlert::getStatus, status);
         }
-        return healthAlertMapper.selectList(wrapper);
+        Page<HealthAlert> page = healthAlertMapper.selectPage(new Page<>(safePageNo, safePageSize), wrapper);
+        return pagedResult(page.getRecords(), page.getTotal(), safePageNo, safePageSize);
     }
 
     @Override
+    @CacheEvict(cacheNames = CacheNames.PATIENT_REPORT_SUMMARY, allEntries = true)
     public void handleAlert(String doctorUsername, Long id, String handleRemark) {
         User doctor = resolveDoctor(doctorUsername);
         HealthAlert alert = healthAlertMapper.selectById(id);
@@ -180,6 +198,15 @@ public class HealthAlertServiceImpl implements HealthAlertService {
         result.put("totalHealthData", totalHealthData);
         result.put("openAlerts", openAlerts);
         result.put("latestHealthData", latestHealthData);
+        return result;
+    }
+
+    private Map<String, Object> pagedResult(List<HealthAlert> records, long total, int pageNo, int pageSize) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("list", records);
+        result.put("total", total);
+        result.put("pageNo", pageNo);
+        result.put("pageSize", pageSize);
         return result;
     }
 

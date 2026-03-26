@@ -1,9 +1,6 @@
 package com.health.system.service;
 
-import java.util.List;
 import java.util.Map;
-
-import com.health.system.entity.HealthAlert;
 
 public interface HealthAlertService {
 
@@ -11,9 +8,9 @@ public interface HealthAlertService {
 
     void deleteByHealthDataId(Long healthDataId);
 
-    List<HealthAlert> listOpenAlerts(String doctorUsername, String riskLevel, Integer minRiskScore, String sortBy);
+    Map<String, Object> listOpenAlerts(String doctorUsername, String riskLevel, Integer minRiskScore, String sortBy, Integer pageNo, Integer pageSize);
 
-    List<HealthAlert> listMyAlerts(String username, String status);
+    Map<String, Object> listMyAlerts(String username, String status, Integer pageNo, Integer pageSize);
 
     void handleAlert(String doctorUsername, Long id, String handleRemark);
 

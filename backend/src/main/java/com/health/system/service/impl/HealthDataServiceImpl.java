@@ -1,7 +1,9 @@
 package com.health.system.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.health.system.common.BusinessException;
+import com.health.system.common.CacheNames;
 import com.health.system.dto.HealthDataDTO;
 import com.health.system.entity.HealthData;
 import com.health.system.entity.User;
@@ -10,12 +12,14 @@ import com.health.system.mapper.UserMapper;
 import com.health.system.service.HealthAlertService;
 import com.health.system.service.HealthDataService;
 import com.health.system.service.HealthIndicatorTypeService;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 public class HealthDataServiceImpl implements HealthDataService {
@@ -36,6 +40,7 @@ public class HealthDataServiceImpl implements HealthDataService {
     }
 
     @Override
+    @CacheEvict(cacheNames = CacheNames.PATIENT_REPORT_SUMMARY, allEntries = true)
     public void create(String username, HealthDataDTO dto) {
         Long userId = getCurrentUserId(username);
         validateData(dto.getIndicatorType(), dto.getValue());
@@ -51,8 +56,11 @@ public class HealthDataServiceImpl implements HealthDataService {
     }
 
     @Override
-    public List<HealthData> list(String username, String indicatorType, String timeRange) {
+    public Map<String, Object> list(String username, String indicatorType, String timeRange, Integer pageNo, Integer pageSize) {
         Long userId = getCurrentUserId(username);
+        int safePageNo = Math.max(pageNo == null ? 1 : pageNo, 1);
+        int safePageSize = Math.min(Math.max(pageSize == null ? 20 : pageSize, 1), 100);
+
         LambdaQueryWrapper<HealthData> wrapper = new LambdaQueryWrapper<HealthData>()
                 .eq(HealthData::getUserId, userId)
                 .orderByDesc(HealthData::getReportTime);
@@ -73,10 +81,18 @@ public class HealthDataServiceImpl implements HealthDataService {
                 wrapper.ge(HealthData::getReportTime, start);
             }
         }
-        return healthDataMapper.selectList(wrapper);
+
+        Page<HealthData> page = healthDataMapper.selectPage(new Page<>(safePageNo, safePageSize), wrapper);
+        Map<String, Object> result = new HashMap<>();
+        result.put("list", page.getRecords());
+        result.put("total", page.getTotal());
+        result.put("pageNo", safePageNo);
+        result.put("pageSize", safePageSize);
+        return result;
     }
 
     @Override
+    @CacheEvict(cacheNames = CacheNames.PATIENT_REPORT_SUMMARY, allEntries = true)
     public void update(String username, Long id, HealthDataDTO dto) {
         Long userId = getCurrentUserId(username);
         HealthData old = healthDataMapper.selectById(id);
@@ -94,6 +110,7 @@ public class HealthDataServiceImpl implements HealthDataService {
     }
 
     @Override
+    @CacheEvict(cacheNames = CacheNames.PATIENT_REPORT_SUMMARY, allEntries = true)
     public void delete(String username, Long id) {
         Long userId = getCurrentUserId(username);
         HealthData old = healthDataMapper.selectById(id);

@@ -18,7 +18,6 @@ import com.health.system.dto.AlertHandleDTO;
 import com.health.system.dto.DoctorGroupAddPatientDTO;
 import com.health.system.dto.DoctorGroupDTO;
 import com.health.system.entity.DoctorGroup;
-import com.health.system.entity.HealthAlert;
 import com.health.system.entity.User;
 import com.health.system.service.DoctorGroupService;
 import com.health.system.service.DoctorPatientInsightService;
@@ -43,11 +42,13 @@ public class DoctorController {
     }
 
     @GetMapping("/alerts")
-    public ApiResponse<List<HealthAlert>> openAlerts(Authentication authentication,
-                                                     @RequestParam(required = false) String riskLevel,
-                                                     @RequestParam(required = false) Integer minRiskScore,
-                                                     @RequestParam(defaultValue = "risk_desc") String sortBy) {
-        return ApiResponse.success(healthAlertService.listOpenAlerts(authentication.getName(), riskLevel, minRiskScore, sortBy));
+    public ApiResponse<Map<String, Object>> openAlerts(Authentication authentication,
+                                                        @RequestParam(required = false) String riskLevel,
+                                                        @RequestParam(required = false) Integer minRiskScore,
+                                                        @RequestParam(defaultValue = "risk_desc") String sortBy,
+                                                        @RequestParam(defaultValue = "1") Integer pageNo,
+                                                        @RequestParam(defaultValue = "20") Integer pageSize) {
+        return ApiResponse.success(healthAlertService.listOpenAlerts(authentication.getName(), riskLevel, minRiskScore, sortBy, pageNo, pageSize));
     }
 
     @PostMapping("/alerts/{id}/handle")

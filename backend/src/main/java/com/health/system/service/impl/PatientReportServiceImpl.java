@@ -2,6 +2,7 @@ package com.health.system.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.health.system.common.BusinessException;
+import com.health.system.common.CacheNames;
 import com.health.system.entity.HealthAlert;
 import com.health.system.entity.HealthData;
 import com.health.system.entity.User;
@@ -9,6 +10,7 @@ import com.health.system.mapper.HealthAlertMapper;
 import com.health.system.mapper.HealthDataMapper;
 import com.health.system.mapper.UserMapper;
 import com.health.system.service.PatientReportService;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -32,6 +34,7 @@ public class PatientReportServiceImpl implements PatientReportService {
     }
 
     @Override
+    @Cacheable(cacheNames = CacheNames.PATIENT_REPORT_SUMMARY, key = "#username + '::' + (#range == null ? 'week' : #range.toLowerCase())")
     public Map<String, Object> summary(String username, String range) {
         User user = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, username));
         if (user == null) {

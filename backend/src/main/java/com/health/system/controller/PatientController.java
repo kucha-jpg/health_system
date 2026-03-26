@@ -3,8 +3,6 @@ package com.health.system.controller;
 import com.health.system.common.ApiResponse;
 import com.health.system.dto.HealthDataDTO;
 import com.health.system.dto.PatientArchiveDTO;
-import com.health.system.entity.HealthAlert;
-import com.health.system.entity.HealthData;
 import com.health.system.entity.PatientArchive;
 import com.health.system.service.HealthAlertService;
 import com.health.system.service.HealthDataService;
@@ -14,7 +12,6 @@ import jakarta.validation.Valid;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -71,10 +68,12 @@ public class PatientController {
     }
 
     @GetMapping("/data")
-    public ApiResponse<List<HealthData>> listData(@RequestParam(required = false, name = "indicator_type") String indicatorType,
+    public ApiResponse<Map<String, Object>> listData(@RequestParam(required = false, name = "indicator_type") String indicatorType,
                                                   @RequestParam(required = false) String timeRange,
+                                                  @RequestParam(defaultValue = "1") Integer pageNo,
+                                                  @RequestParam(defaultValue = "20") Integer pageSize,
                                                   Authentication authentication) {
-        return ApiResponse.success(healthDataService.list(authentication.getName(), indicatorType, timeRange));
+        return ApiResponse.success(healthDataService.list(authentication.getName(), indicatorType, timeRange, pageNo, pageSize));
     }
 
     @PutMapping("/data/{id}")
@@ -92,9 +91,11 @@ public class PatientController {
     }
 
     @GetMapping("/alerts")
-    public ApiResponse<List<HealthAlert>> listMyAlerts(@RequestParam(required = false) String status,
-                                                        Authentication authentication) {
-        return ApiResponse.success(healthAlertService.listMyAlerts(authentication.getName(), status));
+    public ApiResponse<Map<String, Object>> listMyAlerts(@RequestParam(required = false) String status,
+                                                           @RequestParam(defaultValue = "1") Integer pageNo,
+                                                           @RequestParam(defaultValue = "20") Integer pageSize,
+                                                           Authentication authentication) {
+        return ApiResponse.success(healthAlertService.listMyAlerts(authentication.getName(), status, pageNo, pageSize));
     }
 
     @GetMapping("/reports/summary")

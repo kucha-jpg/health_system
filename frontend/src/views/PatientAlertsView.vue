@@ -21,6 +21,17 @@
       <el-table-column prop="createTime" label="触发时间" width="180" />
       <el-table-column prop="handleRemark" label="处理备注" />
     </el-table>
+    <div class="pager">
+      <el-pagination
+        v-model:current-page="pageNo"
+        v-model:page-size="pageSize"
+        layout="total, prev, pager, next, sizes"
+        :page-sizes="[10, 20, 50]"
+        :total="total"
+        @current-change="load"
+        @size-change="handlePageSizeChange"
+      />
+    </div>
   </el-card>
 </template>
 
@@ -30,10 +41,20 @@ import { getPatientAlertsApi } from '../api/modules'
 
 const alerts = ref([])
 const status = ref('')
+const pageNo = ref(1)
+const pageSize = ref(20)
+const total = ref(0)
 let timer = null
 
 const load = async () => {
-  alerts.value = await getPatientAlertsApi({ status: status.value })
+  const res = await getPatientAlertsApi({ status: status.value, pageNo: pageNo.value, pageSize: pageSize.value })
+  alerts.value = res?.list || []
+  total.value = res?.total || 0
+}
+
+const handlePageSizeChange = () => {
+  pageNo.value = 1
+  load()
 }
 
 onMounted(() => {
@@ -48,3 +69,11 @@ onUnmounted(() => {
   }
 })
 </script>
+
+<style scoped>
+.pager {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+</style>

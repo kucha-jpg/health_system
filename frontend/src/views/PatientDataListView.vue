@@ -37,6 +37,17 @@
         </template>
       </el-table-column>
     </el-table>
+    <div class="pager">
+      <el-pagination
+        v-model:current-page="query.pageNo"
+        v-model:page-size="query.pageSize"
+        layout="total, prev, pager, next, sizes"
+        :page-sizes="[10, 20, 50]"
+        :total="total"
+        @current-change="load"
+        @size-change="handlePageSizeChange"
+      />
+    </div>
   </el-card>
 
   <el-dialog v-model="visible" title="编辑健康数据">
@@ -60,13 +71,16 @@ import { deleteHealthDataApi, listHealthDataApi, updateHealthDataApi } from '../
 
 const list = ref([])
 const visible = ref(false)
-const query = reactive({ indicator_type: '', timeRange: '' })
+const query = reactive({ indicator_type: '', timeRange: '', pageNo: 1, pageSize: 20 })
 const form = reactive({ id: null, indicatorType: '', value: '', reportTime: '', remark: '' })
 const trendRef = ref(null)
 let trendChart = null
+const total = ref(0)
 
 const load = async () => {
-  list.value = await listHealthDataApi(query)
+  const res = await listHealthDataApi(query)
+  list.value = res?.list || []
+  total.value = res?.total || 0
   await renderTrend()
 }
 
@@ -132,6 +146,11 @@ const renderTrend = async () => {
   })
 }
 
+const handlePageSizeChange = () => {
+  query.pageNo = 1
+  load()
+}
+
 const openEdit = (row) => {
   Object.assign(form, row)
   visible.value = true
@@ -174,5 +193,11 @@ onUnmounted(() => {
 .trend-chart {
   width: 100%;
   height: 320px;
+}
+
+.pager {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
 }
 </style>

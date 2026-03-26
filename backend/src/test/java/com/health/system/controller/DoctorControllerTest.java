@@ -6,6 +6,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,13 +38,13 @@ class DoctorControllerTest {
         item.setId(1L);
         item.setRiskLevel("HIGH");
         item.setRiskScore(88);
-        when(healthAlertService.listOpenAlerts("doc-a", "HIGH", 80, "time_desc")).thenReturn(List.of(item));
+        when(healthAlertService.listOpenAlerts("doc-a", "HIGH", 80, "time_desc", 1, 20))
+                .thenReturn(Map.of("list", List.of(item), "total", 1L));
 
-        ApiResponse<List<HealthAlert>> response = doctorController.openAlerts(authentication, "HIGH", 80, "time_desc");
+        ApiResponse<Map<String, Object>> response = doctorController.openAlerts(authentication, "HIGH", 80, "time_desc", 1, 20);
 
-        verify(healthAlertService).listOpenAlerts("doc-a", "HIGH", 80, "time_desc");
+        verify(healthAlertService).listOpenAlerts("doc-a", "HIGH", 80, "time_desc", 1, 20);
         assertEquals(200, response.getCode());
-        assertEquals(1, response.getData().size());
-        assertEquals("HIGH", response.getData().get(0).getRiskLevel());
+        assertEquals(1, ((List<?>) response.getData().get("list")).size());
     }
 }

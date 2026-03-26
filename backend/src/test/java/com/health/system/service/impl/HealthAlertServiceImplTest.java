@@ -18,6 +18,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
@@ -60,10 +61,10 @@ class HealthAlertServiceImplTest {
         when(doctorGroupMapper.selectList(any())).thenReturn(List.of());
         when(doctorGroupDoctorMemberMapper.selectList(any())).thenReturn(List.of());
 
-        List<HealthAlert> result = healthAlertService.listOpenAlerts("doc-a", null, null, null);
+        Map<String, Object> result = healthAlertService.listOpenAlerts("doc-a", null, null, null, 1, 20);
 
-        assertEquals(0, result.size());
-        verify(healthAlertMapper, times(0)).selectList(any());
+        assertEquals(0, ((List<?>) result.get("list")).size());
+        verify(healthAlertMapper, times(0)).selectPage(any(), any());
     }
 
     @Test

@@ -42,6 +42,17 @@
         </template>
       </el-table-column>
     </el-table>
+    <div class="pager">
+      <el-pagination
+        v-model:current-page="query.pageNo"
+        v-model:page-size="query.pageSize"
+        layout="total, prev, pager, next, sizes"
+        :page-sizes="[10, 20, 50]"
+        :total="total"
+        @current-change="loadData"
+        @size-change="handlePageSizeChange"
+      />
+    </div>
   </el-card>
 </template>
 
@@ -55,15 +66,19 @@ const alerts = ref([])
 const query = ref({
   riskLevel: '',
   minRiskScore: 0,
-  sortBy: 'risk_desc'
+  sortBy: 'risk_desc',
+  pageNo: 1,
+  pageSize: 20
 })
 let timer = null
+const total = ref(0)
 
 const loadData = async () => {
   loading.value = true
   try {
     const res = await getDoctorAlertsApi(query.value)
-    alerts.value = res || []
+    alerts.value = res?.list || []
+    total.value = res?.total || 0
   } finally {
     loading.value = false
   }
@@ -73,7 +88,9 @@ const resetFilters = () => {
   query.value = {
     riskLevel: '',
     minRiskScore: 0,
-    sortBy: 'risk_desc'
+    sortBy: 'risk_desc',
+    pageNo: 1,
+    pageSize: 20
   }
   loadData()
 }
@@ -82,8 +99,15 @@ const applyHighRiskPreset = () => {
   query.value = {
     riskLevel: 'HIGH',
     minRiskScore: 80,
-    sortBy: 'risk_desc'
+    sortBy: 'risk_desc',
+    pageNo: 1,
+    pageSize: 20
   }
+  loadData()
+}
+
+const handlePageSizeChange = () => {
+  query.value.pageNo = 1
   loadData()
 }
 
@@ -125,5 +149,11 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.pager {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
 }
 </style>
