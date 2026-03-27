@@ -2,25 +2,39 @@
   <el-card>
     <template #header>
       <div class="toolbar">
-        <span>医生预警工作台</span>
-        <div class="filters">
-          <el-select v-model="query.riskLevel" clearable placeholder="风险级别" style="width: 140px" @change="loadData">
-            <el-option label="全部" value="" />
-            <el-option label="高风险" value="HIGH" />
-            <el-option label="中风险" value="MEDIUM" />
-            <el-option label="低风险" value="LOW" />
-          </el-select>
-          <el-input-number v-model="query.minRiskScore" :min="0" :max="100" :step="5" @change="loadData" />
-          <el-select v-model="query.sortBy" style="width: 170px" @change="loadData">
-            <el-option label="按风险分优先" value="risk_desc" />
-            <el-option label="按最新时间优先" value="time_desc" />
-          </el-select>
+        <div>
+          <div class="title">医生预警工作台</div>
+          <div class="sub">聚焦高风险患者，支持快捷筛选与分页查看</div>
+        </div>
+        <div class="toolbar-actions">
+          <el-button :loading="loading" @click="loadData">刷新</el-button>
           <el-button type="danger" plain @click="applyHighRiskPreset">高风险快捷视图</el-button>
-          <el-button @click="resetFilters">重置</el-button>
         </div>
       </div>
     </template>
-    <el-table :data="alerts" v-loading="loading" border>
+
+    <el-row :gutter="10" class="summary-row">
+      <el-col :xs="24" :sm="8"><el-card shadow="never">全部预警：{{ total }}</el-card></el-col>
+      <el-col :xs="24" :sm="8"><el-card shadow="never">高风险：{{ riskSummary.HIGH }}</el-card></el-col>
+      <el-col :xs="24" :sm="8"><el-card shadow="never">中风险：{{ riskSummary.MEDIUM }}</el-card></el-col>
+    </el-row>
+
+    <div class="filters">
+      <el-select v-model="query.riskLevel" clearable placeholder="风险级别" style="width: 140px" @change="onFilterChanged">
+        <el-option label="全部" value="" />
+        <el-option label="高风险" value="HIGH" />
+        <el-option label="中风险" value="MEDIUM" />
+        <el-option label="低风险" value="LOW" />
+      </el-select>
+      <el-input-number v-model="query.minRiskScore" :min="0" :max="100" :step="5" @change="onFilterChanged" />
+      <el-select v-model="query.sortBy" style="width: 170px" @change="onFilterChanged">
+        <el-option label="按风险分优先" value="risk_desc" />
+        <el-option label="按最新时间优先" value="time_desc" />
+      </el-select>
+      <el-button @click="resetFilters">重置</el-button>
+    </div>
+
+    <el-table :data="alerts" v-loading="loading" border empty-text="暂无匹配预警，试试调整筛选条件">
       <el-table-column prop="userId" label="患者ID" width="90" />
       <el-table-column prop="indicatorType" label="指标" width="90" />
       <el-table-column prop="value" label="数值" width="120" />
@@ -36,13 +50,15 @@
           {{ scope.row.reasonText || scope.row.reason }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="120">
+      <el-table-column label="操作" width="130" fixed="right">
         <template #default="scope">
           <el-button size="small" type="primary" @click="handle(scope.row)">闭环处理</el-button>
         </template>
       </el-table-column>
     </el-table>
+
     <div class="pager">
+      <span class="sub">最近刷新：{{ lastUpdated || '-' }}</span>
       <el-pagination
         v-model:current-page="query.pageNo"
         v-model:page-size="query.pageSize"
@@ -57,7 +73,7 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { getDoctorAlertsApi, handleDoctorAlertApi } from '../api/modules'
 
@@ -72,6 +88,16 @@ const query = ref({
 })
 let timer = null
 const total = ref(0)
+const lastUpdated = ref('')
+
+const riskSummary = computed(() => {
+  const stat = { HIGH: 0, MEDIUM: 0 }
+  alerts.value.forEach((item) => {
+    if (item.riskLevel === 'HIGH') stat.HIGH += 1
+    if (item.riskLevel === 'MEDIUM') stat.MEDIUM += 1
+  })
+  return stat
+})
 
 const loadData = async () => {
   loading.value = true
@@ -79,9 +105,17 @@ const loadData = async () => {
     const res = await getDoctorAlertsApi(query.value)
     alerts.value = res?.list || []
     total.value = res?.total || 0
+    lastUpdated.value = new Date().toLocaleString()
+  } catch (err) {
+    ElMessage.error(err?.message || '加载预警数据失败，请稍后重试')
   } finally {
     loading.value = false
   }
+}
+
+const onFilterChanged = () => {
+  query.value.pageNo = 1
+  loadData()
 }
 
 const resetFilters = () => {
@@ -145,15 +179,38 @@ onUnmounted(() => {
   gap: 12px;
 }
 
+.toolbar-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.sub {
+  color: #909399;
+  font-size: 12px;
+}
+
+.summary-row {
+  margin-bottom: 10px;
+}
+
 .filters {
   display: flex;
   align-items: center;
   gap: 8px;
+  margin: 8px 0 12px;
+  flex-wrap: wrap;
 }
 
 .pager {
   margin-top: 12px;
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
 }
 </style>

@@ -2,41 +2,55 @@
   <el-card>
     <template #header>
       <div class="toolbar">
-        <span>历史上报数据</span>
         <div>
-          <el-select v-model="query.indicator_type" placeholder="指标类型" clearable style="width: 140px; margin-right: 8px">
-            <el-option label="血压" value="血压" />
-            <el-option label="血糖" value="血糖" />
-            <el-option label="体重" value="体重" />
-            <el-option label="服药" value="服药" />
-          </el-select>
-          <el-select v-model="query.timeRange" placeholder="时间范围" clearable style="width: 140px; margin-right: 8px">
-            <el-option label="最近一天" value="day" />
-            <el-option label="最近一周" value="week" />
-            <el-option label="最近一月" value="month" />
-          </el-select>
-          <el-button @click="load">筛选</el-button>
+          <div class="title">历史上报数据</div>
+          <div class="sub">支持按指标和时间范围快速筛选</div>
+        </div>
+        <div class="actions">
+          <el-button :loading="loading" @click="load">刷新</el-button>
+          <el-button @click="resetFilter">重置筛选</el-button>
         </div>
       </div>
     </template>
+
+    <div class="filter-row">
+      <el-select v-model="query.indicator_type" placeholder="指标类型" clearable style="width: 140px" @change="onFilterChanged">
+        <el-option label="血压" value="血压" />
+        <el-option label="血糖" value="血糖" />
+        <el-option label="体重" value="体重" />
+        <el-option label="服药" value="服药" />
+      </el-select>
+      <el-select v-model="query.timeRange" placeholder="时间范围" clearable style="width: 140px" @change="onFilterChanged">
+        <el-option label="最近一天" value="day" />
+        <el-option label="最近一周" value="week" />
+        <el-option label="最近一月" value="month" />
+      </el-select>
+    </div>
+
+    <el-row :gutter="10" class="summary-row">
+      <el-col :xs="24" :sm="8"><el-card shadow="never">当前列表数量：{{ list.length }}</el-card></el-col>
+      <el-col :xs="24" :sm="8"><el-card shadow="never">总记录数：{{ total }}</el-card></el-col>
+      <el-col :xs="24" :sm="8"><el-card shadow="never">筛选指标：{{ query.indicator_type || '全部' }}</el-card></el-col>
+    </el-row>
 
     <el-card style="margin-bottom: 12px">
       <template #header>指标趋势图</template>
       <div ref="trendRef" class="trend-chart"></div>
     </el-card>
 
-    <el-table :data="list" border>
+    <el-table :data="list" border v-loading="loading" empty-text="暂无健康数据记录">
       <el-table-column prop="indicatorType" label="指标" width="100" />
       <el-table-column prop="value" label="数值" width="140" />
       <el-table-column prop="reportTime" label="上报时间" width="180" />
-      <el-table-column prop="remark" label="备注" />
-      <el-table-column label="操作" width="160">
+      <el-table-column prop="remark" label="备注" show-overflow-tooltip />
+      <el-table-column label="操作" width="160" fixed="right">
         <template #default="scope">
           <el-button link type="primary" @click="openEdit(scope.row)">编辑</el-button>
           <el-button link type="danger" @click="remove(scope.row.id)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
+
     <div class="pager">
       <el-pagination
         v-model:current-page="query.pageNo"
@@ -58,7 +72,7 @@
     </el-form>
     <template #footer>
       <el-button @click="visible=false">取消</el-button>
-      <el-button type="primary" @click="saveEdit">保存</el-button>
+      <el-button type="primary" :loading="saving" @click="saveEdit">保存</el-button>
     </template>
   </el-dialog>
 </template>
@@ -66,10 +80,12 @@
 <script setup>
 import { nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
 import * as echarts from 'echarts'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { deleteHealthDataApi, listHealthDataApi, updateHealthDataApi } from '../api/modules'
 
 const list = ref([])
+const loading = ref(false)
+const saving = ref(false)
 const visible = ref(false)
 const query = reactive({ indicator_type: '', timeRange: '', pageNo: 1, pageSize: 20 })
 const form = reactive({ id: null, indicatorType: '', value: '', reportTime: '', remark: '' })
@@ -78,10 +94,29 @@ let trendChart = null
 const total = ref(0)
 
 const load = async () => {
-  const res = await listHealthDataApi(query)
-  list.value = res?.list || []
-  total.value = res?.total || 0
-  await renderTrend()
+  loading.value = true
+  try {
+    const res = await listHealthDataApi(query)
+    list.value = res?.list || []
+    total.value = res?.total || 0
+    await renderTrend()
+  } catch (err) {
+    ElMessage.error(err?.message || '加载健康数据失败，请稍后重试')
+  } finally {
+    loading.value = false
+  }
+}
+
+const onFilterChanged = () => {
+  query.pageNo = 1
+  load()
+}
+
+const resetFilter = () => {
+  query.indicator_type = ''
+  query.timeRange = ''
+  query.pageNo = 1
+  load()
 }
 
 const parseNumericValue = (item) => {
@@ -157,13 +192,19 @@ const openEdit = (row) => {
 }
 
 const saveEdit = async () => {
-  await updateHealthDataApi(form.id, form)
-  ElMessage.success('更新成功')
-  visible.value = false
-  await load()
+  saving.value = true
+  try {
+    await updateHealthDataApi(form.id, form)
+    ElMessage.success('更新成功')
+    visible.value = false
+    await load()
+  } finally {
+    saving.value = false
+  }
 }
 
 const remove = async (id) => {
+  await ElMessageBox.confirm('确认删除该条健康数据吗？', '删除确认', { type: 'warning' })
   await deleteHealthDataApi(id)
   ElMessage.success('删除成功')
   await load()
@@ -190,6 +231,39 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.sub {
+  color: #909399;
+  font-size: 12px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.filter-row {
+  margin-bottom: 12px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.summary-row {
+  margin-bottom: 12px;
+}
+
 .trend-chart {
   width: 100%;
   height: 320px;
