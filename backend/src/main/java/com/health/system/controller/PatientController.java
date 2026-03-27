@@ -103,4 +103,17 @@ public class PatientController {
                                                           Authentication authentication) {
         return ApiResponse.success(patientReportService.summary(authentication.getName(), range));
     }
+
+
+    @PostMapping("/reports/summary/async")
+    public ApiResponse<Map<String, Object>> submitReportSummaryTask(@RequestParam(defaultValue = "week") String range,
+                                                                     Authentication authentication) {
+        return ApiResponse.success(patientReportService.submitSummaryTask(authentication.getName(), range));
+    }
+
+    @GetMapping("/reports/summary/async/{taskId}")
+    public ApiResponse<Map<String, Object>> reportSummaryTaskResult(@PathVariable String taskId,
+                                                                     Authentication authentication) {
+        return ApiResponse.success(patientReportService.summaryTaskResult(authentication.getName(), taskId));
+    }
 }
