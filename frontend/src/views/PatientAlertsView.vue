@@ -1,23 +1,23 @@
 <template>
-  <el-card>
-    <template #header>
-      <div class="toolbar">
-        <div>
-          <div class="title">我的预警详情</div>
-          <div class="sub">查看风险变化与处理进度</div>
-        </div>
-        <div class="actions">
-          <el-select v-model="status" style="width: 160px" @change="onStatusChanged">
-            <el-option label="全部" value="" />
-            <el-option label="未处理" value="OPEN" />
-            <el-option label="已处理" value="CLOSED" />
-          </el-select>
-          <el-button :loading="loading" @click="load">刷新</el-button>
-        </div>
+  <el-card class="page-shell fade-in-page">
+    <div class="page-header">
+      <div>
+        <h3 class="page-title">我的预警详情</h3>
+        <p class="page-subtitle">查看风险变化与处理进度</p>
       </div>
-    </template>
+      <div class="page-actions">
+        <el-select v-model="status" style="width: 160px" @change="onStatusChanged">
+          <el-option label="全部" value="" />
+          <el-option label="未处理" value="OPEN" />
+          <el-option label="已处理" value="CLOSED" />
+        </el-select>
+        <el-button :loading="loading" @click="load">刷新</el-button>
+      </div>
+    </div>
 
-    <el-table :data="alerts" border v-loading="loading" empty-text="暂无预警记录">
+    <div class="soft-tip">当前筛选：{{ status || '全部状态' }}，系统将持续刷新预警处理进度。</div>
+
+    <el-table :data="alerts" border v-loading="loading">
       <el-table-column prop="indicatorType" label="指标" width="100" />
       <el-table-column prop="value" label="数值" width="120" />
       <el-table-column prop="level" label="等级" width="100" />
@@ -35,6 +35,13 @@
       </el-table-column>
       <el-table-column prop="createTime" label="触发时间" width="180" />
       <el-table-column prop="handleRemark" label="处理备注" min-width="180" show-overflow-tooltip />
+      <template #empty>
+        <div class="empty-state">
+          <div class="empty-illustration"></div>
+          <div class="empty-title">暂无预警记录</div>
+          <div class="empty-desc">继续保持稳定上报，系统将自动跟踪风险变化。</div>
+        </div>
+      </template>
     </el-table>
 
     <div class="pager">
@@ -107,29 +114,6 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-}
-
-.title {
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.sub {
-  color: #909399;
-  font-size: 12px;
-}
-
-.actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .pager {
   margin-top: 12px;
   display: flex;

@@ -2,6 +2,7 @@ package com.health.system.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.health.system.common.BusinessException;
+import com.health.system.common.SensitiveDataCipher;
 import com.health.system.dto.PatientArchiveDTO;
 import com.health.system.entity.PatientArchive;
 import com.health.system.entity.User;
@@ -15,16 +16,22 @@ public class PatientArchiveServiceImpl implements PatientArchiveService {
 
     private final PatientArchiveMapper patientArchiveMapper;
     private final UserMapper userMapper;
+    private final SensitiveDataCipher sensitiveDataCipher;
 
-    public PatientArchiveServiceImpl(PatientArchiveMapper patientArchiveMapper, UserMapper userMapper) {
+    public PatientArchiveServiceImpl(PatientArchiveMapper patientArchiveMapper,
+                                     UserMapper userMapper,
+                                     SensitiveDataCipher sensitiveDataCipher) {
         this.patientArchiveMapper = patientArchiveMapper;
         this.userMapper = userMapper;
+        this.sensitiveDataCipher = sensitiveDataCipher;
     }
 
     @Override
     public PatientArchive getMyArchive(String username) {
         Long userId = getCurrentUserId(username);
-        return patientArchiveMapper.selectOne(new LambdaQueryWrapper<PatientArchive>().eq(PatientArchive::getUserId, userId));
+        PatientArchive archive = patientArchiveMapper.selectOne(new LambdaQueryWrapper<PatientArchive>().eq(PatientArchive::getUserId, userId));
+        decryptArchive(archive);
+        return archive;
     }
 
     @Override
@@ -37,9 +44,9 @@ public class PatientArchiveServiceImpl implements PatientArchiveService {
         }
         archive.setName(dto.getName());
         archive.setAge(dto.getAge());
-        archive.setMedicalHistory(dto.getMedicalHistory());
-        archive.setMedicationHistory(dto.getMedicationHistory());
-        archive.setAllergyHistory(dto.getAllergyHistory());
+        archive.setMedicalHistory(sensitiveDataCipher.encrypt(dto.getMedicalHistory()));
+        archive.setMedicationHistory(sensitiveDataCipher.encrypt(dto.getMedicationHistory()));
+        archive.setAllergyHistory(sensitiveDataCipher.encrypt(dto.getAllergyHistory()));
 
         if (archive.getId() == null) {
             patientArchiveMapper.insert(archive);
@@ -64,5 +71,14 @@ public class PatientArchiveServiceImpl implements PatientArchiveService {
             throw BusinessException.notFound("用户不存在");
         }
         return user.getId();
+    }
+
+    private void decryptArchive(PatientArchive archive) {
+        if (archive == null) {
+            return;
+        }
+        archive.setMedicalHistory(sensitiveDataCipher.decrypt(archive.getMedicalHistory()));
+        archive.setMedicationHistory(sensitiveDataCipher.decrypt(archive.getMedicationHistory()));
+        archive.setAllergyHistory(sensitiveDataCipher.decrypt(archive.getAllergyHistory()));
     }
 }

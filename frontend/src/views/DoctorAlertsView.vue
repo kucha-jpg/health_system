@@ -1,17 +1,19 @@
 <template>
-  <el-card>
-    <template #header>
-      <div class="toolbar">
-        <div>
-          <div class="title">医生预警工作台</div>
-          <div class="sub">聚焦高风险患者，支持快捷筛选与分页查看</div>
-        </div>
-        <div class="toolbar-actions">
-          <el-button :loading="loading" @click="loadData">刷新</el-button>
-          <el-button type="danger" plain @click="applyHighRiskPreset">高风险快捷视图</el-button>
-        </div>
+  <el-card class="page-shell">
+    <div class="page-header">
+      <div>
+        <h3 class="page-title">医生预警工作台</h3>
+        <p class="page-subtitle">聚焦高风险患者，支持快捷筛选与分页查看</p>
       </div>
-    </template>
+      <div class="page-actions">
+        <el-button :loading="loading" @click="loadData">刷新</el-button>
+        <el-button type="danger" plain @click="applyHighRiskPreset">高风险快捷视图</el-button>
+      </div>
+    </div>
+
+    <div class="soft-tip">
+      当前筛选：{{ query.riskLevel || '全部级别' }} / 最低风险分 {{ query.minRiskScore }} / {{ query.sortBy === 'risk_desc' ? '按风险优先' : '按时间优先' }}
+    </div>
 
     <el-row :gutter="10" class="summary-row">
       <el-col :xs="24" :sm="8"><el-card shadow="never">全部预警：{{ total }}</el-card></el-col>
@@ -53,6 +55,7 @@
       <el-table-column label="操作" width="130" fixed="right">
         <template #default="scope">
           <el-button size="small" type="primary" @click="handle(scope.row)">闭环处理</el-button>
+          <el-button size="small" text type="success" @click="quickHandle(scope.row)">一键闭环</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -76,6 +79,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { getDoctorAlertsApi, handleDoctorAlertApi } from '../api/modules'
+import { showFirstVisitGuide } from '../composables/useFirstVisitGuide'
 
 const loading = ref(false)
 const alerts = ref([])
@@ -158,8 +162,24 @@ const handle = async (row) => {
   await loadData()
 }
 
+const quickHandle = async (row) => {
+  await ElMessageBox.confirm('将使用默认处理意见“已电话随访，建议持续监测”，确认继续？', '一键闭环', {
+    confirmButtonText: '确认',
+    cancelButtonText: '取消',
+    type: 'warning'
+  })
+  await handleDoctorAlertApi(row.id, { handleRemark: '已电话随访，建议持续监测' })
+  ElMessage.success('已快速完成闭环处理')
+  await loadData()
+}
+
 onMounted(() => {
   loadData()
+  showFirstVisitGuide({
+    storageKey: 'guide_doctor_alerts_v1',
+    title: '预警工作台引导',
+    message: '可先使用“高风险快捷视图”进行分诊，再按风险分和时间排序处理；闭环意见将进入审计链路用于追踪。'
+  }).catch(() => {})
   timer = window.setInterval(loadData, 10000)
 })
 
@@ -177,11 +197,6 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-}
-
-.toolbar-actions {
-  display: flex;
-  gap: 8px;
 }
 
 .title {

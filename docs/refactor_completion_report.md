@@ -94,3 +94,9 @@
 ## 8. 结论
 - 本轮优化已完成“可维护性提升 + 行为不变 + 全程回归验证”的目标。
 - 系统当前已达到“可继续扩展、可持续重构、可证据化交付”的稳定状态。
+
+## 9. 后续回归更新（2026-04-07）
+
+- `SecurityErrorCodeIntegrationTest` 已恢复通过（4 passed, 0 failed）。
+- 失败根因定位为 WebMvcTest 切片下新增 Mapper 未被 mock，导致上下文加载失败。
+- 修复方式：在测试类补充新增 Mapper 的 `@MockBean(classes=...)` 注入。

@@ -6,10 +6,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.health.system.common.BusinessException;
+import com.health.system.common.CacheNames;
 import com.health.system.dto.DoctorGroupDTO;
 import com.health.system.entity.DoctorGroup;
 import com.health.system.entity.DoctorGroupDoctorMember;
@@ -20,6 +23,7 @@ import com.health.system.mapper.DoctorGroupMapper;
 import com.health.system.mapper.DoctorGroupMemberMapper;
 import com.health.system.mapper.UserMapper;
 import com.health.system.service.DoctorGroupService;
+import com.health.system.service.support.DoctorAccessSupport;
 
 @Service
 public class DoctorGroupServiceImpl implements DoctorGroupService {
@@ -28,20 +32,27 @@ public class DoctorGroupServiceImpl implements DoctorGroupService {
     private final DoctorGroupDoctorMemberMapper doctorGroupDoctorMemberMapper;
     private final DoctorGroupMemberMapper doctorGroupMemberMapper;
     private final UserMapper userMapper;
+    private final DoctorAccessSupport doctorAccessSupport;
 
     public DoctorGroupServiceImpl(DoctorGroupMapper doctorGroupMapper,
                                   DoctorGroupDoctorMemberMapper doctorGroupDoctorMemberMapper,
                                   DoctorGroupMemberMapper doctorGroupMemberMapper,
-                                  UserMapper userMapper) {
+                                  UserMapper userMapper,
+                                  DoctorAccessSupport doctorAccessSupport) {
         this.doctorGroupMapper = doctorGroupMapper;
         this.doctorGroupDoctorMemberMapper = doctorGroupDoctorMemberMapper;
         this.doctorGroupMemberMapper = doctorGroupMemberMapper;
         this.userMapper = userMapper;
+        this.doctorAccessSupport = doctorAccessSupport;
     }
 
     @Override
+        @Caching(evict = {
+            @CacheEvict(cacheNames = CacheNames.DOCTOR_PATIENT_INSIGHT, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.DOCTOR_OPEN_ALERTS, allEntries = true)
+        })
     public void createGroup(String doctorUsername, DoctorGroupDTO dto) {
-        User doctor = getDoctor(doctorUsername);
+        User doctor = doctorAccessSupport.requireDoctor(doctorUsername);
         DoctorGroup group = new DoctorGroup();
         group.setDoctorId(doctor.getId());
         group.setGroupName(dto.getGroupName());
@@ -51,7 +62,7 @@ public class DoctorGroupServiceImpl implements DoctorGroupService {
 
     @Override
     public List<DoctorGroup> listMyGroups(String doctorUsername) {
-        User doctor = getDoctor(doctorUsername);
+        User doctor = doctorAccessSupport.requireDoctor(doctorUsername);
         List<DoctorGroup> ownedGroups = doctorGroupMapper.selectList(new LambdaQueryWrapper<DoctorGroup>()
                 .eq(DoctorGroup::getDoctorId, doctor.getId())
                 .orderByDesc(DoctorGroup::getCreateTime));
@@ -83,8 +94,12 @@ public class DoctorGroupServiceImpl implements DoctorGroupService {
     }
 
     @Override
+        @Caching(evict = {
+            @CacheEvict(cacheNames = CacheNames.DOCTOR_PATIENT_INSIGHT, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.DOCTOR_OPEN_ALERTS, allEntries = true)
+        })
     public void addDoctorToGroup(String doctorUsername, Long groupId, Long doctorUserId) {
-        User operator = getDoctor(doctorUsername);
+        User operator = doctorAccessSupport.requireDoctor(doctorUsername);
         DoctorGroup group = doctorGroupMapper.selectById(groupId);
         if (group == null) {
             throw BusinessException.notFound("群组不存在");
@@ -117,8 +132,8 @@ public class DoctorGroupServiceImpl implements DoctorGroupService {
 
     @Override
     public List<User> listGroupDoctors(String doctorUsername, Long groupId) {
-        User operator = getDoctor(doctorUsername);
-        assertGroupAccessible(operator.getId(), groupId);
+        User operator = doctorAccessSupport.requireDoctor(doctorUsername);
+        doctorAccessSupport.assertGroupAccessible(operator.getId(), groupId);
 
         DoctorGroup group = doctorGroupMapper.selectById(groupId);
         if (group == null) {
@@ -145,9 +160,13 @@ public class DoctorGroupServiceImpl implements DoctorGroupService {
     }
 
     @Override
+        @Caching(evict = {
+            @CacheEvict(cacheNames = CacheNames.DOCTOR_PATIENT_INSIGHT, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.DOCTOR_OPEN_ALERTS, allEntries = true)
+        })
     public void addPatientToGroup(String doctorUsername, Long groupId, Long patientUserId) {
-        User doctor = getDoctor(doctorUsername);
-        assertGroupAccessible(doctor.getId(), groupId);
+        User doctor = doctorAccessSupport.requireDoctor(doctorUsername);
+        doctorAccessSupport.assertGroupAccessible(doctor.getId(), groupId);
         User patient = userMapper.selectById(patientUserId);
         if (patient == null || !"PATIENT".equals(patient.getRoleType())) {
             throw BusinessException.notFound("患者不存在");
@@ -166,8 +185,8 @@ public class DoctorGroupServiceImpl implements DoctorGroupService {
 
     @Override
     public List<User> listGroupPatients(String doctorUsername, Long groupId) {
-        User doctor = getDoctor(doctorUsername);
-        assertGroupAccessible(doctor.getId(), groupId);
+        User doctor = doctorAccessSupport.requireDoctor(doctorUsername);
+        doctorAccessSupport.assertGroupAccessible(doctor.getId(), groupId);
         List<DoctorGroupMember> members = doctorGroupMemberMapper.selectList(new LambdaQueryWrapper<DoctorGroupMember>()
                 .eq(DoctorGroupMember::getGroupId, groupId));
         List<User> patients = new ArrayList<>();
@@ -180,27 +199,4 @@ public class DoctorGroupServiceImpl implements DoctorGroupService {
         return patients;
     }
 
-    private void assertGroupAccessible(Long doctorId, Long groupId) {
-        DoctorGroup group = doctorGroupMapper.selectById(groupId);
-        if (group == null) {
-            throw BusinessException.notFound("群组不存在");
-        }
-        if (doctorId.equals(group.getDoctorId())) {
-            return;
-        }
-        Long count = doctorGroupDoctorMemberMapper.selectCount(new LambdaQueryWrapper<DoctorGroupDoctorMember>()
-                .eq(DoctorGroupDoctorMember::getGroupId, groupId)
-                .eq(DoctorGroupDoctorMember::getDoctorUserId, doctorId));
-        if (count == null || count == 0) {
-            throw BusinessException.forbidden("群组不存在或无权限");
-        }
-    }
-
-    private User getDoctor(String username) {
-        User doctor = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, username));
-        if (doctor == null || !"DOCTOR".equals(doctor.getRoleType())) {
-            throw BusinessException.notFound("医生不存在");
-        }
-        return doctor;
-    }
 }

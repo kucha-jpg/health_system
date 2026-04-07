@@ -1,13 +1,20 @@
 <template>
-  <el-card>
-    <template #header>
-      <div class="toolbar">
-        <span>预警规则管理</span>
-        <el-button type="primary" @click="openDialog()">新增规则</el-button>
+  <div class="page-shell">
+    <el-card class="page-shell fade-in-page">
+      <div class="page-header">
+        <div>
+          <h3 class="page-title">预警规则管理</h3>
+          <p class="page-subtitle">维护高/中风险阈值，支持启停与指标联动配置</p>
+        </div>
+        <div class="page-actions">
+          <el-button @click="load">刷新</el-button>
+          <el-button type="primary" @click="openDialog()">新增规则</el-button>
+        </div>
       </div>
-    </template>
 
-    <el-table :data="rules" border>
+      <div class="soft-tip">规则总数 {{ rules.length }}，启用指标 {{ enabledIndicatorTypes.length }} 个。</div>
+
+      <el-table :data="rules" border>
       <el-table-column prop="id" label="ID" width="80" />
       <el-table-column prop="indicatorType" label="指标类型" width="120" />
       <el-table-column prop="highRule" label="高风险阈值" width="180" />
@@ -22,18 +29,28 @@
           <el-button link type="primary" @click="openDialog(scope.row)">编辑</el-button>
         </template>
       </el-table-column>
-    </el-table>
-  </el-card>
+      <template #empty>
+        <div class="empty-state">
+          <div class="empty-illustration"></div>
+          <div class="empty-title">暂无预警规则</div>
+          <div class="empty-desc">可先新增规则并启用对应指标类型。</div>
+        </div>
+      </template>
+      </el-table>
+    </el-card>
 
-  <el-card style="margin-top: 16px;">
-    <template #header>
-      <div class="toolbar">
-        <span>健康指标类型管理</span>
-        <el-button type="primary" @click="openIndicatorDialog()">新增指标</el-button>
+    <el-card class="fade-in-page">
+      <div class="page-header">
+        <div>
+          <h3 class="page-title">健康指标类型管理</h3>
+          <p class="page-subtitle">统一维护可上报指标与展示名称，支持启停控制</p>
+        </div>
+        <div class="page-actions">
+          <el-button type="primary" @click="openIndicatorDialog()">新增指标</el-button>
+        </div>
       </div>
-    </template>
 
-    <el-table :data="indicatorTypes" border>
+      <el-table :data="indicatorTypes" border>
       <el-table-column prop="id" label="ID" width="80" />
       <el-table-column prop="indicatorType" label="指标类型" width="160" />
       <el-table-column prop="displayName" label="展示名称" width="160" />
@@ -47,8 +64,16 @@
           <el-button link type="primary" @click="openIndicatorDialog(scope.row)">编辑</el-button>
         </template>
       </el-table-column>
-    </el-table>
-  </el-card>
+      <template #empty>
+        <div class="empty-state">
+          <div class="empty-illustration"></div>
+          <div class="empty-title">暂无指标类型</div>
+          <div class="empty-desc">建议先创建基础指标，再维护对应预警规则。</div>
+        </div>
+      </template>
+      </el-table>
+    </el-card>
+  </div>
 
   <el-dialog v-model="visible" title="预警规则">
     <el-form :model="form" label-width="110px">

@@ -52,7 +52,7 @@ public class OperationLogServiceImpl implements OperationLogService {
         Integer pageSizeObj = query == null ? null : query.getPageSize();
         int pageNo = safeInt(pageNoObj, 1);
         int pageSize = safeInt(pageSizeObj, 20);
-        int safePageNo = Math.max(pageNo, 1);
+        int safePageNo = Math.min(Math.max(pageNo, 1), 1000);
         int safePageSize = Math.min(Math.max(pageSize, 1), 200);
         int offset = (safePageNo - 1) * safePageSize;
 
@@ -69,6 +69,8 @@ public class OperationLogServiceImpl implements OperationLogService {
         Map<String, Object> result = new HashMap<>();
         result.put("records", records);
         result.put("total", total);
+        result.put("pageNo", safePageNo);
+        result.put("pageSize", safePageSize);
         return result;
     }
 

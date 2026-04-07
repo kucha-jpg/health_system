@@ -1,60 +1,6 @@
-import http from './http'
-
-export const loginApi = (payload) => http.post('/auth/login', payload)
-export const registerApi = (payload) => http.post('/auth/register', payload)
-export const validateSessionApi = () => http.get('/auth/ping', { __skipAuthRedirect: true, __skipErrorToast: true })
-export const createFeedbackApi = (payload) => http.post('/feedback', payload)
-export const listMyFeedbackApi = () => http.get('/feedback/mine')
-export const listMyFeedbackPageApi = (params) => http.get('/feedback/mine/page', { params })
-export const getUnreadFeedbackCountApi = () => http.get('/feedback/unread-count')
-export const markMyFeedbackReadApi = () => http.post('/feedback/mark-read')
-export const listAdminFeedbackApi = (params) => http.get('/admin/feedback', { params })
-export const listAdminFeedbackPageApi = (params) => http.get('/admin/feedback/page', { params })
-export const getAdminFeedbackStatsApi = () => http.get('/admin/feedback/stats')
-export const getPendingFeedbackCountApi = () => http.get('/admin/feedback/pending-count')
-export const updateFeedbackStatusApi = (id, status) => http.patch(`/admin/feedback/${id}/status?status=${status}`)
-export const batchUpdateFeedbackStatusApi = (payload) => http.patch('/admin/feedback/batch-status', payload)
-export const batchUpdateFeedbackStatusByFilterApi = (params) => http.patch('/admin/feedback/batch-status-by-filter', null, { params })
-export const replyFeedbackApi = (payload) => http.put('/admin/feedback/reply', payload)
-
-export const getUsersApi = (params) => http.get('/admin/user', { params })
-export const addUserApi = (payload) => http.post('/admin/user', payload)
-export const updateUserApi = (payload) => http.put('/admin/user', payload)
-export const updateUserStatusApi = (id, status) => http.patch(`/admin/user/${id}/status?status=${status}`)
-export const getMonitorOverviewApi = () => http.get('/admin/monitor/overview')
-
-export const getArchiveApi = () => http.get('/patient/archive')
-export const saveArchiveApi = (payload) => http.post('/patient/archive', payload)
-
-export const reportHealthDataApi = (payload) => http.post('/patient/data', payload)
-export const listHealthDataApi = (params) => http.get('/patient/data', { params })
-export const updateHealthDataApi = (id, payload) => http.put(`/patient/data/${id}`, payload)
-export const deleteHealthDataApi = (id) => http.delete(`/patient/data/${id}`)
-
-export const getDoctorAlertsApi = (params) => http.get('/doctor/alerts', { params })
-export const handleDoctorAlertApi = (id, payload) => http.post(`/doctor/alerts/${id}/handle`, payload)
-export const getDoctorGroupsApi = () => http.get('/doctor/groups')
-export const createDoctorGroupApi = (payload) => http.post('/doctor/groups', payload)
-export const addDoctorGroupPatientApi = (id, payload) => http.post(`/doctor/groups/${id}/patients`, payload)
-export const listDoctorGroupPatientsApi = (id) => http.get(`/doctor/groups/${id}/patients`)
-export const addDoctorGroupDoctorApi = (id, payload) => http.post(`/doctor/groups/${id}/doctors`, payload)
-export const listDoctorGroupDoctorsApi = (id) => http.get(`/doctor/groups/${id}/doctors`)
-
-export const getPatientAlertsApi = (params) => http.get('/patient/alerts', { params })
-export const getPatientReportSummaryApi = (params) => http.get('/patient/reports/summary', { params })
-
-export const listNoticesApi = (params) => http.get('/admin/config/notices', { params })
-export const createNoticeApi = (payload) => http.post('/admin/config/notices', payload)
-export const updateNoticeApi = (payload) => http.put('/admin/config/notices', payload)
-export const deleteNoticeApi = (id) => http.delete(`/admin/config/notices/${id}`)
-export const listAlertRulesApi = () => http.get('/admin/config/alert-rules')
-export const createAlertRuleApi = (payload) => http.post('/admin/config/alert-rules', payload)
-export const updateAlertRuleApi = (payload) => http.put('/admin/config/alert-rules', payload)
-export const listIndicatorTypesApi = (params) => http.get('/admin/config/indicator-types', { params })
-export const createIndicatorTypeApi = (payload) => http.post('/admin/config/indicator-types', payload)
-export const updateIndicatorTypeApi = (payload) => http.put('/admin/config/indicator-types', payload)
-export const listOperationLogsApi = (params) => http.get('/admin/logs', { params })
-export const listOperationLogsPageApi = (params) => http.get('/admin/logs/page', { params })
-export const listRolesApi = () => http.get('/admin/roles')
-export const updateRolePermissionApi = (payload) => http.put('/admin/roles', payload)
-export const getDoctorPatientInsightApi = (patientUserId, params) => http.get(`/doctor/patients/${patientUserId}/insight`, { params })
+export * from './modules/auth'
+export * from './modules/feedback'
+export * from './modules/admin'
+export * from './modules/patient'
+export * from './modules/doctor'
+export * from './modules/config'

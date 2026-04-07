@@ -7,11 +7,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.health.system.common.BusinessException;
+import com.health.system.common.CacheNames;
 import com.health.system.dto.AdminFeedbackReplyDTO;
 import com.health.system.dto.FeedbackCreateDTO;
 import com.health.system.dto.FeedbackQueryDTO;
@@ -33,6 +37,7 @@ public class FeedbackMessageServiceImpl implements FeedbackMessageService {
     }
 
     @Override
+    @CacheEvict(cacheNames = CacheNames.ADMIN_FEEDBACK_STATS, allEntries = true)
     public void createFeedback(String username, FeedbackCreateDTO dto) {
         User user = requireNonAdminUser(username, "管理员账号无需反馈");
 
@@ -58,7 +63,7 @@ public class FeedbackMessageServiceImpl implements FeedbackMessageService {
     public Map<String, Object> listMinePaged(String username, LocalDateTime startTime, LocalDateTime endTime, int pageNo, int pageSize) {
         User user = requireNonAdminUser(username, "管理员账号无需查看该通道");
 
-        int safePageNo = Math.max(pageNo, 1);
+        int safePageNo = Math.min(Math.max(pageNo, 1), 1000);
         int safePageSize = Math.min(Math.max(pageSize, 1), 100);
         int offset = (safePageNo - 1) * safePageSize;
 
@@ -74,7 +79,7 @@ public class FeedbackMessageServiceImpl implements FeedbackMessageService {
         applyDateRange(pageWrapper, startTime, endTime);
 
         List<FeedbackMessage> records = feedbackMessageMapper.selectList(pageWrapper);
-        return pagedResult(records, total);
+        return pagedResult(records, total, safePageNo, safePageSize);
     }
 
     @Override
@@ -91,7 +96,7 @@ public class FeedbackMessageServiceImpl implements FeedbackMessageService {
         Integer pageSizeObj = query == null ? null : query.getPageSize();
         int pageNo = pageNoObj == null ? 1 : pageNoObj;
         int pageSize = pageSizeObj == null ? 10 : pageSizeObj;
-        int safePageNo = Math.max(pageNo, 1);
+        int safePageNo = Math.min(Math.max(pageNo, 1), 1000);
         int safePageSize = Math.min(Math.max(pageSize, 1), 100);
         int offset = (safePageNo - 1) * safePageSize;
 
@@ -106,7 +111,7 @@ public class FeedbackMessageServiceImpl implements FeedbackMessageService {
                 .last("limit " + offset + "," + safePageSize);
 
         List<FeedbackMessage> records = feedbackMessageMapper.selectList(pageWrapper);
-        return pagedResult(records, total);
+        return pagedResult(records, total, safePageNo, safePageSize);
     }
 
     @Override
@@ -119,6 +124,7 @@ public class FeedbackMessageServiceImpl implements FeedbackMessageService {
     }
 
     @Override
+    @Cacheable(cacheNames = CacheNames.ADMIN_FEEDBACK_STATS, key = "'dashboard'")
     public Map<String, Object> getAdminStats() {
         long totalCount = feedbackMessageMapper.selectCount(new LambdaQueryWrapper<>());
         long pendingCount = feedbackMessageMapper.selectCount(new LambdaQueryWrapper<FeedbackMessage>()
@@ -206,6 +212,9 @@ public class FeedbackMessageServiceImpl implements FeedbackMessageService {
     }
 
     @Override
+        @Caching(evict = {
+            @CacheEvict(cacheNames = CacheNames.ADMIN_FEEDBACK_STATS, allEntries = true)
+        })
     public void updateStatus(Long id, Integer status) {
         FeedbackMessage feedback = feedbackMessageMapper.selectById(id);
         if (feedback == null) {
@@ -217,6 +226,9 @@ public class FeedbackMessageServiceImpl implements FeedbackMessageService {
     }
 
     @Override
+        @Caching(evict = {
+            @CacheEvict(cacheNames = CacheNames.ADMIN_FEEDBACK_STATS, allEntries = true)
+        })
     public Map<String, Object> batchUpdateStatus(List<Long> ids, Integer status) {
         if (ids == null || ids.isEmpty()) {
             throw BusinessException.badRequest("反馈ID列表不能为空");
@@ -250,6 +262,9 @@ public class FeedbackMessageServiceImpl implements FeedbackMessageService {
     }
 
     @Override
+        @Caching(evict = {
+            @CacheEvict(cacheNames = CacheNames.ADMIN_FEEDBACK_STATS, allEntries = true)
+        })
     public Map<String, Object> batchUpdateStatusByFilter(FeedbackQueryDTO query, Integer targetStatus) {
         validateStatus(targetStatus);
 
@@ -275,6 +290,9 @@ public class FeedbackMessageServiceImpl implements FeedbackMessageService {
     }
 
     @Override
+        @Caching(evict = {
+            @CacheEvict(cacheNames = CacheNames.ADMIN_FEEDBACK_STATS, allEntries = true)
+        })
     public void replyFeedback(AdminFeedbackReplyDTO dto) {
         FeedbackMessage feedback = feedbackMessageMapper.selectById(dto.getId());
         if (feedback == null) {
@@ -331,10 +349,12 @@ public class FeedbackMessageServiceImpl implements FeedbackMessageService {
         }
     }
 
-    private Map<String, Object> pagedResult(List<FeedbackMessage> records, long total) {
+    private Map<String, Object> pagedResult(List<FeedbackMessage> records, long total, int pageNo, int pageSize) {
         Map<String, Object> result = new HashMap<>();
         result.put("records", records);
         result.put("total", total);
+        result.put("pageNo", pageNo);
+        result.put("pageSize", pageSize);
         return result;
     }
 

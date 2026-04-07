@@ -32,7 +32,9 @@ import com.health.system.mapper.DoctorGroupMemberMapper;
 import com.health.system.mapper.FeedbackMessageMapper;
 import com.health.system.mapper.HealthAlertMapper;
 import com.health.system.mapper.HealthDataMapper;
+import com.health.system.mapper.HealthIndicatorTypeMapper;
 import com.health.system.mapper.OperationLogMapper;
+import com.health.system.mapper.PatientAlertPreferenceMapper;
 import com.health.system.mapper.PatientArchiveMapper;
 import com.health.system.mapper.PermissionMapper;
 import com.health.system.mapper.RoleMapper;
@@ -53,13 +55,18 @@ import com.health.system.service.UserService;
     FeedbackMessageMapper.class,
     HealthAlertMapper.class,
     HealthDataMapper.class,
+    HealthIndicatorTypeMapper.class,
     OperationLogMapper.class,
+    PatientAlertPreferenceMapper.class,
     PatientArchiveMapper.class,
     PermissionMapper.class,
     RoleMapper.class,
     SystemNoticeMapper.class,
     UserMapper.class,
-    UserRoleMapper.class
+    UserRoleMapper.class,
+    AuthService.class,
+    UserService.class,
+    OperationLogService.class
 })
 class SecurityErrorCodeIntegrationTest {
 
@@ -67,18 +74,10 @@ class SecurityErrorCodeIntegrationTest {
     private MockMvc mockMvc;
 
     @MockBean
-    private AuthService authService;
-
-    @MockBean
-    private UserService userService;
-
-    @MockBean
-    private OperationLogService operationLogService;
-
-    @MockBean
     private JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @BeforeEach
+    @SuppressWarnings("unused")
     void setupJwtFilterPassThrough() throws Exception {
         doAnswer(invocation -> {
             ServletRequest request = invocation.getArgument(0);

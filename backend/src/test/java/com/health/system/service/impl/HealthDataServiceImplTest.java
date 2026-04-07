@@ -6,6 +6,7 @@ import com.health.system.entity.User;
 import com.health.system.mapper.HealthDataMapper;
 import com.health.system.mapper.UserMapper;
 import com.health.system.service.HealthAlertService;
+import com.health.system.service.HealthIndicatorTypeService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -31,6 +32,8 @@ class HealthDataServiceImplTest {
     private UserMapper userMapper;
     @Mock
     private HealthAlertService healthAlertService;
+    @Mock
+    private HealthIndicatorTypeService healthIndicatorTypeService;
 
     @InjectMocks
     private HealthDataServiceImpl healthDataService;
@@ -44,6 +47,7 @@ class HealthDataServiceImplTest {
         user.setId(100L);
         user.setUsername("patient01");
         when(userMapper.selectOne(any())).thenReturn(user);
+        when(healthIndicatorTypeService.isEnabledType("血压")).thenReturn(true);
 
         HealthDataDTO dto = new HealthDataDTO();
         dto.setIndicatorType("血压");
@@ -67,6 +71,7 @@ class HealthDataServiceImplTest {
         User user = new User();
         user.setId(100L);
         when(userMapper.selectOne(any())).thenReturn(user);
+        when(healthIndicatorTypeService.isEnabledType("血糖")).thenReturn(true);
 
         HealthDataDTO dto = new HealthDataDTO();
         dto.setIndicatorType("血糖");

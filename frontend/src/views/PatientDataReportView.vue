@@ -1,6 +1,17 @@
 <template>
-  <el-card>
-    <template #header>健康数据上报</template>
+  <el-card class="page-shell">
+    <div class="page-header">
+      <div>
+        <h3 class="page-title">健康数据上报</h3>
+        <p class="page-subtitle">按指标持续记录健康状态，系统将自动分析并触发预警</p>
+      </div>
+      <div class="page-actions">
+        <el-button type="primary" @click="submit">提交上报</el-button>
+      </div>
+    </div>
+
+    <div class="soft-tip">填写示例：血压 120/80，血糖 6.1，体重 65，服药状态可填“已服药/未服药”。</div>
+
     <el-form :model="form" label-width="120px">
       <el-form-item label="指标类型">
         <el-select v-model="form.indicatorType" style="width: 100%">
@@ -18,9 +29,6 @@
       </el-form-item>
       <el-form-item label="备注">
         <el-input v-model="form.remark" type="textarea" :rows="3" />
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" @click="submit">提交上报</el-button>
       </el-form-item>
     </el-form>
   </el-card>

@@ -2,6 +2,7 @@ package com.health.system.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.health.system.common.BusinessException;
+import com.health.system.common.SecurityInputSanitizer;
 import com.health.system.dto.UserDTO;
 import com.health.system.entity.Role;
 import com.health.system.entity.User;
@@ -33,17 +34,19 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public List<User> listUsers(String keyword, String roleType, Integer status) {
+        String safeKeyword = SecurityInputSanitizer.sanitizeKeyword(keyword, 64, "账号查询关键词");
+        String safeRoleType = SecurityInputSanitizer.sanitizeRoleType(roleType);
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<User>()
                 .ne(User::getRoleType, "ADMIN")
                 .orderByDesc(User::getCreateTime);
 
-        if (StringUtils.hasText(keyword)) {
-            wrapper.and(w -> w.like(User::getUsername, keyword)
-                    .or().like(User::getName, keyword)
-                    .or().like(User::getPhone, keyword));
+        if (StringUtils.hasText(safeKeyword)) {
+            wrapper.and(w -> w.like(User::getUsername, safeKeyword)
+                    .or().like(User::getName, safeKeyword)
+                    .or().like(User::getPhone, safeKeyword));
         }
-        if (StringUtils.hasText(roleType)) {
-            wrapper.eq(User::getRoleType, roleType);
+        if (StringUtils.hasText(safeRoleType)) {
+            wrapper.eq(User::getRoleType, safeRoleType);
         }
         if (status != null) {
             wrapper.eq(User::getStatus, status);

@@ -1,7 +1,18 @@
 package com.health.system.service.impl;
 
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.health.system.common.BusinessException;
+import com.health.system.common.CacheNames;
+import com.health.system.common.SensitiveDataCipher;
 import com.health.system.entity.DoctorGroup;
 import com.health.system.entity.DoctorGroupDoctorMember;
 import com.health.system.entity.DoctorGroupMember;
@@ -9,21 +20,15 @@ import com.health.system.entity.HealthAlert;
 import com.health.system.entity.HealthData;
 import com.health.system.entity.PatientArchive;
 import com.health.system.entity.User;
-import com.health.system.mapper.DoctorGroupMapper;
 import com.health.system.mapper.DoctorGroupDoctorMemberMapper;
+import com.health.system.mapper.DoctorGroupMapper;
 import com.health.system.mapper.DoctorGroupMemberMapper;
 import com.health.system.mapper.HealthAlertMapper;
 import com.health.system.mapper.HealthDataMapper;
 import com.health.system.mapper.PatientArchiveMapper;
 import com.health.system.mapper.UserMapper;
 import com.health.system.service.DoctorPatientInsightService;
-import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
-
-import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import com.health.system.service.support.DoctorAccessSupport;
 
 @Service
 public class DoctorPatientInsightServiceImpl implements DoctorPatientInsightService {
@@ -35,6 +40,8 @@ public class DoctorPatientInsightServiceImpl implements DoctorPatientInsightServ
     private final PatientArchiveMapper patientArchiveMapper;
     private final HealthDataMapper healthDataMapper;
     private final HealthAlertMapper healthAlertMapper;
+    private final SensitiveDataCipher sensitiveDataCipher;
+    private final DoctorAccessSupport doctorAccessSupport;
 
     public DoctorPatientInsightServiceImpl(UserMapper userMapper,
                                            DoctorGroupMapper doctorGroupMapper,
@@ -42,7 +49,9 @@ public class DoctorPatientInsightServiceImpl implements DoctorPatientInsightServ
                                            DoctorGroupMemberMapper doctorGroupMemberMapper,
                                            PatientArchiveMapper patientArchiveMapper,
                                            HealthDataMapper healthDataMapper,
-                                           HealthAlertMapper healthAlertMapper) {
+                                           HealthAlertMapper healthAlertMapper,
+                                           SensitiveDataCipher sensitiveDataCipher,
+                                           DoctorAccessSupport doctorAccessSupport) {
         this.userMapper = userMapper;
         this.doctorGroupMapper = doctorGroupMapper;
         this.doctorGroupDoctorMemberMapper = doctorGroupDoctorMemberMapper;
@@ -50,23 +59,25 @@ public class DoctorPatientInsightServiceImpl implements DoctorPatientInsightServ
         this.patientArchiveMapper = patientArchiveMapper;
         this.healthDataMapper = healthDataMapper;
         this.healthAlertMapper = healthAlertMapper;
+        this.sensitiveDataCipher = sensitiveDataCipher;
+        this.doctorAccessSupport = doctorAccessSupport;
     }
 
     @Override
+        @Cacheable(cacheNames = CacheNames.DOCTOR_PATIENT_INSIGHT,
+            key = "#doctorUsername + '::' + #patientUserId + '::' + (#indicatorType == null ? '' : #indicatorType) + '::' + (#timeRange == null ? 'month' : #timeRange.toLowerCase())")
     public Map<String, Object> patientInsight(String doctorUsername, Long patientUserId, String indicatorType, String timeRange) {
-        User doctor = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, doctorUsername));
-        if (doctor == null || !"DOCTOR".equals(doctor.getRoleType())) {
-            throw BusinessException.notFound("医生不存在");
-        }
+        User doctor = doctorAccessSupport.requireDoctor(doctorUsername);
 
         User patient = userMapper.selectById(patientUserId);
         if (patient == null || !"PATIENT".equals(patient.getRoleType())) {
             throw BusinessException.notFound("患者不存在");
         }
-        validateMembership(doctor.getId(), patientUserId);
+        doctorAccessSupport.assertPatientAccessible(doctor.getId(), patientUserId, "该患者不在您的群组中");
 
         PatientArchive archive = patientArchiveMapper.selectOne(new LambdaQueryWrapper<PatientArchive>()
                 .eq(PatientArchive::getUserId, patientUserId));
+        decryptArchive(archive);
 
         LambdaQueryWrapper<HealthData> dataWrapper = new LambdaQueryWrapper<HealthData>()
                 .eq(HealthData::getUserId, patientUserId)
@@ -107,29 +118,13 @@ public class DoctorPatientInsightServiceImpl implements DoctorPatientInsightServ
         return result;
     }
 
-    private void validateMembership(Long doctorId, Long patientUserId) {
-        List<DoctorGroup> ownerGroups = doctorGroupMapper.selectList(new LambdaQueryWrapper<DoctorGroup>()
-                .eq(DoctorGroup::getDoctorId, doctorId));
-
-        List<DoctorGroupDoctorMember> memberships = doctorGroupDoctorMemberMapper.selectList(
-            new LambdaQueryWrapper<DoctorGroupDoctorMember>()
-                .eq(DoctorGroupDoctorMember::getDoctorUserId, doctorId)
-        );
-
-        List<Long> groupIds = ownerGroups.stream().map(DoctorGroup::getId).toList();
-        List<Long> memberGroupIds = memberships.stream().map(DoctorGroupDoctorMember::getGroupId).toList();
-        List<Long> accessibleGroupIds = new java.util.ArrayList<>(groupIds);
-        accessibleGroupIds.addAll(memberGroupIds);
-
-        if (accessibleGroupIds.isEmpty()) {
-            throw BusinessException.forbidden("该患者不在您的群组中");
+    private void decryptArchive(PatientArchive archive) {
+        if (archive == null) {
+            return;
         }
-        Long count = doctorGroupMemberMapper.selectCount(new LambdaQueryWrapper<DoctorGroupMember>()
-            .in(DoctorGroupMember::getGroupId, accessibleGroupIds)
-                .eq(DoctorGroupMember::getPatientUserId, patientUserId));
-        if (count == null || count == 0) {
-            throw BusinessException.forbidden("该患者不在您的群组中");
-        }
+        archive.setMedicalHistory(sensitiveDataCipher.decrypt(archive.getMedicalHistory()));
+        archive.setMedicationHistory(sensitiveDataCipher.decrypt(archive.getMedicationHistory()));
+        archive.setAllergyHistory(sensitiveDataCipher.decrypt(archive.getAllergyHistory()));
     }
 
     private LocalDateTime resolveStart(String timeRange) {

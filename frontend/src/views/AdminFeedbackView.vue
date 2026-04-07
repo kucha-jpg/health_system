@@ -1,5 +1,17 @@
 <template>
-  <div class="feedback-admin-page">
+  <div class="feedback-admin-page fade-in-page">
+    <div class="page-header">
+      <div>
+        <h3 class="page-title">反馈消息管理</h3>
+        <p class="page-subtitle">汇总用户反馈、统一回复处理并支持批量状态流转</p>
+      </div>
+      <div class="page-actions">
+        <el-button @click="refreshAll">刷新全部</el-button>
+      </div>
+    </div>
+
+    <div class="soft-tip">可先看趋势图与待处理数量，再通过筛选和批量操作提升处理效率。</div>
+
     <div class="stats-grid">
       <el-card class="stat-card">
         <div class="stat-label">反馈总数</div>
@@ -96,6 +108,13 @@
           <el-button v-else link type="warning" @click="mark(scope.row.id, 0)">标记未处理</el-button>
         </template>
       </el-table-column>
+      <template #empty>
+        <div class="empty-state">
+          <div class="empty-illustration"></div>
+          <div class="empty-title">暂无反馈消息</div>
+          <div class="empty-desc">当前筛选条件下没有数据，可重置筛选后重试。</div>
+        </div>
+      </template>
     </el-table>
 
     <div style="margin-top: 12px; display:flex; justify-content:flex-end;">

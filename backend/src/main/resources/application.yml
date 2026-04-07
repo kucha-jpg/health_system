@@ -24,3 +24,7 @@ mybatis-plus:
 jwt:
   secret: ${JWT_SECRET:healthSystemSecretKeyhealthSystemSecretKey}
   expiration: ${JWT_EXPIRATION:86400000}
+
+security:
+  data:
+    aes-key: ${APP_DATA_AES_KEY:}

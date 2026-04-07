@@ -1,17 +1,21 @@
 <template>
-  <el-card>
-    <template #header>
-      <div class="toolbar">
-        <div>
-          <div class="title">历史上报数据</div>
-          <div class="sub">支持按指标和时间范围快速筛选</div>
-        </div>
-        <div class="actions">
-          <el-button :loading="loading" @click="load">刷新</el-button>
-          <el-button @click="resetFilter">重置筛选</el-button>
-        </div>
+  <el-card class="page-shell">
+    <div class="page-header">
+      <div>
+        <h3 class="page-title">历史上报数据</h3>
+        <p class="page-subtitle">支持按指标和时间范围快速筛选</p>
       </div>
-    </template>
+      <div class="page-actions">
+        <el-button type="primary" plain @click="goReport">快捷上报</el-button>
+        <el-button :loading="loading" @click="load">刷新</el-button>
+        <el-button @click="resetFilter">重置筛选</el-button>
+      </div>
+    </div>
+
+    <div class="soft-tip">
+      当前筛选：{{ query.indicator_type || '全部指标' }} / {{ query.timeRange || '全部时间' }}
+      <el-button link type="primary" @click="resetFilter">清空条件</el-button>
+    </div>
 
     <div class="filter-row">
       <el-select v-model="query.indicator_type" placeholder="指标类型" clearable style="width: 140px" @change="onFilterChanged">
@@ -35,7 +39,8 @@
 
     <el-card style="margin-bottom: 12px">
       <template #header>指标趋势图</template>
-      <div ref="trendRef" class="trend-chart"></div>
+      <div v-if="list.length === 0" class="chart-empty">暂无可绘制数据，请先上报或调整筛选条件</div>
+      <div v-else ref="trendRef" class="trend-chart"></div>
     </el-card>
 
     <el-table :data="list" border v-loading="loading" empty-text="暂无健康数据记录">
@@ -81,8 +86,10 @@
 import { nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useRouter } from 'vue-router'
 import { deleteHealthDataApi, listHealthDataApi, updateHealthDataApi } from '../api/modules'
 
+const router = useRouter()
 const list = ref([])
 const loading = ref(false)
 const saving = ref(false)
@@ -157,6 +164,12 @@ const resolveThresholds = () => {
 
 const renderTrend = async () => {
   await nextTick()
+  if (list.value.length === 0) {
+    if (trendChart) {
+      trendChart.clear()
+    }
+    return
+  }
   if (!trendRef.value) return
   if (!trendChart) {
     trendChart = echarts.init(trendRef.value)
@@ -184,6 +197,10 @@ const renderTrend = async () => {
 const handlePageSizeChange = () => {
   query.pageNo = 1
   load()
+}
+
+const goReport = () => {
+  router.push('/patient/report')
 }
 
 const openEdit = (row) => {
@@ -251,6 +268,15 @@ onUnmounted(() => {
 .actions {
   display: flex;
   gap: 8px;
+}
+
+.chart-empty {
+  height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #698188;
+  font-size: 13px;
 }
 
 .filter-row {

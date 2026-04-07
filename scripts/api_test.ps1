@@ -373,11 +373,22 @@ if (-not $AssertOnly) {
     $case10Ok = $false
     try {
       $riskObj = $riskRes.body | ConvertFrom-Json
-      $riskList = @($riskObj.data)
+      $riskList = @()
+      if ($riskObj -and $riskObj.data) {
+        if ($riskObj.data.PSObject.Properties.Name -contains "list") {
+          $riskList = @($riskObj.data.list)
+        } else {
+          $riskList = @($riskObj.data)
+        }
+      }
       $allMatch = $true
       $prev = 101
       foreach ($item in $riskList) {
         $level = [string]$item.riskLevel
+        if ($null -eq $item.riskScore) {
+          $allMatch = $false
+          break
+        }
         $score = [int]$item.riskScore
         if ($level -ne "HIGH" -or $score -lt 80 -or $score -gt $prev) {
           $allMatch = $false
@@ -520,21 +531,31 @@ if (-not $AssertOnly) {
   Write-Title "CASE-13 three-day persistent blood pressure alert"
   if ($patientToken -and $doctorToken2 -and $adminToken2) {
     $bpIndicatorType = $null
+    $bpHighRule = $null
     try {
       $ruleList2 = Invoke-RestMethod -Method Get -Uri ("$BaseUrl/admin/config/alert-rules") -Headers @{ "Authorization" = "Bearer $adminToken2" }
       if ($ruleList2 -and $ruleList2.data) {
         $bpRule = $ruleList2.data | Where-Object { [string]$_.highRule -like '*/*' } | Select-Object -First 1
         if ($bpRule) {
           $bpIndicatorType = [string]$bpRule.indicatorType
+          $bpHighRule = [string]$bpRule.highRule
         }
       }
     } catch {
       $bpIndicatorType = $null
+      $bpHighRule = $null
     }
 
     if (-not $bpIndicatorType) {
       Write-Host "[WARN] blood-pressure indicator type not found, skip CASE-13"
     } else {
+    $highSys = 150
+    $highDia = 95
+    if ($bpHighRule -and $bpHighRule -match '^(\d{2,3})/(\d{2,3})$') {
+      $highSys = [int]$Matches[1] + 5
+      $highDia = [int]$Matches[2] + 5
+    }
+
     $times = @(
       (Get-Date).AddDays(-2),
       (Get-Date).AddDays(-1),
@@ -544,7 +565,7 @@ if (-not $AssertOnly) {
     foreach ($t in $times) {
       $payloadObj = @{
         indicatorType = $bpIndicatorType
-        value = "150/95"
+        value = "$highSys/$highDia"
         reportTime = $t.ToString("yyyy-MM-ddTHH:mm:ss")
         remark = "case13 $runMark"
       }
@@ -557,7 +578,15 @@ if (-not $AssertOnly) {
     $case13Ok = $false
     try {
       $alertsObj = $alertsRaw.body | ConvertFrom-Json
-      $case13Ok = (@($alertsObj.data) | Where-Object { $_.reasonCode -eq "BP_PERSISTENT_HIGH" }).Count -gt 0
+      $alertsList = @()
+      if ($alertsObj -and $alertsObj.data) {
+        if ($alertsObj.data.PSObject.Properties.Name -contains "list") {
+          $alertsList = @($alertsObj.data.list)
+        } else {
+          $alertsList = @($alertsObj.data)
+        }
+      }
+      $case13Ok = (@($alertsList) | Where-Object { $_.reasonCode -eq "BP_PERSISTENT_HIGH" }).Count -gt 0
     } catch {
       $case13Ok = $false
     }

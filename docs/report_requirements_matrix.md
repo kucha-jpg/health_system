@@ -5,6 +5,7 @@
 - 本表用于将开题/中期/结题报告中的“拟实现功能”与当前代码证据进行一一映射。
 - 证据分为四类：后端接口、前端页面、数据库结构、测试结果。
 - 验收建议：按“核心场景1-11”执行 `scripts/api_test.ps1` 或 `scripts/api_test.sh`，再结合前端手工步骤复核。
+- 研究方法过程证据：`docs/research_method_evidence.md`、`docs/prototype_notes.md`。
 
 ## 一、研究内容与功能模块对照
 

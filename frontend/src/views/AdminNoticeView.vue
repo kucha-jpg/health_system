@@ -1,20 +1,23 @@
 <template>
-  <el-card>
-    <template #header>
-      <div class="toolbar">
-        <span>系统公告管理</span>
-        <div style="display:flex; gap:8px; align-items:center; margin-left:auto; margin-right:8px;">
-          <el-input v-model="query.keyword" placeholder="标题/内容关键字" clearable style="width:220px" />
-          <el-select v-model="query.status" placeholder="状态" clearable style="width:120px">
-            <el-option label="发布" :value="1" />
-            <el-option label="下线" :value="0" />
-          </el-select>
-          <el-button @click="load">查询</el-button>
-          <el-button @click="resetQuery">重置</el-button>
-        </div>
+  <el-card class="page-shell fade-in-page">
+    <div class="page-header">
+      <div>
+        <h3 class="page-title">系统公告管理</h3>
+        <p class="page-subtitle">统一发布平台通知，支持按状态与关键词检索</p>
+      </div>
+      <div class="page-actions">
+        <el-input v-model="query.keyword" placeholder="标题/内容关键字" clearable style="width:220px" />
+        <el-select v-model="query.status" placeholder="状态" clearable style="width:120px">
+          <el-option label="发布" :value="1" />
+          <el-option label="下线" :value="0" />
+        </el-select>
+        <el-button @click="load">查询</el-button>
+        <el-button @click="resetQuery">重置</el-button>
         <el-button type="primary" @click="openDialog()">新增公告</el-button>
       </div>
-    </template>
+    </div>
+
+    <div class="soft-tip">当前公告数：{{ notices.length }}，建议标题简洁明确，内容优先说明时间范围与执行动作。</div>
 
     <el-table :data="notices" border>
       <el-table-column prop="id" label="ID" width="80" />
@@ -29,6 +32,13 @@
           <el-button link type="danger" @click="remove(scope.row.id)">删除</el-button>
         </template>
       </el-table-column>
+      <template #empty>
+        <div class="empty-state">
+          <div class="empty-illustration"></div>
+          <div class="empty-title">暂无公告数据</div>
+          <div class="empty-desc">点击“新增公告”发布第一条通知。</div>
+        </div>
+      </template>
     </el-table>
   </el-card>
 

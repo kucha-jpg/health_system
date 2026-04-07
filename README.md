@@ -47,6 +47,14 @@
 - 预警在规则触发后会计算 `riskScore(0-100)` 与 `riskLevel(LOW/MEDIUM/HIGH)`。
 - 医生预警工作台支持按 `riskLevel`、`minRiskScore` 过滤，并支持按风险优先或按时间优先排序。
 - 患者周报/月报新增 `riskTrend`（按天统计平均风险分与预警数量）。
+- 预警引擎新增趋势预测能力：当历史数据呈持续上升且预测下一时点将超阈值时，可触发趋势预警（如 `BP_TREND_UP`、`GLUCOSE_TREND_UP`、`WEIGHT_TREND_UP`）。
+- 新增患者个性化阈值配置：患者可按指标维护 `highRule/mediumRule`，预警判定优先读取个性化阈值。
+
+### 个性化阈值接口
+
+- `GET /api/patient/alert-preferences`：查看当前患者个性化阈值配置
+- `PUT /api/patient/alert-preferences`：保存当前患者个性化阈值配置
+  - 入参：`{ indicatorType, highRule, mediumRule, enabled }`
 
 ## 权限控制逻辑
 
@@ -208,7 +216,7 @@ BASE_URL=http://127.0.0.1:9090/api ./scripts/api_assert.sh
   1. 启动 `mysql + backend` 容器并等待后端就绪
   2. 执行后端测试（含新增集成测试）
   3. 执行 Bash 脚本静态检查（`shellcheck`）
-  4. 执行接口回归脚本 `scripts/api_test.sh`（覆盖场景1-11）
+  4. 执行接口回归脚本 `scripts/api_test.sh`（覆盖场景1-13）
   5. 执行错误码断言脚本 `scripts/api_assert.sh`
 - 失败时会自动输出容器日志，便于定位问题。
 

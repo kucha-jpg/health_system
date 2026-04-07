@@ -1,10 +1,16 @@
 <template>
-  <el-card>
-    <template #header>
-      <div class="toolbar">
-        <span>反馈通道</span>
+  <el-card class="page-shell fade-in-page">
+    <div class="page-header">
+      <div>
+        <h3 class="page-title">反馈通道</h3>
+        <p class="page-subtitle">提交问题与建议，管理员处理后会在列表中同步回复</p>
       </div>
-    </template>
+      <div class="page-actions">
+        <el-button @click="reloadFromStart">刷新</el-button>
+      </div>
+    </div>
+
+    <div class="soft-tip">可按时间范围筛选历史反馈，建议描述复现步骤与期望结果以便快速处理。</div>
 
     <el-form label-width="80px" style="max-width: 820px; margin-bottom: 18px;">
       <el-form-item label="反馈内容">
@@ -44,6 +50,13 @@
           </el-tag>
         </template>
       </el-table-column>
+      <template #empty>
+        <div class="empty-state">
+          <div class="empty-illustration"></div>
+          <div class="empty-title">暂无反馈记录</div>
+          <div class="empty-desc">可先提交一条反馈，管理员处理后会在此显示回复。</div>
+        </div>
+      </template>
     </el-table>
 
     <div style="margin-top: 12px; display:flex; justify-content:flex-end;">

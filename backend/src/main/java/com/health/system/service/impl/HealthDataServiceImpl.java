@@ -1,5 +1,16 @@
 package com.health.system.service.impl;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
+import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.health.system.common.BusinessException;
@@ -12,14 +23,6 @@ import com.health.system.mapper.UserMapper;
 import com.health.system.service.HealthAlertService;
 import com.health.system.service.HealthDataService;
 import com.health.system.service.HealthIndicatorTypeService;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
-
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
 
 @Service
 public class HealthDataServiceImpl implements HealthDataService {
@@ -40,7 +43,11 @@ public class HealthDataServiceImpl implements HealthDataService {
     }
 
     @Override
-    @CacheEvict(cacheNames = CacheNames.PATIENT_REPORT_SUMMARY, allEntries = true)
+        @Caching(evict = {
+            @CacheEvict(cacheNames = CacheNames.PATIENT_REPORT_SUMMARY, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.PATIENT_HEALTH_DATA_LIST, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.DOCTOR_PATIENT_INSIGHT, allEntries = true)
+        })
     public void create(String username, HealthDataDTO dto) {
         Long userId = getCurrentUserId(username);
         validateData(dto.getIndicatorType(), dto.getValue());
@@ -56,9 +63,11 @@ public class HealthDataServiceImpl implements HealthDataService {
     }
 
     @Override
+    @Cacheable(cacheNames = CacheNames.PATIENT_HEALTH_DATA_LIST,
+            key = "#username + '::' + (#indicatorType == null ? '' : #indicatorType) + '::' + (#timeRange == null ? '' : #timeRange.toLowerCase()) + '::' + (#pageNo == null ? 1 : #pageNo) + '::' + (#pageSize == null ? 20 : #pageSize)")
     public Map<String, Object> list(String username, String indicatorType, String timeRange, Integer pageNo, Integer pageSize) {
         Long userId = getCurrentUserId(username);
-        int safePageNo = Math.max(pageNo == null ? 1 : pageNo, 1);
+        int safePageNo = Math.min(Math.max(pageNo == null ? 1 : pageNo, 1), 1000);
         int safePageSize = Math.min(Math.max(pageSize == null ? 20 : pageSize, 1), 100);
 
         LambdaQueryWrapper<HealthData> wrapper = new LambdaQueryWrapper<HealthData>()
@@ -92,7 +101,11 @@ public class HealthDataServiceImpl implements HealthDataService {
     }
 
     @Override
-    @CacheEvict(cacheNames = CacheNames.PATIENT_REPORT_SUMMARY, allEntries = true)
+        @Caching(evict = {
+            @CacheEvict(cacheNames = CacheNames.PATIENT_REPORT_SUMMARY, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.PATIENT_HEALTH_DATA_LIST, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.DOCTOR_PATIENT_INSIGHT, allEntries = true)
+        })
     public void update(String username, Long id, HealthDataDTO dto) {
         Long userId = getCurrentUserId(username);
         HealthData old = healthDataMapper.selectById(id);
@@ -110,7 +123,11 @@ public class HealthDataServiceImpl implements HealthDataService {
     }
 
     @Override
-    @CacheEvict(cacheNames = CacheNames.PATIENT_REPORT_SUMMARY, allEntries = true)
+        @Caching(evict = {
+            @CacheEvict(cacheNames = CacheNames.PATIENT_REPORT_SUMMARY, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.PATIENT_HEALTH_DATA_LIST, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.DOCTOR_PATIENT_INSIGHT, allEntries = true)
+        })
     public void delete(String username, Long id) {
         Long userId = getCurrentUserId(username);
         HealthData old = healthDataMapper.selectById(id);

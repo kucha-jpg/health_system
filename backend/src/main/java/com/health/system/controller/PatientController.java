@@ -2,10 +2,12 @@ package com.health.system.controller;
 
 import com.health.system.common.ApiResponse;
 import com.health.system.dto.HealthDataDTO;
+import com.health.system.dto.PatientAlertPreferenceDTO;
 import com.health.system.dto.PatientArchiveDTO;
 import com.health.system.entity.PatientArchive;
 import com.health.system.service.HealthAlertService;
 import com.health.system.service.HealthDataService;
+import com.health.system.service.PatientAlertPreferenceService;
 import com.health.system.service.PatientReportService;
 import com.health.system.service.PatientArchiveService;
 import jakarta.validation.Valid;
@@ -22,15 +24,18 @@ public class PatientController {
     private final HealthDataService healthDataService;
     private final HealthAlertService healthAlertService;
     private final PatientReportService patientReportService;
+    private final PatientAlertPreferenceService patientAlertPreferenceService;
 
     public PatientController(PatientArchiveService patientArchiveService,
                              HealthDataService healthDataService,
                              HealthAlertService healthAlertService,
-                             PatientReportService patientReportService) {
+                             PatientReportService patientReportService,
+                             PatientAlertPreferenceService patientAlertPreferenceService) {
         this.patientArchiveService = patientArchiveService;
         this.healthDataService = healthDataService;
         this.healthAlertService = healthAlertService;
         this.patientReportService = patientReportService;
+        this.patientAlertPreferenceService = patientAlertPreferenceService;
     }
 
     @GetMapping("/home")
@@ -115,5 +120,17 @@ public class PatientController {
     public ApiResponse<Map<String, Object>> reportSummaryTaskResult(@PathVariable String taskId,
                                                                      Authentication authentication) {
         return ApiResponse.success(patientReportService.summaryTaskResult(authentication.getName(), taskId));
+    }
+
+    @GetMapping("/alert-preferences")
+    public ApiResponse<Object> listAlertPreferences(Authentication authentication) {
+        return ApiResponse.success(patientAlertPreferenceService.listMyPreferences(authentication.getName()));
+    }
+
+    @PutMapping("/alert-preferences")
+    public ApiResponse<Void> saveAlertPreference(@Valid @RequestBody PatientAlertPreferenceDTO dto,
+                                                 Authentication authentication) {
+        patientAlertPreferenceService.upsertMyPreference(authentication.getName(), dto);
+        return ApiResponse.success("保存成功", null);
     }
 }

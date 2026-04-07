@@ -1,9 +1,18 @@
 <template>
-  <el-card>
-    <template #header>
-      <div class="toolbar">
-        <span>系统操作日志</span>
-        <div style="display:flex; gap:8px; align-items:center; margin-left:auto; margin-right:8px;">
+  <el-card class="page-shell fade-in-page">
+    <div class="page-header">
+      <div>
+        <h3 class="page-title">系统操作日志</h3>
+        <p class="page-subtitle">支持检索、慢导出识别、批量行为追踪与 CSV 导出</p>
+      </div>
+      <div class="page-actions">
+        <el-button @click="load">刷新</el-button>
+      </div>
+    </div>
+
+    <div class="soft-tip">当前日志总数 {{ total }}，可优先查看“慢导出优先”定位高耗时操作。</div>
+
+    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
           <el-input v-model="query.keyword" placeholder="用户/路径/信息关键字" clearable style="width:240px" />
           <el-select v-model="query.roleType" placeholder="角色" clearable style="width:120px">
             <el-option label="管理员" value="ADMIN" />
@@ -41,10 +50,7 @@
           <el-button type="primary" plain @click="filterFeedbackBatch">反馈批量日志</el-button>
           <el-button type="success" plain @click="filterSelectionBatch">勾选批量</el-button>
           <el-button type="warning" plain @click="filterCrossPageBatch">跨页批量</el-button>
-        </div>
-        <el-button @click="load">刷新</el-button>
-      </div>
-    </template>
+    </div>
 
     <el-table :data="logs" border>
       <el-table-column prop="createTime" label="时间" width="180" />
@@ -85,6 +91,13 @@
         </template>
       </el-table-column>
       <el-table-column prop="message" label="信息" width="160" />
+      <template #empty>
+        <div class="empty-state">
+          <div class="empty-illustration"></div>
+          <div class="empty-title">暂无日志记录</div>
+          <div class="empty-desc">可调整筛选条件，或稍后刷新查看最新操作轨迹。</div>
+        </div>
+      </template>
     </el-table>
 
     <div style="margin-top: 12px; display:flex; justify-content:flex-end;">

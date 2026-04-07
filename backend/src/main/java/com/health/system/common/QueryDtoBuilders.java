@@ -18,8 +18,8 @@ public final class QueryDtoBuilders {
                                                          Integer pageNo,
                                                          Integer pageSize) {
         OperationLogQueryDTO query = new OperationLogQueryDTO();
-        query.setKeyword(keyword);
-        query.setRoleType(roleType);
+        query.setKeyword(SecurityInputSanitizer.sanitizeKeyword(keyword, 64, "日志关键词"));
+        query.setRoleType(SecurityInputSanitizer.sanitizeRoleType(roleType));
         query.setSuccess(success);
         query.setStartTime(startTime);
         query.setEndTime(endTime);
@@ -37,8 +37,8 @@ public final class QueryDtoBuilders {
                                                  Integer pageNo,
                                                  Integer pageSize) {
         FeedbackQueryDTO query = new FeedbackQueryDTO();
-        query.setKeyword(keyword);
-        query.setRoleType(roleType);
+        query.setKeyword(SecurityInputSanitizer.sanitizeKeyword(keyword, 64, "反馈关键词"));
+        query.setRoleType(SecurityInputSanitizer.sanitizeRoleType(roleType));
         query.setStatus(status);
         query.setReplyStatus(replyStatus);
         query.setStartTime(startTime);

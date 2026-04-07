@@ -24,6 +24,7 @@ import com.health.system.mapper.DoctorGroupDoctorMemberMapper;
 import com.health.system.mapper.DoctorGroupMapper;
 import com.health.system.mapper.DoctorGroupMemberMapper;
 import com.health.system.mapper.UserMapper;
+import com.health.system.service.support.DoctorAccessSupport;
 
 @ExtendWith(MockitoExtension.class)
 class DoctorGroupServiceImplTest {
@@ -36,6 +37,8 @@ class DoctorGroupServiceImplTest {
     private DoctorGroupMemberMapper doctorGroupMemberMapper;
     @Mock
     private UserMapper userMapper;
+    @Mock
+    private DoctorAccessSupport doctorAccessSupport;
 
     @InjectMocks
     private DoctorGroupServiceImpl doctorGroupService;
@@ -43,7 +46,7 @@ class DoctorGroupServiceImplTest {
     @Test
     void listMyGroups_shouldReturnOwnedAndCollaborativeGroups() {
         User doctor = doctorUser(1L, "doc-a");
-        when(userMapper.selectOne(any())).thenReturn(doctor);
+        when(doctorAccessSupport.requireDoctor("doc-a")).thenReturn(doctor);
 
         DoctorGroup owned = new DoctorGroup();
         owned.setId(10L);
@@ -70,13 +73,7 @@ class DoctorGroupServiceImplTest {
     @Test
     void listGroupPatients_shouldAllowCollaboratorDoctor() {
         User doctor = doctorUser(1L, "doc-a");
-        when(userMapper.selectOne(any())).thenReturn(doctor);
-
-        DoctorGroup group = new DoctorGroup();
-        group.setId(10L);
-        group.setDoctorId(2L);
-        when(doctorGroupMapper.selectById(10L)).thenReturn(group);
-        when(doctorGroupDoctorMemberMapper.selectCount(any())).thenReturn(1L);
+        when(doctorAccessSupport.requireDoctor("doc-a")).thenReturn(doctor);
 
         DoctorGroupMember patientMember = new DoctorGroupMember();
         patientMember.setGroupId(10L);
@@ -98,7 +95,7 @@ class DoctorGroupServiceImplTest {
     @Test
     void addDoctorToGroup_shouldRejectNonOwner() {
         User operator = doctorUser(1L, "doc-a");
-        when(userMapper.selectOne(any())).thenReturn(operator);
+        when(doctorAccessSupport.requireDoctor("doc-a")).thenReturn(operator);
 
         DoctorGroup group = new DoctorGroup();
         group.setId(10L);
