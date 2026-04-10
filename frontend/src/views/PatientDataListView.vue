@@ -3,7 +3,7 @@
     <div class="page-header">
       <div>
         <h3 class="page-title">历史上报数据</h3>
-        <p class="page-subtitle">支持按指标和时间范围快速筛选</p>
+        <p class="page-subtitle">按指标与时间筛选数据</p>
       </div>
       <div class="page-actions">
         <el-button type="primary" plain @click="goReport">快捷上报</el-button>
@@ -12,32 +12,40 @@
       </div>
     </div>
 
-    <div class="soft-tip">
-      当前筛选：{{ query.indicator_type || '全部指标' }} / {{ query.timeRange || '全部时间' }}
-      <el-button link type="primary" @click="resetFilter">清空条件</el-button>
+    <div class="info-strip">
+      <div>
+        <div class="info-strip-title">历史数据支持筛选、趋势对比与编辑修正</div>
+        <div class="info-strip-desc">当前筛选：{{ activeFiltersText }}</div>
+      </div>
+      <el-tag effect="light">最近上报：{{ latestReportTime }}</el-tag>
     </div>
 
-    <div class="filter-row">
-      <el-select v-model="query.indicator_type" placeholder="指标类型" clearable style="width: 140px" @change="onFilterChanged">
+    <div class="filter-toolbar filter-row">
+      <el-select v-model="query.indicator_type" class="w-140" placeholder="指标类型" clearable @change="onFilterChanged">
         <el-option label="血压" value="血压" />
         <el-option label="血糖" value="血糖" />
         <el-option label="体重" value="体重" />
         <el-option label="服药" value="服药" />
       </el-select>
-      <el-select v-model="query.timeRange" placeholder="时间范围" clearable style="width: 140px" @change="onFilterChanged">
+      <el-select v-model="query.timeRange" class="w-140" placeholder="时间范围" clearable @change="onFilterChanged">
         <el-option label="最近一天" value="day" />
         <el-option label="最近一周" value="week" />
         <el-option label="最近一月" value="month" />
       </el-select>
     </div>
 
-    <el-row :gutter="10" class="summary-row">
-      <el-col :xs="24" :sm="8"><el-card shadow="never">当前列表数量：{{ list.length }}</el-card></el-col>
-      <el-col :xs="24" :sm="8"><el-card shadow="never">总记录数：{{ total }}</el-card></el-col>
-      <el-col :xs="24" :sm="8"><el-card shadow="never">筛选指标：{{ query.indicator_type || '全部' }}</el-card></el-col>
-    </el-row>
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">当前列表数量</div>
+        <div class="kpi-value">{{ list.length }}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">总记录数</div>
+        <div class="kpi-value">{{ total }}</div>
+      </div>
+    </div>
 
-    <el-card style="margin-bottom: 12px">
+    <el-card class="section-card" style="margin-bottom: 12px" shadow="never">
       <template #header>指标趋势图</template>
       <div v-if="list.length === 0" class="chart-empty">暂无可绘制数据，请先上报或调整筛选条件</div>
       <div v-else ref="trendRef" class="trend-chart"></div>
@@ -56,7 +64,7 @@
       </el-table-column>
     </el-table>
 
-    <div class="pager">
+    <div class="pager-row">
       <el-pagination
         v-model:current-page="query.pageNo"
         v-model:page-size="query.pageSize"
@@ -69,7 +77,7 @@
     </div>
   </el-card>
 
-  <el-dialog v-model="visible" title="编辑健康数据">
+  <el-dialog v-model="visible" title="编辑健康数据" class="app-dialog-style" :show-close="false" align-center>
     <el-form :model="form" label-width="100px">
       <el-form-item label="指标"><el-input v-model="form.indicatorType" disabled /></el-form-item>
       <el-form-item label="数值"><el-input v-model="form.value" /></el-form-item>
@@ -83,8 +91,8 @@
 </template>
 
 <script setup>
-import { nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
-import * as echarts from 'echarts'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
+import echarts from '../utils/echarts'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { deleteHealthDataApi, listHealthDataApi, updateHealthDataApi } from '../api/modules'
@@ -99,6 +107,18 @@ const form = reactive({ id: null, indicatorType: '', value: '', reportTime: '', 
 const trendRef = ref(null)
 let trendChart = null
 const total = ref(0)
+
+const activeFiltersText = computed(() => {
+  const indicator = query.indicator_type || '全部指标'
+  const time = query.timeRange || '全部时间'
+  return `${indicator} / ${time}`
+})
+
+const latestReportTime = computed(() => {
+  if (!list.value.length) return '-'
+  const sorted = [...list.value].sort((a, b) => String(b.reportTime).localeCompare(String(a.reportTime)))
+  return sorted[0]?.reportTime || '-'
+})
 
 const load = async () => {
   loading.value = true
@@ -248,28 +268,6 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-}
-
-.title {
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.sub {
-  color: #909399;
-  font-size: 12px;
-}
-
-.actions {
-  display: flex;
-  gap: 8px;
-}
-
 .chart-empty {
   height: 140px;
   display: flex;
@@ -281,9 +279,6 @@ onUnmounted(() => {
 
 .filter-row {
   margin-bottom: 12px;
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
 }
 
 .summary-row {
@@ -295,9 +290,4 @@ onUnmounted(() => {
   height: 320px;
 }
 
-.pager {
-  margin-top: 12px;
-  display: flex;
-  justify-content: flex-end;
-}
 </style>

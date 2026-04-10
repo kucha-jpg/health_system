@@ -3,73 +3,83 @@
     <div class="page-header">
       <div>
         <h3 class="page-title">反馈消息管理</h3>
-        <p class="page-subtitle">汇总用户反馈、统一回复处理并支持批量状态流转</p>
+        <p class="page-subtitle">集中处理用户反馈与回复</p>
       </div>
       <div class="page-actions">
         <el-button @click="refreshAll">刷新全部</el-button>
       </div>
     </div>
 
-    <div class="soft-tip">可先看趋势图与待处理数量，再通过筛选和批量操作提升处理效率。</div>
+    <div class="info-strip">
+      <div>
+        <div class="info-strip-title">优先处理待办反馈，再执行跨页批量状态流转</div>
+        <div class="info-strip-desc">待处理 {{ stats.pendingCount }} 条，今日新增 {{ stats.todayNewCount }} 条。</div>
+      </div>
+      <el-tag effect="light">反馈总数 {{ stats.totalCount }}</el-tag>
+    </div>
 
-    <div class="stats-grid">
-      <el-card class="stat-card">
+    <div class="kpi-grid">
+      <div class="kpi-card">
         <div class="stat-label">反馈总数</div>
         <div class="stat-value">{{ stats.totalCount }}</div>
-      </el-card>
-      <el-card class="stat-card">
+      </div>
+      <div class="kpi-card">
         <div class="stat-label">待处理</div>
         <div class="stat-value warn">{{ stats.pendingCount }}</div>
-      </el-card>
-      <el-card class="stat-card">
+      </div>
+      <div class="kpi-card">
         <div class="stat-label">今日新增</div>
         <div class="stat-value">{{ stats.todayNewCount }}</div>
-      </el-card>
-      <el-card class="stat-card">
+      </div>
+      <div class="kpi-card">
         <div class="stat-label">角色分布</div>
         <div class="stat-value role">
           <span>患者 {{ stats.roleDistribution.PATIENT || 0 }}</span>
           <span>医生 {{ stats.roleDistribution.DOCTOR || 0 }}</span>
         </div>
-      </el-card>
+      </div>
     </div>
 
-    <el-card>
+    <el-card class="section-card" shadow="never">
       <template #header>
         <span>近7天反馈趋势</span>
       </template>
       <div ref="trendChartRef" class="trend-chart"></div>
     </el-card>
 
-    <el-card>
+    <el-card class="section-card" shadow="never">
     <template #header>
       <div class="toolbar">
         <span>反馈消息</span>
-        <div style="display:flex; gap:8px; align-items:center; margin-left:auto;">
-          <el-input v-model="query.keyword" placeholder="用户名/内容关键字" clearable style="width:220px" />
-          <el-select v-model="query.roleType" placeholder="角色" clearable style="width:120px">
+        <div class="header-tools">
+          <div class="filter-toolbar">
+          <el-input v-model="query.keyword" class="w-220" placeholder="用户名/内容关键字" clearable />
+          <el-select v-model="query.roleType" class="w-120" placeholder="角色" clearable>
             <el-option label="患者" value="PATIENT" />
             <el-option label="医生" value="DOCTOR" />
           </el-select>
-          <el-select v-model="query.status" placeholder="状态" clearable style="width:120px">
+          <el-select v-model="query.status" class="w-120" placeholder="状态" clearable>
             <el-option label="未处理" :value="0" />
             <el-option label="已处理" :value="1" />
           </el-select>
-          <el-select v-model="query.replyStatus" placeholder="回复" clearable style="width:120px">
+          <el-select v-model="query.replyStatus" class="w-120" placeholder="回复" clearable>
             <el-option label="未回复" :value="0" />
             <el-option label="已回复" :value="1" />
           </el-select>
           <el-date-picker
+            class="w-320"
             v-model="query.range"
             type="datetimerange"
             range-separator="至"
             start-placeholder="开始时间"
             end-placeholder="结束时间"
             value-format="YYYY-MM-DD HH:mm:ss"
-            style="width:320px"
           />
           <el-button @click="load">查询</el-button>
           <el-button @click="resetQuery">重置</el-button>
+          </div>
+
+          <div class="filter-toolbar filter-toolbar-secondary">
           <el-button :disabled="rows.length === 0" @click="selectCurrentPending">全选本页未处理</el-button>
           <el-button :disabled="selectedRows.length === 0" @click="clearSelection">清空选择</el-button>
           <el-button type="success" plain :disabled="total === 0" @click="batchMarkByFilter(1)">筛选结果标记已处理</el-button>
@@ -77,6 +87,7 @@
           <el-button type="primary" plain @click="exportCsv">导出CSV</el-button>
           <el-button type="success" :disabled="selectedRows.length === 0" @click="batchMark(1)">批量标记已处理</el-button>
           <el-button type="warning" :disabled="selectedRows.length === 0" @click="batchMark(0)">批量标记未处理</el-button>
+          </div>
         </div>
       </div>
     </template>
@@ -101,11 +112,29 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="130">
+      <el-table-column label="操作" width="170">
         <template #default="scope">
-          <el-button link type="primary" @click="openReply(scope.row)">回复</el-button>
-          <el-button v-if="scope.row.status !== 1" link type="success" @click="mark(scope.row.id, 1)">标记处理</el-button>
-          <el-button v-else link type="warning" @click="mark(scope.row.id, 0)">标记未处理</el-button>
+          <div class="action-group">
+            <el-button class="action-link-btn" link type="primary" @click="openReply(scope.row)">回复</el-button>
+            <el-button
+              v-if="scope.row.status !== 1"
+              class="action-link-btn"
+              link
+              type="success"
+              @click="mark(scope.row.id, 1)"
+            >
+              标记处理
+            </el-button>
+            <el-button
+              v-else
+              class="action-link-btn"
+              link
+              type="warning"
+              @click="mark(scope.row.id, 0)"
+            >
+              标记未处理
+            </el-button>
+          </div>
         </template>
       </el-table-column>
       <template #empty>
@@ -117,7 +146,7 @@
       </template>
     </el-table>
 
-    <div style="margin-top: 12px; display:flex; justify-content:flex-end;">
+    <div class="pager-row">
       <el-pagination
         v-model:current-page="pageNo"
         v-model:page-size="pageSize"
@@ -129,7 +158,7 @@
       />
     </div>
 
-    <el-dialog v-model="replyVisible" title="回复反馈" width="520px">
+    <el-dialog v-model="replyVisible" title="回复反馈" width="520px" class="app-dialog-style" :show-close="false" align-center>
       <el-form :model="replyForm" label-width="90px">
         <el-form-item label="反馈账号">
           <el-input v-model="replyForm.senderUsername" disabled />
@@ -138,7 +167,7 @@
           <el-input v-model="replyForm.content" type="textarea" :rows="3" disabled />
         </el-form-item>
         <el-form-item label="处理状态">
-          <el-select v-model="replyForm.status" style="width:100%">
+          <el-select v-model="replyForm.status" class="w-full">
             <el-option label="未处理" :value="0" />
             <el-option label="已处理" :value="1" />
           </el-select>
@@ -149,7 +178,7 @@
       </el-form>
       <template #footer>
         <el-button @click="replyVisible = false">取消</el-button>
-        <el-button type="primary" @click="submitReply">保存回复</el-button>
+        <el-button type="primary" @click="submitReply">保存</el-button>
       </template>
     </el-dialog>
     </el-card>
@@ -157,7 +186,7 @@
 </template>
 
 <script setup>
-import * as echarts from 'echarts'
+import echarts from '../utils/echarts'
 import { nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { batchUpdateFeedbackStatusApi, batchUpdateFeedbackStatusByFilterApi, getAdminFeedbackStatsApi, listAdminFeedbackPageApi, replyFeedbackApi, updateFeedbackStatusApi } from '../api/modules'
@@ -488,10 +517,6 @@ onUnmounted(() => {
   gap: 12px;
 }
 
-.stat-card {
-  min-height: 90px;
-}
-
 .stat-label {
   color: #6b7280;
   font-size: 13px;
@@ -499,7 +524,7 @@ onUnmounted(() => {
 
 .stat-value {
   margin-top: 8px;
-  font-size: 26px;
+  font-size: clamp(20px, 2.4vw, 26px);
   font-weight: 700;
   color: #111827;
 }
@@ -512,10 +537,45 @@ onUnmounted(() => {
   display: flex;
   gap: 16px;
   font-size: 18px;
+  flex-wrap: wrap;
 }
 
 .trend-chart {
   width: 100%;
   height: 260px;
+}
+
+.header-tools {
+  margin-left: auto;
+}
+
+.toolbar {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.action-group {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.action-link-btn {
+  min-width: 76px;
+  justify-content: flex-start;
+  padding-left: 0 !important;
+}
+
+@media (max-width: 900px) {
+  .toolbar {
+    flex-direction: column;
+  }
+
+  .header-tools {
+    width: 100%;
+    margin-left: 0;
+  }
 }
 </style>

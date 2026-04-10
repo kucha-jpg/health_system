@@ -2,12 +2,11 @@ package com.health.system.controller;
 
 import com.health.system.common.ApiResponse;
 import com.health.system.dto.UserDTO;
-import com.health.system.entity.User;
 import com.health.system.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin/user")
@@ -20,10 +19,12 @@ public class AdminUserController {
     }
 
     @GetMapping
-    public ApiResponse<List<User>> list(@RequestParam(required = false) String keyword,
-                                        @RequestParam(required = false) String roleType,
-                                        @RequestParam(required = false) Integer status) {
-        return ApiResponse.success(userService.listUsers(keyword, roleType, status));
+    public ApiResponse<Map<String, Object>> list(@RequestParam(required = false) String keyword,
+                                                 @RequestParam(required = false) String roleType,
+                                                 @RequestParam(required = false) Integer status,
+                                                 @RequestParam(defaultValue = "1") Integer pageNo,
+                                                 @RequestParam(defaultValue = "20") Integer pageSize) {
+        return ApiResponse.success(userService.listUsers(keyword, roleType, status, pageNo, pageSize));
     }
 
     @PostMapping

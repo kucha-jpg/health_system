@@ -3,28 +3,36 @@
     <div class="page-header">
       <div>
         <h3 class="page-title">健康周报/月报</h3>
-        <p class="page-subtitle">支持多图表联动、维度筛选与自定义报表视角</p>
+        <p class="page-subtitle">周报月报与趋势分析</p>
       </div>
       <div class="page-actions">
         <el-radio-group v-model="range" @change="load">
-          <el-radio-button label="week">周报</el-radio-button>
-          <el-radio-button label="month">月报</el-radio-button>
+          <el-radio-button value="week">周报</el-radio-button>
+          <el-radio-button value="month">月报</el-radio-button>
         </el-radio-group>
         <el-button @click="exportCsv">导出当前报表</el-button>
         <el-button :loading="loading" @click="load">刷新</el-button>
       </div>
     </div>
 
-    <div class="filter-row">
-      <el-select v-model="filters.indicatorType" clearable placeholder="指标筛选" style="width: 140px">
+    <div class="filter-toolbar filter-toolbar-compact">
+      <el-select v-model="filters.indicatorType" class="w-140" clearable placeholder="指标筛选">
         <el-option label="血压" value="血压" />
         <el-option label="血糖" value="血糖" />
         <el-option label="体重" value="体重" />
         <el-option label="服药" value="服药" />
       </el-select>
-      <el-input v-model="filters.keyword" clearable placeholder="备注关键词" style="width: 180px" />
+      <el-input v-model="filters.keyword" class="w-180" clearable placeholder="备注关键词" />
       <el-segmented v-model="riskChartType" :options="['line', 'bar']" />
       <el-button @click="resetFilters">重置筛选</el-button>
+    </div>
+
+    <div class="info-strip">
+      <div>
+        <div class="info-strip-title">统计范围：{{ summary.range || '-' }}</div>
+        <div class="info-strip-desc">当前筛选后最近数据 {{ filteredLatestData.length }} 条，可直接导出。</div>
+      </div>
+      <el-tag effect="light">图表模式：{{ riskChartType }}</el-tag>
     </div>
 
     <el-row :gutter="12" class="summary-row">
@@ -48,7 +56,7 @@
       </el-col>
     </el-row>
 
-    <el-card style="margin-bottom: 12px">
+    <el-card class="section-card" style="margin-bottom: 12px" shadow="never">
       <template #header>指标分布（雷达图）</template>
       <div ref="typeRadarRef" class="chart-main"></div>
     </el-card>
@@ -67,7 +75,7 @@
 
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
-import * as echarts from 'echarts'
+import echarts from '../utils/echarts'
 import { ElMessage } from 'element-plus'
 import { getPatientReportSummaryApi } from '../api/modules'
 import { CHART_PALETTE, CHART_SPLIT_LINE, RISK_COLORS } from '../constants/chart-theme'
@@ -84,6 +92,21 @@ const typeRadarRef = ref(null)
 let riskTrendChart = null
 let typePieChart = null
 let typeRadarChart = null
+
+const INDICATOR_LABEL_MAP = {
+  BLOOD_PRESSURE: '血压',
+  BLOOD_SUGAR: '血糖',
+  WEIGHT: '体重',
+  MEDICATION: '服药',
+  HEART_RATE: '心率',
+  TEMPERATURE: '体温',
+  OXYGEN_SATURATION: '血氧'
+}
+
+const toIndicatorLabel = (value) => {
+  const key = String(value || '').trim()
+  return INDICATOR_LABEL_MAP[key] || key
+}
 
 const filteredLatestData = computed(() => {
   const list = summary.value?.latestData || []
@@ -150,12 +173,13 @@ const renderTypeCharts = async () => {
   await nextTick()
   const byType = summary.value?.byType || {}
   const entries = Object.entries(byType)
+  const displayEntries = entries.map(([name, value]) => [toIndicatorLabel(name), value])
   if (!typePieRef.value || !typeRadarRef.value) return
 
   if (!typePieChart) typePieChart = echarts.init(typePieRef.value)
   if (!typeRadarChart) typeRadarChart = echarts.init(typeRadarRef.value)
 
-  const pieData = entries.map(([name, value]) => ({ name, value }))
+  const pieData = displayEntries.map(([name, value]) => ({ name, value }))
   typePieChart.setOption({
     color: CHART_PALETTE,
     tooltip: { trigger: 'item' },
@@ -169,18 +193,18 @@ const renderTypeCharts = async () => {
     }]
   })
 
-  const max = Math.max(...entries.map(([, value]) => Number(value)), 1)
+  const max = Math.max(...displayEntries.map(([, value]) => Number(value)), 1)
   typeRadarChart.setOption({
     color: [CHART_PALETTE[0]],
     tooltip: {},
     radar: {
       radius: '65%',
-      indicator: entries.map(([name]) => ({ name, max }))
+      indicator: displayEntries.map(([name]) => ({ name, max }))
     },
     series: [{
       type: 'radar',
       areaStyle: { opacity: 0.28 },
-      data: [{ value: entries.map(([, value]) => value), name: '指标频次' }]
+      data: [{ value: displayEntries.map(([, value]) => value), name: '指标频次' }]
     }]
   })
 }
@@ -298,13 +322,6 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.filter-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
 .summary-row {
   margin: 12px 0;
 }

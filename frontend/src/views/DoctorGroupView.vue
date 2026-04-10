@@ -3,7 +3,7 @@
     <div class="page-header">
       <div>
         <h3 class="page-title">医生群组管理</h3>
-        <p class="page-subtitle">聚焦团队分工与患者归属，支持快捷管理协作关系</p>
+        <p class="page-subtitle">维护群组与协作成员</p>
       </div>
       <div class="page-actions">
         <el-button :loading="loading" @click="load">刷新</el-button>
@@ -11,11 +11,32 @@
       </div>
     </div>
 
-    <div class="soft-tip">
-      当前共 {{ groups.length }} 个群组。建议先创建群组，再批量添加患者与协作医生。
+    <div class="info-strip">
+      <div>
+        <div class="info-strip-title">先建群组，再补齐患者与协作医生，形成稳定随访小队</div>
+        <div class="info-strip-desc">当前选中：{{ activeGroup?.groupName || '未选择群组' }}</div>
+      </div>
+      <el-tag effect="light">群组总数 {{ groups.length }}</el-tag>
     </div>
 
-    <el-table :data="groups" border v-loading="loading" empty-text="暂无群组，点击右上角“新建群组”开始">
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">群组数量</div>
+        <div class="kpi-value">{{ groups.length }}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">当前群组患者数</div>
+        <div class="kpi-value">{{ patients.length }}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">当前协作医生数</div>
+        <div class="kpi-value">{{ doctors.length }}</div>
+      </div>
+    </div>
+
+    <el-card class="section-card" shadow="never">
+      <template #header>群组列表</template>
+      <el-table :data="groups" border v-loading="loading" empty-text="暂无群组，点击右上角“新建群组”开始">
       <el-table-column prop="id" label="ID" width="80" />
       <el-table-column prop="groupName" label="群组名称" />
       <el-table-column prop="description" label="描述" show-overflow-tooltip />
@@ -27,10 +48,11 @@
           <el-button link type="info" @click="addDoctorByGroup(scope.row)">添加医生</el-button>
         </template>
       </el-table-column>
-    </el-table>
+      </el-table>
+    </el-card>
   </el-card>
 
-  <el-dialog v-model="createDialogVisible" title="新建群组" width="520px">
+  <el-dialog v-model="createDialogVisible" title="新建群组" width="520px" class="app-dialog-style" :show-close="false" align-center>
     <el-form :model="createForm" label-width="92px">
       <el-form-item label="群组名称">
         <el-input v-model="createForm.groupName" maxlength="64" show-word-limit placeholder="例如：心血管重点随访组" />
@@ -41,11 +63,11 @@
     </el-form>
     <template #footer>
       <el-button @click="createDialogVisible = false">取消</el-button>
-      <el-button type="primary" :loading="saving" @click="createGroup">创建</el-button>
+      <el-button type="primary" :loading="saving" @click="createGroup">保存</el-button>
     </template>
   </el-dialog>
 
-  <el-dialog v-model="patientDialogVisible" :title="`群组成员 - ${activeGroup?.groupName || ''}`" width="760px">
+  <el-dialog v-model="patientDialogVisible" :title="`群组成员 - ${activeGroup?.groupName || ''}`" width="760px" class="app-dialog-style" :show-close="false" align-center>
     <el-table :data="patients" border v-loading="memberLoading" empty-text="暂无患者成员">
       <el-table-column prop="id" label="患者ID" width="100" />
       <el-table-column prop="username" label="用户名" />
@@ -59,7 +81,7 @@
     </el-table>
   </el-dialog>
 
-  <el-dialog v-model="doctorDialogVisible" :title="`协作医生 - ${activeGroup?.groupName || ''}`" width="760px">
+  <el-dialog v-model="doctorDialogVisible" :title="`协作医生 - ${activeGroup?.groupName || ''}`" width="760px" class="app-dialog-style" :show-close="false" align-center>
     <div class="dialog-actions">
       <el-button type="primary" @click="addDoctor" :disabled="!activeGroup">添加协作医生</el-button>
     </div>

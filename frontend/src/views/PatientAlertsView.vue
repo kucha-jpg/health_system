@@ -3,10 +3,10 @@
     <div class="page-header">
       <div>
         <h3 class="page-title">我的预警详情</h3>
-        <p class="page-subtitle">查看风险变化与处理进度</p>
+        <p class="page-subtitle">风险变化与处理进度</p>
       </div>
       <div class="page-actions">
-        <el-select v-model="status" style="width: 160px" @change="onStatusChanged">
+        <el-select v-model="status" class="w-170" @change="onStatusChanged">
           <el-option label="全部" value="" />
           <el-option label="未处理" value="OPEN" />
           <el-option label="已处理" value="CLOSED" />
@@ -15,7 +15,28 @@
       </div>
     </div>
 
-    <div class="soft-tip">当前筛选：{{ status || '全部状态' }}，系统将持续刷新预警处理进度。</div>
+    <div class="info-strip">
+      <div>
+        <div class="info-strip-title">系统将自动跟踪风险变化并提示处理进度</div>
+        <div class="info-strip-desc">筛选状态：{{ status || '全部状态' }}</div>
+      </div>
+      <el-tag effect="light">当前页 {{ alerts.length }} 条</el-tag>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">未处理预警</div>
+        <div class="kpi-value">{{ openCount }}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">已处理预警</div>
+        <div class="kpi-value">{{ closedCount }}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">总记录数</div>
+        <div class="kpi-value">{{ total }}</div>
+      </div>
+    </div>
 
     <el-table :data="alerts" border v-loading="loading">
       <el-table-column prop="indicatorType" label="指标" width="100" />
@@ -44,7 +65,7 @@
       </template>
     </el-table>
 
-    <div class="pager">
+    <div class="pager-row">
       <el-pagination
         v-model:current-page="pageNo"
         v-model:page-size="pageSize"
@@ -59,7 +80,7 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getPatientAlertsApi } from '../api/modules'
 
@@ -70,6 +91,9 @@ const pageSize = ref(20)
 const total = ref(0)
 const loading = ref(false)
 let timer = null
+
+const openCount = computed(() => alerts.value.filter((item) => item.status === 'OPEN').length)
+const closedCount = computed(() => alerts.value.filter((item) => item.status === 'CLOSED').length)
 
 const load = async () => {
   loading.value = true
@@ -112,11 +136,3 @@ onUnmounted(() => {
   }
 })
 </script>
-
-<style scoped>
-.pager {
-  margin-top: 12px;
-  display: flex;
-  justify-content: flex-end;
-}
-</style>

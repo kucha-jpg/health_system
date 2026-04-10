@@ -13,16 +13,10 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.health.system.common.BusinessException;
 import com.health.system.common.CacheNames;
 import com.health.system.common.SensitiveDataCipher;
-import com.health.system.entity.DoctorGroup;
-import com.health.system.entity.DoctorGroupDoctorMember;
-import com.health.system.entity.DoctorGroupMember;
 import com.health.system.entity.HealthAlert;
 import com.health.system.entity.HealthData;
 import com.health.system.entity.PatientArchive;
 import com.health.system.entity.User;
-import com.health.system.mapper.DoctorGroupDoctorMemberMapper;
-import com.health.system.mapper.DoctorGroupMapper;
-import com.health.system.mapper.DoctorGroupMemberMapper;
 import com.health.system.mapper.HealthAlertMapper;
 import com.health.system.mapper.HealthDataMapper;
 import com.health.system.mapper.PatientArchiveMapper;
@@ -34,9 +28,6 @@ import com.health.system.service.support.DoctorAccessSupport;
 public class DoctorPatientInsightServiceImpl implements DoctorPatientInsightService {
 
     private final UserMapper userMapper;
-    private final DoctorGroupMapper doctorGroupMapper;
-    private final DoctorGroupDoctorMemberMapper doctorGroupDoctorMemberMapper;
-    private final DoctorGroupMemberMapper doctorGroupMemberMapper;
     private final PatientArchiveMapper patientArchiveMapper;
     private final HealthDataMapper healthDataMapper;
     private final HealthAlertMapper healthAlertMapper;
@@ -44,18 +35,12 @@ public class DoctorPatientInsightServiceImpl implements DoctorPatientInsightServ
     private final DoctorAccessSupport doctorAccessSupport;
 
     public DoctorPatientInsightServiceImpl(UserMapper userMapper,
-                                           DoctorGroupMapper doctorGroupMapper,
-                                           DoctorGroupDoctorMemberMapper doctorGroupDoctorMemberMapper,
-                                           DoctorGroupMemberMapper doctorGroupMemberMapper,
                                            PatientArchiveMapper patientArchiveMapper,
                                            HealthDataMapper healthDataMapper,
                                            HealthAlertMapper healthAlertMapper,
                                            SensitiveDataCipher sensitiveDataCipher,
                                            DoctorAccessSupport doctorAccessSupport) {
         this.userMapper = userMapper;
-        this.doctorGroupMapper = doctorGroupMapper;
-        this.doctorGroupDoctorMemberMapper = doctorGroupDoctorMemberMapper;
-        this.doctorGroupMemberMapper = doctorGroupMemberMapper;
         this.patientArchiveMapper = patientArchiveMapper;
         this.healthDataMapper = healthDataMapper;
         this.healthAlertMapper = healthAlertMapper;

@@ -3,16 +3,16 @@ services:
     image: ${IMAGE_PREFIX:-docker.m.daocloud.io/library/}mysql:8.0
     container_name: health-mysql
     environment:
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change_me_root_password}
       MYSQL_DATABASE: health_system
       TZ: Asia/Shanghai
     command: --default-authentication-plugin=mysql_native_password
     ports:
-      - "3307:3306"
+      - "127.0.0.1:3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD}"]
       interval: 10s
       timeout: 5s
       retries: 20
@@ -21,8 +21,18 @@ services:
   redis:
     image: ${IMAGE_PREFIX:-docker.m.daocloud.io/library/}redis:7-alpine
     container_name: health-redis
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-change_me_redis_password}
+    command: ["sh", "-c", "redis-server --appendonly yes --appendfsync everysec --save 60 1000 --requirepass \"$${REDIS_PASSWORD}\""]
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
 
   backend:
     build:
@@ -36,20 +46,21 @@ services:
       DB_HOST: mysql
       DB_PORT: 3306
       DB_NAME: health_system
-      DB_USER: root
-      DB_PASSWORD: root
-      JWT_SECRET: healthSystemSecretKeyhealthSystemSecretKey
+      DB_USER: ${DB_USER:-root}
+      DB_PASSWORD: ${DB_PASSWORD:-change_me_root_password}
+      JWT_SECRET: ${JWT_SECRET:-PLEASE_CHANGE_ME_32CHARS_MINIMUM}
       JWT_EXPIRATION: 86400000
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-change_me_redis_password}
       TZ: Asia/Shanghai
     depends_on:
       mysql:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
 
   frontend:
     build:
@@ -67,3 +78,4 @@ services:
 
 volumes:
   mysql_data:
+  redis_data:

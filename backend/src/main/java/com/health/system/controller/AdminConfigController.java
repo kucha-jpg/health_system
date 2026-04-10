@@ -44,8 +44,9 @@ public class AdminConfigController {
     @GetMapping("/notices")
     public ApiResponse<List<SystemNotice>> list(@RequestParam(defaultValue = "true") boolean includeOffline,
                                                 @RequestParam(required = false) String keyword,
-                                                @RequestParam(required = false) Integer status) {
-        return ApiResponse.success(systemNoticeService.listNotices(includeOffline, keyword, status));
+                                                @RequestParam(required = false) Integer status,
+                                                @RequestParam(required = false) String targetRole) {
+        return ApiResponse.success(systemNoticeService.listNotices(includeOffline, keyword, status, targetRole, null));
     }
 
     @PostMapping("/notices")
@@ -99,5 +100,11 @@ public class AdminConfigController {
     public ApiResponse<Void> updateIndicatorType(@Valid @RequestBody HealthIndicatorTypeDTO dto) {
         healthIndicatorTypeService.updateType(dto);
         return ApiResponse.success("更新成功", null);
+    }
+
+    @DeleteMapping("/indicator-types/{id}")
+    public ApiResponse<Void> deleteIndicatorType(@PathVariable Long id) {
+        healthIndicatorTypeService.deleteType(id);
+        return ApiResponse.success("删除成功", null);
     }
 }

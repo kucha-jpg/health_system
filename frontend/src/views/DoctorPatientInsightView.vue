@@ -3,16 +3,16 @@
     <div class="page-header">
       <div>
         <h3 class="page-title">患者档案与趋势洞察</h3>
-        <p class="page-subtitle">支持指标、时间、图表类型切换，帮助医生多角度识别风险</p>
+        <p class="page-subtitle">患者档案与风险趋势</p>
       </div>
       <div class="page-actions">
-        <el-select v-model="query.indicatorType" clearable placeholder="指标类型" style="width: 130px" @change="load">
+        <el-select v-model="query.indicatorType" class="w-130" clearable placeholder="指标类型" @change="load">
           <el-option label="血压" value="血压" />
           <el-option label="血糖" value="血糖" />
           <el-option label="体重" value="体重" />
           <el-option label="服药" value="服药" />
         </el-select>
-        <el-select v-model="query.timeRange" placeholder="时间范围" style="width: 130px" @change="load">
+        <el-select v-model="query.timeRange" class="w-130" placeholder="时间范围" @change="load">
           <el-option label="最近一天" value="day" />
           <el-option label="最近一周" value="week" />
           <el-option label="最近一月" value="month" />
@@ -22,22 +22,43 @@
       </div>
     </div>
 
-    <div class="filter-row">
-      <el-input v-model="filters.remarkKeyword" clearable placeholder="明细备注关键词" style="width: 220px" />
-      <el-select v-model="filters.alertStatus" clearable placeholder="预警状态" style="width: 130px">
+    <div class="filter-toolbar filter-toolbar-compact">
+      <el-input v-model="filters.remarkKeyword" class="w-220" clearable placeholder="明细备注关键词" />
+      <el-select v-model="filters.alertStatus" class="w-130" clearable placeholder="预警状态">
         <el-option label="未处理" value="OPEN" />
         <el-option label="已处理" value="CLOSED" />
       </el-select>
       <el-button @click="resetFilters">重置筛选</el-button>
     </div>
 
-    <el-row :gutter="12" style="margin-bottom: 12px">
-      <el-col :span="8"><el-card>患者：{{ insight.patient?.name || '-' }}</el-card></el-col>
-      <el-col :span="8"><el-card>手机号：{{ insight.patient?.phone || '-' }}</el-card></el-col>
-      <el-col :span="8"><el-card>未处理预警：{{ insight.openAlertCount || 0 }}</el-card></el-col>
-    </el-row>
+    <div class="info-strip">
+      <div>
+        <div class="info-strip-title">先看趋势，再看分布，最后在明细中确认风险来源</div>
+        <div class="info-strip-desc">当前视图：{{ activeInsightText }}</div>
+      </div>
+      <el-tag effect="light">患者 {{ insight.patient?.name || '-' }}</el-tag>
+    </div>
 
-    <el-card style="margin-bottom: 12px">
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">患者</div>
+        <div class="kpi-value">{{ insight.patient?.name || '-' }}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">手机号</div>
+        <div class="kpi-value">{{ insight.patient?.phone || '-' }}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">未处理预警</div>
+        <div class="kpi-value">{{ insight.openAlertCount || 0 }}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">趋势数据条数</div>
+        <div class="kpi-value">{{ (insight.trendData || []).length }}</div>
+      </div>
+    </div>
+
+    <el-card class="section-card" style="margin-bottom: 12px" shadow="never">
       <template #header>患者档案</template>
       <el-descriptions :column="2" border>
         <el-descriptions-item label="姓名">{{ insight.archive?.name || insight.patient?.name || '-' }}</el-descriptions-item>
@@ -48,27 +69,27 @@
       </el-descriptions>
     </el-card>
 
-    <el-row :gutter="12" style="margin-bottom: 12px">
+    <el-row :gutter="12" class="chart-row">
       <el-col :xs="24" :lg="15">
-        <el-card>
+        <el-card class="section-card" shadow="never">
           <template #header>连续健康数据趋势</template>
           <div ref="trendRef" class="trend-chart"></div>
         </el-card>
       </el-col>
       <el-col :xs="24" :lg="9">
-        <el-card>
+        <el-card class="section-card" shadow="never">
           <template #header>预警状态分布（饼图）</template>
           <div ref="alertPieRef" class="trend-chart"></div>
         </el-card>
       </el-col>
     </el-row>
 
-    <el-card style="margin-bottom: 12px">
+    <el-card class="section-card" style="margin-bottom: 12px" shadow="never">
       <template #header>指标出现频次（柱状图）</template>
       <div ref="indicatorBarRef" class="trend-chart"></div>
     </el-card>
 
-    <el-card style="margin-bottom: 12px">
+    <el-card class="section-card" style="margin-bottom: 12px" shadow="never">
       <template #header>健康数据明细</template>
       <el-table :data="filteredTrendData" border v-loading="loading" empty-text="暂无匹配明细">
         <el-table-column prop="indicatorType" label="指标" width="100" />
@@ -78,7 +99,7 @@
       </el-table>
     </el-card>
 
-    <el-card>
+    <el-card class="section-card" shadow="never">
       <template #header>最近预警记录</template>
       <el-table :data="filteredAlerts" border v-loading="loading" empty-text="暂无匹配预警">
         <el-table-column prop="indicatorType" label="指标" width="90" />
@@ -95,7 +116,7 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import * as echarts from 'echarts'
+import echarts from '../utils/echarts'
 import { getDoctorPatientInsightApi } from '../api/modules'
 import { CHART_PALETTE, CHART_SPLIT_LINE, RISK_COLORS } from '../constants/chart-theme'
 import { showFirstVisitGuide } from '../composables/useFirstVisitGuide'
@@ -125,6 +146,13 @@ const filteredAlerts = computed(() => {
   const source = insight.value?.recentAlerts || []
   if (!filters.alertStatus) return source
   return source.filter((item) => item.status === filters.alertStatus)
+})
+
+const activeInsightText = computed(() => {
+  const indicator = query.indicatorType || '全部指标'
+  const time = query.timeRange || 'month'
+  const chartType = trendChartType.value
+  return `${indicator} / ${time} / ${chartType}`
 })
 
 const parseTrendValue = (item) => {
@@ -258,11 +286,8 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.filter-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+.chart-row {
+  margin-bottom: 12px;
 }
 
 .trend-chart {

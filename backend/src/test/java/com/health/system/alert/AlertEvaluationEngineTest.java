@@ -11,6 +11,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -28,8 +29,9 @@ class AlertEvaluationEngineTest {
         AlertEvaluator e1 = new TestEvaluator(IndicatorTypes.BLOOD_PRESSURE, new AlertDecision("MEDIUM", 60, "MEDIUM", "A", "A"));
         AlertEvaluator e2 = new TestEvaluator(IndicatorTypes.BLOOD_PRESSURE, new AlertDecision("HIGH", 80, "HIGH", "B", "B"));
 
-        assertThrows(IllegalStateException.class,
-                () -> new AlertEvaluationEngine(alertRuleMapper, patientAlertPreferenceMapper, List.of(e1, e2)));
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+            () -> new AlertEvaluationEngine(alertRuleMapper, patientAlertPreferenceMapper, List.of(e1, e2)));
+        assertNotNull(ex);
     }
 
     @Test
@@ -45,8 +47,9 @@ class AlertEvaluationEngineTest {
         rule.setMediumRule("80");
         when(alertRuleMapper.selectOne(any())).thenReturn(rule);
 
-        assertThrows(IllegalStateException.class,
-                () -> engine.evaluate(1L, "自定义", "90"));
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+            () -> engine.evaluate(1L, "自定义", "90"));
+        assertNotNull(ex);
     }
 
     @Test

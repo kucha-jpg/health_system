@@ -3,12 +3,20 @@
     <div class="page-header">
       <div>
         <h3 class="page-title">系统监控总览</h3>
-        <p class="page-subtitle">支持时间、群组、用户、指标四个维度的数据洞察</p>
+        <p class="page-subtitle">平台数据总览</p>
       </div>
       <div class="page-actions">
         <el-button @click="exportCsv">导出监控概览</el-button>
         <el-button :loading="loading" @click="load">刷新</el-button>
       </div>
+    </div>
+
+    <div class="info-strip">
+      <div>
+        <div class="info-strip-title">先看趋势，再看结构分布，最后定位重点人群与群组</div>
+        <div class="info-strip-desc">最近刷新：{{ lastUpdated || '-' }}</div>
+      </div>
+      <el-tag effect="light">未处理预警 {{ overview.openAlerts || 0 }}</el-tag>
     </div>
 
     <div v-if="loading" class="skeleton-grid summary-row">
@@ -17,21 +25,30 @@
       <div class="skeleton-card"></div>
     </div>
 
-    <el-row v-else :gutter="12" class="summary-row">
-      <el-col :xs="24" :sm="8"><el-card>系统用户总数：{{ overview.totalUsers || 0 }}</el-card></el-col>
-      <el-col :xs="24" :sm="8"><el-card>健康上报总数：{{ overview.totalHealthData || 0 }}</el-card></el-col>
-      <el-col :xs="24" :sm="8"><el-card>未处理预警：{{ overview.openAlerts || 0 }}</el-card></el-col>
-    </el-row>
+    <div v-else class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">系统用户总数</div>
+        <div class="kpi-value">{{ overview.totalUsers || 0 }}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">健康上报总数</div>
+        <div class="kpi-value">{{ overview.totalHealthData || 0 }}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">未处理预警</div>
+        <div class="kpi-value">{{ overview.openAlerts || 0 }}</div>
+      </div>
+    </div>
 
     <el-row :gutter="12" class="chart-row" v-loading="loading">
       <el-col :xs="24" :lg="14">
-        <el-card>
+        <el-card class="section-card" shadow="never">
           <template #header>近14天上报趋势（时间维度）</template>
           <div ref="dailyTrendRef" class="chart-main"></div>
         </el-card>
       </el-col>
       <el-col :xs="24" :lg="10">
-        <el-card>
+        <el-card class="section-card" shadow="never">
           <template #header>指标分布（饼图）</template>
           <div ref="indicatorPieRef" class="chart-main"></div>
         </el-card>
@@ -40,20 +57,20 @@
 
     <el-row :gutter="12" class="chart-row" v-loading="loading">
       <el-col :xs="24" :lg="12">
-        <el-card>
+        <el-card class="section-card" shadow="never">
           <template #header>群组患者规模（群组维度）</template>
           <div ref="groupBarRef" class="chart-main"></div>
         </el-card>
       </el-col>
       <el-col :xs="24" :lg="12">
-        <el-card>
+        <el-card class="section-card" shadow="never">
           <template #header>活跃患者 Top（用户维度）</template>
           <div ref="userBarRef" class="chart-main"></div>
         </el-card>
       </el-col>
     </el-row>
 
-    <el-card>
+    <el-card class="section-card" shadow="never">
       <template #header>最近上报数据</template>
       <el-table :data="overview.latestHealthData || []" border v-loading="loading" empty-text="暂无数据">
         <el-table-column prop="userId" label="患者ID" width="100" />
@@ -67,7 +84,7 @@
 
 <script setup>
 import { nextTick, onMounted, onUnmounted, ref } from 'vue'
-import * as echarts from 'echarts'
+import echarts from '../utils/echarts'
 import { ElMessage } from 'element-plus'
 import { getMonitorOverviewApi } from '../api/modules'
 import { CHART_PALETTE, CHART_SPLIT_LINE } from '../constants/chart-theme'
@@ -79,10 +96,26 @@ const dailyTrendRef = ref(null)
 const indicatorPieRef = ref(null)
 const groupBarRef = ref(null)
 const userBarRef = ref(null)
+const lastUpdated = ref('')
 let dailyTrendChart = null
 let indicatorPieChart = null
 let groupBarChart = null
 let userBarChart = null
+
+const INDICATOR_LABEL_MAP = {
+  BLOOD_PRESSURE: '血压',
+  BLOOD_SUGAR: '血糖',
+  WEIGHT: '体重',
+  MEDICATION: '服药',
+  HEART_RATE: '心率',
+  TEMPERATURE: '体温',
+  OXYGEN_SATURATION: '血氧'
+}
+
+const toIndicatorLabel = (value) => {
+  const key = String(value || '').trim()
+  return INDICATOR_LABEL_MAP[key] || key
+}
 
 const renderCharts = async () => {
   await nextTick()
@@ -109,7 +142,7 @@ const renderCharts = async () => {
       series: [{
         type: 'pie',
         radius: ['35%', '68%'],
-        data: source.map((item) => ({ name: item.indicatorType, value: item.count }))
+        data: source.map((item) => ({ name: toIndicatorLabel(item.indicatorType), value: item.count }))
       }]
     })
   }
@@ -144,6 +177,7 @@ const load = async () => {
   try {
     const res = await getMonitorOverviewApi()
     overview.value = res || {}
+    lastUpdated.value = new Date().toLocaleString()
     await renderCharts()
   } finally {
     loading.value = false

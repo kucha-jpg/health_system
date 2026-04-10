@@ -3,7 +3,7 @@
     <div class="page-header">
       <div>
         <h3 class="page-title">医生预警工作台</h3>
-        <p class="page-subtitle">聚焦高风险患者，支持快捷筛选与分页查看</p>
+        <p class="page-subtitle">高风险患者优先处理</p>
       </div>
       <div class="page-actions">
         <el-button :loading="loading" @click="loadData">刷新</el-button>
@@ -11,25 +11,42 @@
       </div>
     </div>
 
-    <div class="soft-tip">
-      当前筛选：{{ query.riskLevel || '全部级别' }} / 最低风险分 {{ query.minRiskScore }} / {{ query.sortBy === 'risk_desc' ? '按风险优先' : '按时间优先' }}
+    <div class="info-strip">
+      <div>
+        <div class="info-strip-title">优先处理高风险与待闭环预警</div>
+        <div class="info-strip-desc">筛选：{{ activeFilterText }}</div>
+      </div>
+      <el-tag effect="light">最近刷新：{{ lastUpdated || '-' }}</el-tag>
     </div>
 
-    <el-row :gutter="10" class="summary-row">
-      <el-col :xs="24" :sm="8"><el-card shadow="never">全部预警：{{ total }}</el-card></el-col>
-      <el-col :xs="24" :sm="8"><el-card shadow="never">高风险：{{ riskSummary.HIGH }}</el-card></el-col>
-      <el-col :xs="24" :sm="8"><el-card shadow="never">中风险：{{ riskSummary.MEDIUM }}</el-card></el-col>
-    </el-row>
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">全部预警</div>
+        <div class="kpi-value">{{ total }}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">高风险</div>
+        <div class="kpi-value">{{ riskSummary.HIGH }}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">中风险</div>
+        <div class="kpi-value">{{ riskSummary.MEDIUM }}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">待闭环</div>
+        <div class="kpi-value">{{ openCount }}</div>
+      </div>
+    </div>
 
-    <div class="filters">
-      <el-select v-model="query.riskLevel" clearable placeholder="风险级别" style="width: 140px" @change="onFilterChanged">
+    <div class="filter-toolbar filters">
+      <el-select v-model="query.riskLevel" class="w-140" clearable placeholder="风险级别" @change="onFilterChanged">
         <el-option label="全部" value="" />
         <el-option label="高风险" value="HIGH" />
         <el-option label="中风险" value="MEDIUM" />
         <el-option label="低风险" value="LOW" />
       </el-select>
       <el-input-number v-model="query.minRiskScore" :min="0" :max="100" :step="5" @change="onFilterChanged" />
-      <el-select v-model="query.sortBy" style="width: 170px" @change="onFilterChanged">
+      <el-select v-model="query.sortBy" class="w-170" @change="onFilterChanged">
         <el-option label="按风险分优先" value="risk_desc" />
         <el-option label="按最新时间优先" value="time_desc" />
       </el-select>
@@ -52,16 +69,17 @@
           {{ scope.row.reasonText || scope.row.reason }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="130" fixed="right">
+      <el-table-column label="操作" width="210" fixed="right">
         <template #default="scope">
-          <el-button size="small" type="primary" @click="handle(scope.row)">闭环处理</el-button>
-          <el-button size="small" text type="success" @click="quickHandle(scope.row)">一键闭环</el-button>
+          <div class="action-group">
+            <el-button size="small" class="btn-handle" type="primary" @click="handle(scope.row)">闭环处理</el-button>
+            <el-button size="small" class="btn-quick" type="success" plain @click="quickHandle(scope.row)">一键闭环</el-button>
+          </div>
         </template>
       </el-table-column>
     </el-table>
 
-    <div class="pager">
-      <span class="sub">最近刷新：{{ lastUpdated || '-' }}</span>
+    <div class="pager-row">
       <el-pagination
         v-model:current-page="query.pageNo"
         v-model:page-size="query.pageSize"
@@ -101,6 +119,15 @@ const riskSummary = computed(() => {
     if (item.riskLevel === 'MEDIUM') stat.MEDIUM += 1
   })
   return stat
+})
+
+const openCount = computed(() => alerts.value.filter((item) => item.status === 'OPEN').length)
+
+const activeFilterText = computed(() => {
+  const level = query.value.riskLevel || '全部'
+  const score = query.value.minRiskScore
+  const sortText = query.value.sortBy === 'risk_desc' ? '风险优先' : '时间优先'
+  return `${level} / 最低分 ${score} / ${sortText}`
 })
 
 const loadData = async () => {
@@ -192,40 +219,31 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.toolbar {
-  display: flex;
-  justify-content: space-between;
+
+.action-group {
+  display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
 }
 
-.title {
-  font-size: 16px;
-  font-weight: 600;
+.btn-handle,
+.btn-quick {
+  min-width: 76px;
 }
 
-.sub {
-  color: #909399;
-  font-size: 12px;
+.btn-quick {
+  border-color: rgba(37, 138, 102, 0.38) !important;
+  color: #1e7458 !important;
+  background: rgba(255, 255, 255, 0.86) !important;
 }
 
-.summary-row {
-  margin-bottom: 10px;
+.btn-quick:hover {
+  border-color: rgba(37, 138, 102, 0.62) !important;
+  color: #145842 !important;
+  background: rgba(255, 255, 255, 0.96) !important;
 }
 
 .filters {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   margin: 8px 0 12px;
-  flex-wrap: wrap;
-}
-
-.pager {
-  margin-top: 12px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
 }
 </style>

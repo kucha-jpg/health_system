@@ -3,42 +3,70 @@
     <div class="page-header">
       <div>
         <h3 class="page-title">系统操作日志</h3>
-        <p class="page-subtitle">支持检索、慢导出识别、批量行为追踪与 CSV 导出</p>
+        <p class="page-subtitle">检索与导出操作日志</p>
       </div>
       <div class="page-actions">
         <el-button @click="load">刷新</el-button>
       </div>
     </div>
 
-    <div class="soft-tip">当前日志总数 {{ total }}，可优先查看“慢导出优先”定位高耗时操作。</div>
+    <div class="info-strip">
+      <div>
+        <div class="info-strip-title">操作日志用于审计追踪与慢请求定位</div>
+        <div class="info-strip-desc">日志总数 {{ total }}，可按耗时阈值筛查。</div>
+      </div>
+      <el-tag effect="light">当前页 {{ logs.length }} 条</el-tag>
+    </div>
 
-    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-          <el-input v-model="query.keyword" placeholder="用户/路径/信息关键字" clearable style="width:240px" />
-          <el-select v-model="query.roleType" placeholder="角色" clearable style="width:120px">
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">当前页成功日志</div>
+        <div class="kpi-value">{{ successCount }}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">当前页失败日志</div>
+        <div class="kpi-value">{{ failedCount }}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">导出相关日志</div>
+        <div class="kpi-value">{{ exportLogCount }}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">慢导出日志</div>
+        <div class="kpi-value">{{ slowExportCount }}</div>
+      </div>
+    </div>
+
+    <div class="filter-toolbar">
+          <el-input v-model="query.keyword" class="w-240" placeholder="用户/路径/信息关键字" clearable />
+          <el-select v-model="query.roleType" class="w-120" placeholder="角色" clearable>
             <el-option label="管理员" value="ADMIN" />
             <el-option label="医生" value="DOCTOR" />
             <el-option label="患者" value="PATIENT" />
           </el-select>
-          <el-select v-model="query.success" placeholder="结果" clearable style="width:120px">
+          <el-select v-model="query.success" class="w-120" placeholder="结果" clearable>
             <el-option label="成功" :value="1" />
             <el-option label="失败" :value="0" />
           </el-select>
           <el-date-picker
+            class="w-320"
             v-model="query.range"
             type="datetimerange"
             range-separator="至"
             start-placeholder="开始时间"
             end-placeholder="结束时间"
             value-format="YYYY-MM-DD HH:mm:ss"
-            style="width:320px"
           />
           <el-button @click="search">查询</el-button>
           <el-button @click="resetQuery">重置</el-button>
-          <el-input-number v-model="warnThreshold" :min="1" :max="99999" :step="100" controls-position="right" style="width:140px" @change="onThresholdChange" />
-          <span style="font-size:12px;color:#6b7280;">偏慢阈值(ms)</span>
-          <el-input-number v-model="dangerThreshold" :min="2" :max="99999" :step="100" controls-position="right" style="width:140px" @change="onThresholdChange" />
-          <span style="font-size:12px;color:#6b7280;">严重阈值(ms)</span>
-          <el-select v-model="exportLimit" style="width:130px">
+    </div>
+
+    <div class="filter-toolbar filter-toolbar-secondary">
+          <el-input-number v-model="warnThreshold" class="w-140" :min="1" :max="99999" :step="100" controls-position="right" @change="onThresholdChange" />
+          <span class="text-note">偏慢阈值(ms)</span>
+          <el-input-number v-model="dangerThreshold" class="w-140" :min="2" :max="99999" :step="100" controls-position="right" @change="onThresholdChange" />
+          <span class="text-note">严重阈值(ms)</span>
+          <el-select v-model="exportLimit" class="w-130">
             <el-option label="导出200条" :value="200" />
             <el-option label="导出1000条" :value="1000" />
             <el-option label="导出3000条" :value="3000" />
@@ -100,7 +128,7 @@
       </template>
     </el-table>
 
-    <div style="margin-top: 12px; display:flex; justify-content:flex-end;">
+    <div class="pager-row">
       <el-pagination
         v-model:current-page="pageNo"
         v-model:page-size="pageSize"
@@ -115,7 +143,7 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { listOperationLogsPageApi } from '../api/modules'
 import { authStore } from '../stores/auth'
@@ -129,6 +157,11 @@ const warnThreshold = ref(500)
 const dangerThreshold = ref(1000)
 const query = ref({ keyword: '', roleType: '', success: null, range: [] })
 let timer = null
+
+const successCount = computed(() => logs.value.filter((item) => item.success === 1).length)
+const failedCount = computed(() => logs.value.filter((item) => item.success !== 1).length)
+const exportLogCount = computed(() => logs.value.filter((item) => String(item.message || '').includes('log-export')).length)
+const slowExportCount = computed(() => logs.value.filter((item) => metricNumber(item, 'durationMs') >= warnThreshold.value).length)
 
 const LOG_WARN_THRESHOLD_KEY = 'logWarnThresholdMs'
 const LOG_DANGER_THRESHOLD_KEY = 'logDangerThresholdMs'
@@ -355,3 +388,9 @@ onUnmounted(() => {
   }
 })
 </script>
+
+<style scoped>
+.w-140 {
+  width: 140px;
+}
+</style>

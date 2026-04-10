@@ -1,0 +1,2 @@
+ALTER TABLE system_notice
+    MODIFY COLUMN content MEDIUMTEXT NOT NULL COMMENT '公告富文本HTML内容';

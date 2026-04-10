@@ -1,6 +1,7 @@
 package com.health.system.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.health.system.common.BusinessException;
 import com.health.system.common.SecurityInputSanitizer;
 import com.health.system.dto.UserDTO;
@@ -15,7 +16,8 @@ import org.springframework.util.StringUtils;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @Service
 public class UserServiceImpl implements UserService {
@@ -33,9 +35,11 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public List<User> listUsers(String keyword, String roleType, Integer status) {
+    public Map<String, Object> listUsers(String keyword, String roleType, Integer status, Integer pageNo, Integer pageSize) {
         String safeKeyword = SecurityInputSanitizer.sanitizeKeyword(keyword, 64, "账号查询关键词");
         String safeRoleType = SecurityInputSanitizer.sanitizeRoleType(roleType);
+        int safePageNo = Math.min(Math.max(pageNo == null ? 1 : pageNo, 1), 1000);
+        int safePageSize = Math.min(Math.max(pageSize == null ? 20 : pageSize, 1), 100);
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<User>()
                 .ne(User::getRoleType, "ADMIN")
                 .orderByDesc(User::getCreateTime);
@@ -52,7 +56,13 @@ public class UserServiceImpl implements UserService {
             wrapper.eq(User::getStatus, status);
         }
 
-        return userMapper.selectList(wrapper);
+        Page<User> page = userMapper.selectPage(new Page<>(safePageNo, safePageSize), wrapper);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("records", page.getRecords());
+        result.put("total", page.getTotal());
+        result.put("pageNo", safePageNo);
+        result.put("pageSize", safePageSize);
+        return result;
     }
 
     @Override

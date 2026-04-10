@@ -225,15 +225,25 @@ BASE_URL=http://127.0.0.1:9090/api ./scripts/api_assert.sh
 ### 新增文件
 
 - `docker-compose.yml`：一键编排 `mysql + backend + frontend`
+- `docker-compose.tls.yml`：可选 HTTPS 覆盖配置（为 `frontend` 增加 `443` 与证书挂载）
 - `backend/Dockerfile`：Spring Boot 后端镜像（Maven 构建 + JRE 运行，内置 Maven 镜像源）
-- `frontend/Dockerfile`：Vue 前端镜像（Node 运行 Vite 服务）
-- `frontend/nginx/default.conf`：前端 Nginx 配置（用于非当前 Docker 运行方式，可保留）
+- `frontend/Dockerfile`：Vue 前端镜像（构建静态资源 + Nginx 托管）
+- `frontend/nginx/default.conf`：HTTP 部署默认 Nginx 配置
+- `frontend/nginx/default.tls.conf`：HTTPS 部署 Nginx 配置模板（80 跳转 443）
 
 ### 快速启动
 
 ```bash
 docker compose up -d --build
 ```
+
+可选 HTTPS 启用方式（需要证书）：
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d --build
+```
+
+证书目录：`frontend/nginx/certs`，需要提供：`server.crt`、`server.key`。
 
 如需切换镜像源，可通过 `IMAGE_PREFIX` 覆盖默认前缀：
 
@@ -272,7 +282,8 @@ $env:IMAGE_PREFIX='docker.m.daocloud.io/library/'; docker compose up -d --build
 
 - `DB_NAME=health_system`
 - `DB_USER=root`
-- `DB_PASSWORD=root`
+- `DB_PASSWORD=change_me_root_password`
+- `REDIS_PASSWORD=change_me_redis_password`
 - MySQL 映射端口：`3307`
 - 后端映射端口：`9090`
 - 前端映射端口：`80`

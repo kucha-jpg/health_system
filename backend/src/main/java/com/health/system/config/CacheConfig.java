@@ -3,7 +3,7 @@ package com.health.system.config;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
+import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.springframework.boot.autoconfigure.cache.RedisCacheManagerBuilderCustomizer;
 import org.springframework.cache.annotation.EnableCaching;
@@ -22,8 +22,17 @@ public class CacheConfig {
     ObjectMapper cacheObjectMapper = objectMapper.copy();
     cacheObjectMapper.registerModule(new JavaTimeModule());
     cacheObjectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+
+    BasicPolymorphicTypeValidator typeValidator = BasicPolymorphicTypeValidator.builder()
+        .allowIfSubType("com.health.system.")
+        .allowIfSubType("java.lang.")
+        .allowIfSubType("java.util.")
+        .allowIfSubType("java.time.")
+        .allowIfSubType("java.math.")
+        .build();
+
     cacheObjectMapper.activateDefaultTyping(
-        LaissezFaireSubTypeValidator.instance,
+        typeValidator,
         ObjectMapper.DefaultTyping.NON_FINAL,
         JsonTypeInfo.As.PROPERTY
     );

@@ -12,5 +12,7 @@ public interface HealthIndicatorTypeService {
 
     void updateType(HealthIndicatorTypeDTO dto);
 
+    void deleteType(Long id);
+
     boolean isEnabledType(String indicatorType);
 }

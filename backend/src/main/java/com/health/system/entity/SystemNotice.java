@@ -11,5 +11,6 @@ import lombok.EqualsAndHashCode;
 public class SystemNotice extends BaseEntity {
     private String title;
     private String content;
+    private String targetRole;
     private Integer status;
 }

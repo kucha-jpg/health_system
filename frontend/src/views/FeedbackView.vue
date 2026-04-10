@@ -3,30 +3,30 @@
     <div class="page-header">
       <div>
         <h3 class="page-title">反馈通道</h3>
-        <p class="page-subtitle">提交问题与建议，管理员处理后会在列表中同步回复</p>
+        <p class="page-subtitle">提交与跟踪反馈处理</p>
       </div>
       <div class="page-actions">
         <el-button @click="reloadFromStart">刷新</el-button>
       </div>
     </div>
 
-    <div class="soft-tip">可按时间范围筛选历史反馈，建议描述复现步骤与期望结果以便快速处理。</div>
+    <div class="soft-tip">支持按时间范围筛选。</div>
 
-    <el-form label-width="80px" style="max-width: 820px; margin-bottom: 18px;">
+    <el-form label-width="80px" class="feedback-form">
       <el-form-item label="反馈内容">
         <el-input v-model="content" type="textarea" :rows="4" maxlength="500" show-word-limit placeholder="请输入你遇到的问题、建议或改进想法" />
       </el-form-item>
       <el-form-item label="时间范围">
         <el-date-picker
           v-model="range"
+          class="w-360"
           type="datetimerange"
           range-separator="至"
           start-placeholder="开始时间"
           end-placeholder="结束时间"
           value-format="YYYY-MM-DD HH:mm:ss"
-          style="width:360px"
         />
-        <el-button style="margin-left:8px" @click="reloadFromStart">筛选</el-button>
+        <el-button class="filter-btn" @click="reloadFromStart">筛选</el-button>
       </el-form-item>
       <el-form-item>
         <el-button type="primary" @click="submit">提交反馈</el-button>
@@ -59,7 +59,7 @@
       </template>
     </el-table>
 
-    <div style="margin-top: 12px; display:flex; justify-content:flex-end;">
+    <div class="pager-row">
       <el-pagination
         v-model:current-page="pageNo"
         v-model:page-size="pageSize"
@@ -133,3 +133,20 @@ onUnmounted(() => {
   }
 })
 </script>
+
+<style scoped>
+.feedback-form {
+  max-width: 820px;
+  margin-bottom: 18px;
+}
+
+.filter-btn {
+  margin-left: 8px;
+}
+
+@media (max-width: 900px) {
+  .filter-btn {
+    margin-left: 0;
+  }
+}
+</style>

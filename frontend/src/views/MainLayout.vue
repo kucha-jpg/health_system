@@ -73,15 +73,12 @@
           <el-button size="small" @click="logout">退出</el-button>
         </div>
       </div>
-      <div class="page-heading panel-head">
-        <div>
-          <h1 class="page-heading-title">{{ pageTitle }}</h1>
-          <p class="page-heading-sub">{{ pageSubtitle }}</p>
+      <div class="context-strip">
+        <div class="context-main">
+          <span class="context-badge">{{ roleTag }}</span>
+          <span class="context-title">{{ pageTitle }}</span>
         </div>
-        <div class="page-heading-tags">
-          <span class="heading-tag">{{ roleLabel }}</span>
-          <span class="heading-tag">在线会话</span>
-        </div>
+        <div class="context-hint">{{ pageHint }}</div>
       </div>
       <router-view />
     </main>
@@ -101,19 +98,21 @@ const role = authStore.role
 const name = authStore.name || '用户'
 let sessionTimer = null
 let feedbackTimer = null
+const SESSION_INTERVAL_VISIBLE_MS = 15000
+const SESSION_INTERVAL_HIDDEN_MS = 60000
+const FEEDBACK_INTERVAL_VISIBLE_MS = 30000
+const FEEDBACK_INTERVAL_HIDDEN_MS = 120000
 const pendingFeedbackCount = ref(0)
 const unreadFeedbackCount = ref(0)
 const currentTheme = ref('mint')
 const isHome = computed(() => route.path === '/home')
 const pageTitle = computed(() => route.meta?.title || '工作首页')
-
-const pageSubtitle = computed(() => subtitleMap[role] || '请根据当前页面完成相应操作。')
-const roleLabel = computed(() => {
-  if (role === 'ADMIN') return '管理员视角'
-  if (role === 'DOCTOR') return '医生视角'
-  return '患者视角'
+const roleTag = computed(() => {
+  if (role === 'ADMIN') return '管理员'
+  if (role === 'DOCTOR') return '医生'
+  return '患者'
 })
-
+const pageHint = computed(() => subtitleMap[role] || '请按当前页面完成对应操作。')
 const checkSession = async () => {
   if (!authStore.token) return
   try {
@@ -131,7 +130,10 @@ const checkSession = async () => {
 const handleVisibilityChange = () => {
   if (document.visibilityState === 'visible') {
     checkSession()
+    loadPendingFeedbackCount()
+    loadUnreadFeedbackCount()
   }
+  restartTimers()
 }
 
 const logout = () => {
@@ -176,24 +178,7 @@ const applyTheme = (theme) => {
   window.localStorage.setItem('hs_theme', nextTheme)
 }
 
-onMounted(() => {
-  const savedTheme = window.localStorage.getItem('hs_theme')
-  applyTheme(savedTheme || 'mint')
-  checkSession()
-  loadPendingFeedbackCount()
-  loadUnreadFeedbackCount()
-  sessionTimer = window.setInterval(async () => {
-    await checkSession()
-  }, 5000)
-  feedbackTimer = window.setInterval(async () => {
-    await loadPendingFeedbackCount()
-    await loadUnreadFeedbackCount()
-  }, 10000)
-  document.addEventListener('visibilitychange', handleVisibilityChange)
-  window.addEventListener('feedback:read', handleFeedbackRead)
-})
-
-onUnmounted(() => {
+const clearTimers = () => {
   if (sessionTimer) {
     window.clearInterval(sessionTimer)
     sessionTimer = null
@@ -202,6 +187,37 @@ onUnmounted(() => {
     window.clearInterval(feedbackTimer)
     feedbackTimer = null
   }
+}
+
+const restartTimers = () => {
+  clearTimers()
+  const isVisible = document.visibilityState === 'visible'
+  const sessionInterval = isVisible ? SESSION_INTERVAL_VISIBLE_MS : SESSION_INTERVAL_HIDDEN_MS
+  const feedbackInterval = isVisible ? FEEDBACK_INTERVAL_VISIBLE_MS : FEEDBACK_INTERVAL_HIDDEN_MS
+
+  sessionTimer = window.setInterval(async () => {
+    await checkSession()
+  }, sessionInterval)
+
+  feedbackTimer = window.setInterval(async () => {
+    await loadPendingFeedbackCount()
+    await loadUnreadFeedbackCount()
+  }, feedbackInterval)
+}
+
+onMounted(() => {
+  const savedTheme = window.localStorage.getItem('hs_theme')
+  applyTheme(savedTheme || 'mint')
+  checkSession()
+  loadPendingFeedbackCount()
+  loadUnreadFeedbackCount()
+  restartTimers()
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+  window.addEventListener('feedback:read', handleFeedbackRead)
+})
+
+onUnmounted(() => {
+  clearTimers()
   document.removeEventListener('visibilitychange', handleVisibilityChange)
   window.removeEventListener('feedback:read', handleFeedbackRead)
 })
@@ -268,48 +284,55 @@ onUnmounted(() => {
   box-shadow: 0 0 0 3px rgba(47, 125, 50, 0.18);
 }
 
-.page-heading {
-  padding: 2px 6px 14px;
-}
-
-.panel-head {
+.context-strip {
+  margin: -2px 2px 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.48);
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
 }
 
-.page-heading-title {
-  margin: 0;
-  font-size: 22px;
-  line-height: 1.2;
-}
-
-.page-heading-sub {
-  margin: 6px 0 0;
-  font-size: 13px;
-  color: #5a7176;
-}
-
-.page-heading-tags {
+.context-main {
   display: inline-flex;
+  align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
+  min-width: 0;
 }
 
-.heading-tag {
-  padding: 5px 10px;
+.context-badge {
+  padding: 2px 8px;
   border-radius: 999px;
   font-size: 12px;
-  color: #32535b;
+  color: #28515a;
+  border: 1px solid rgba(47, 111, 152, 0.2);
   background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.78);
+  white-space: nowrap;
+}
+
+.context-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1d4048;
+}
+
+.context-hint {
+  font-size: 12px;
+  color: #5b747b;
+  text-align: right;
 }
 
 @media (max-width: 760px) {
-  .panel-head {
+  .context-strip {
     flex-direction: column;
-    align-items: stretch;
+    align-items: flex-start;
+  }
+
+  .context-hint {
+    text-align: left;
   }
 
   .theme-switch {

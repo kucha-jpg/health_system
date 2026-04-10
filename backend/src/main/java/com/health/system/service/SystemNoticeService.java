@@ -6,7 +6,7 @@ import com.health.system.entity.SystemNotice;
 import java.util.List;
 
 public interface SystemNoticeService {
-    List<SystemNotice> listNotices(boolean includeOffline, String keyword, Integer status);
+    List<SystemNotice> listNotices(boolean includeOffline, String keyword, Integer status, String targetRole, String visibleRoleType);
 
     void createNotice(SystemNoticeDTO dto);
 

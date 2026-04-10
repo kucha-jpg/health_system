@@ -14,6 +14,9 @@ public class SystemNoticeDTO {
     @NotBlank(message = "公告内容不能为空")
     private String content;
 
+    @NotBlank(message = "投放对象不能为空")
+    private String targetRole;
+
     @NotNull(message = "状态不能为空")
     private Integer status;
 }

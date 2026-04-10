@@ -4,8 +4,6 @@ import com.health.system.alert.AlertDecision;
 import com.health.system.alert.AlertEvaluationEngine;
 import com.health.system.entity.HealthAlert;
 import com.health.system.entity.User;
-import com.health.system.mapper.DoctorGroupDoctorMemberMapper;
-import com.health.system.mapper.DoctorGroupMapper;
 import com.health.system.mapper.DoctorGroupMemberMapper;
 import com.health.system.mapper.HealthAlertMapper;
 import com.health.system.mapper.HealthDataMapper;
@@ -40,10 +38,6 @@ class HealthAlertServiceImplTest {
     private UserMapper userMapper;
     @Mock
     private AlertEvaluationEngine alertEvaluationEngine;
-    @Mock
-    private DoctorGroupMapper doctorGroupMapper;
-    @Mock
-    private DoctorGroupDoctorMemberMapper doctorGroupDoctorMemberMapper;
     @Mock
     private DoctorGroupMemberMapper doctorGroupMemberMapper;
     @Mock

@@ -1,12 +1,11 @@
 package com.health.system.service;
 
 import com.health.system.dto.UserDTO;
-import com.health.system.entity.User;
 
-import java.util.List;
+import java.util.Map;
 
 public interface UserService {
-    List<User> listUsers(String keyword, String roleType, Integer status);
+    Map<String, Object> listUsers(String keyword, String roleType, Integer status, Integer pageNo, Integer pageSize);
 
     void createUser(UserDTO dto);
 
