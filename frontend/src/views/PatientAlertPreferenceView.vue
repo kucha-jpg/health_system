@@ -7,7 +7,9 @@
       </div>
       <div class="page-actions">
         <el-button :loading="loading" @click="load">刷新</el-button>
-        <el-button type="primary" :loading="saving" @click="saveCurrent">保存当前配置</el-button>
+        <el-button v-if="!isEditing" type="primary" @click="startEdit()">编辑当前指标</el-button>
+        <el-button v-else type="primary" :loading="saving" @click="saveCurrent">保存修改</el-button>
+        <el-button v-if="isEditing" @click="cancelEdit">取消</el-button>
       </div>
     </div>
 
@@ -30,25 +32,25 @@
       </div>
     </div>
 
-    <el-segmented v-model="activeIndicator" :options="indicatorOptions" class="indicator-switch" @change="fillFormByIndicator" />
+    <el-segmented v-model="activeIndicator" :options="indicatorOptions" class="indicator-switch" @change="onIndicatorChanged" />
 
     <el-form :model="form" label-width="120px" class="pref-form">
       <el-form-item label="指标类型">
         <el-input v-model="form.indicatorType" disabled />
       </el-form-item>
       <el-form-item :label="highRuleLabel">
-        <el-input v-model="form.highRule" :placeholder="highRulePlaceholder" />
+        <el-input v-model="form.highRule" :disabled="!isEditing" :placeholder="highRulePlaceholder" />
       </el-form-item>
       <el-form-item :label="mediumRuleLabel">
-        <el-input v-model="form.mediumRule" :placeholder="mediumRulePlaceholder" />
+        <el-input v-model="form.mediumRule" :disabled="!isEditing" :placeholder="mediumRulePlaceholder" />
       </el-form-item>
       <el-form-item label="启用个性化阈值">
-        <el-switch v-model="form.enabled" :active-value="1" :inactive-value="0" />
+        <el-switch v-model="form.enabled" :disabled="!isEditing" :active-value="1" :inactive-value="0" />
       </el-form-item>
     </el-form>
 
     <div class="form-actions">
-      <el-button @click="applyRecommended">恢复推荐阈值</el-button>
+      <el-button :disabled="!isEditing" @click="applyRecommended">恢复推荐阈值</el-button>
       <el-button type="primary" plain @click="goAlerts">查看预警结果</el-button>
     </div>
 
@@ -67,7 +69,7 @@
       </el-table-column>
       <el-table-column label="操作" width="120">
         <template #default="scope">
-          <el-button link type="primary" @click="switchIndicator(scope.row.indicatorType)">编辑</el-button>
+          <el-button link type="primary" @click="startEdit(scope.row.indicatorType)">编辑</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -83,6 +85,7 @@ import { listPatientAlertPreferencesApi, updatePatientAlertPreferenceApi } from 
 const router = useRouter()
 const loading = ref(false)
 const saving = ref(false)
+const isEditing = ref(false)
 const activeIndicator = ref('血压')
 const indicatorOptions = ['血压', '血糖', '体重']
 const defaults = {
@@ -123,6 +126,23 @@ const fillFormByIndicator = () => {
 const switchIndicator = (indicatorType) => {
   activeIndicator.value = indicatorType
   fillFormByIndicator()
+}
+
+const onIndicatorChanged = () => {
+  fillFormByIndicator()
+  isEditing.value = false
+}
+
+const startEdit = (indicatorType) => {
+  if (indicatorType) {
+    switchIndicator(indicatorType)
+  }
+  isEditing.value = true
+}
+
+const cancelEdit = () => {
+  fillFormByIndicator()
+  isEditing.value = false
 }
 
 const applyRecommended = () => {
@@ -192,6 +212,10 @@ const load = async () => {
 }
 
 const saveCurrent = async () => {
+  if (!isEditing.value) {
+    ElMessage.warning('请先进入编辑模式')
+    return
+  }
   const msg = validate()
   if (msg) {
     ElMessage.warning(msg)
@@ -210,6 +234,7 @@ const saveCurrent = async () => {
     await updatePatientAlertPreferenceApi(payload)
     prefMap.value[form.indicatorType] = { ...payload }
     ElMessage.success('个性化阈值保存成功')
+    isEditing.value = false
   } catch (err) {
     ElMessage.error(err?.message || '保存失败，请稍后重试')
   } finally {

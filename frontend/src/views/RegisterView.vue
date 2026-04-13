@@ -19,8 +19,7 @@
         </el-form-item>
 
         <div class="auth-actions">
-          <el-button type="primary" class="auth-action" size="large" :loading="submitting" @click="onRegister">{{ copy.submitText }}</el-button>
-          <el-button class="auth-action" size="large" plain @click="goBack">返回登录</el-button>
+          <el-button type="primary" class="auth-action auth-submit" size="large" :loading="submitting" @click="onRegister">{{ copy.submitText }}</el-button>
         </div>
 
         <div class="auth-footer">
@@ -68,44 +67,84 @@ const onRegister = async () => {
   }
 }
 
-const goBack = () => {
-  if (window.history.length > 1) {
-    router.back()
-    return
-  }
-  router.push('/login')
-}
 </script>
 
 <style scoped>
 .auth-page {
   min-height: 100vh;
-  padding: 16px;
+  padding: 22px 16px;
   display: grid;
   place-items: center;
-  background: linear-gradient(180deg, #edf3ef 0%, #e4ece8 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-page::before,
+.auth-page::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+}
+
+.auth-page::before {
+  width: 480px;
+  height: 480px;
+  left: -180px;
+  top: -130px;
+  border-radius: 40% 60% 52% 48%;
+  background: radial-gradient(circle, rgba(var(--brand-rgb), 0.28), transparent 70%);
+  filter: blur(10px);
+}
+
+.auth-page::after {
+  width: 360px;
+  height: 360px;
+  right: -120px;
+  bottom: -90px;
+  border-radius: 58% 42% 44% 56%;
+  background: radial-gradient(circle, rgba(var(--brand-2-rgb), 0.34), transparent 72%);
+  filter: blur(10px);
 }
 
 .auth-card {
   width: min(520px, 100%);
-  border-radius: 14px;
-  padding: 20px 20px;
-  border: 1px solid #e6eeea;
-  background: #ffffff;
-  box-shadow: 0 10px 28px rgba(22, 53, 45, 0.1);
+  border-radius: 24px;
+  padding: 26px 24px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.66), rgba(255, 255, 255, 0.35)),
+    radial-gradient(circle at 12% 8%, rgba(var(--brand-rgb), 0.12), transparent 42%);
+  box-shadow: 0 24px 54px rgba(20, 52, 60, 0.24);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0.22), transparent 30%, transparent 60%, rgba(255, 255, 255, 0.2));
 }
 
 .auth-title {
   margin: 0;
-  font-size: 30px;
+  font-size: 34px;
   line-height: 1.2;
-  color: #1f3f36;
+  color: var(--ink-1);
+  font-family: 'Noto Serif SC', 'Noto Sans SC', serif;
+  position: relative;
+  z-index: 1;
 }
 
 .auth-subtitle {
   margin: 6px 0 12px;
-  color: #5e756c;
+  color: var(--ink-2);
   font-size: 15px;
+  position: relative;
+  z-index: 1;
 }
 
 .auth-form :deep(.el-form-item) {
@@ -122,24 +161,46 @@ const goBack = () => {
 }
 
 .auth-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  display: flex;
+  justify-content: center;
 }
 
 .auth-action {
-  width: 100%;
+  width: min(260px, 100%);
   height: 52px;
   font-size: 16px;
   margin-left: 0;
+  letter-spacing: 0.3px;
+}
+
+.auth-form :deep(.auth-submit.el-button) {
+  border-radius: 999px !important;
+  padding: 0 20px !important;
+  border: 0 !important;
+  background: linear-gradient(120deg, var(--brand-1), var(--brand-2)) !important;
+  color: #ffffff !important;
+  box-shadow: 0 10px 24px rgba(var(--brand-rgb), 0.36) !important;
+}
+
+.auth-form :deep(.auth-submit.el-button:hover) {
+  opacity: 0.92;
 }
 
 .auth-footer {
-  margin-top: 10px;
+  margin-top: 12px;
   display: flex;
   justify-content: center;
   gap: 8px;
   font-size: 14px;
+  color: var(--ink-2);
+  position: relative;
+  z-index: 1;
+}
+
+.auth-footer a {
+  color: var(--brand-1);
+  font-weight: 600;
+  text-decoration: none;
 }
 
 @media (max-width: 980px) {
@@ -153,7 +214,11 @@ const goBack = () => {
   }
 
   .auth-actions {
-    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .auth-title {
+    font-size: 28px;
   }
 }
 </style>
