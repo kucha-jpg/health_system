@@ -2,6 +2,8 @@ server:
   port: 8080
 
 spring:
+  cache:
+    type: simple
   datasource:
     url: jdbc:mysql://127.0.0.1:3306/health_system?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
     username: root

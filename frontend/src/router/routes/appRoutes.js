@@ -1,22 +1,23 @@
-const MainLayout = () => import('../../views/MainLayout.vue')
-const UserView = () => import('../../views/UserView.vue')
-const RoleHomeView = () => import('../../views/RoleHomeView.vue')
-const PatientArchiveView = () => import('../../views/PatientArchiveView.vue')
-const PatientDataReportView = () => import('../../views/PatientDataReportView.vue')
-const PatientDataListView = () => import('../../views/PatientDataListView.vue')
-const DoctorAlertsView = () => import('../../views/DoctorAlertsView.vue')
-const AdminMonitorView = () => import('../../views/AdminMonitorView.vue')
-const DoctorGroupView = () => import('../../views/DoctorGroupView.vue')
-const PatientAlertsView = () => import('../../views/PatientAlertsView.vue')
-const PatientAlertPreferenceView = () => import('../../views/PatientAlertPreferenceView.vue')
-const PatientReportSummaryView = () => import('../../views/PatientReportSummaryView.vue')
-const AdminNoticeView = () => import('../../views/AdminNoticeView.vue')
-const AdminAlertRuleView = () => import('../../views/AdminAlertRuleView.vue')
-const AdminLogView = () => import('../../views/AdminLogView.vue')
-const AdminRoleView = () => import('../../views/AdminRoleView.vue')
-const DoctorPatientInsightView = () => import('../../views/DoctorPatientInsightView.vue')
-const FeedbackView = () => import('../../views/FeedbackView.vue')
-const AdminFeedbackView = () => import('../../views/AdminFeedbackView.vue')
+import MainLayout from '../../views/MainLayout.vue'
+import UserView from '../../views/UserView.vue'
+import RoleHomeView from '../../views/RoleHomeView.vue'
+import PatientArchiveView from '../../views/PatientArchiveView.vue'
+import PatientDataReportView from '../../views/PatientDataReportView.vue'
+import PatientDataListView from '../../views/PatientDataListView.vue'
+import DoctorAlertsView from '../../views/DoctorAlertsView.vue'
+import AdminMonitorView from '../../views/AdminMonitorView.vue'
+import DoctorGroupView from '../../views/DoctorGroupView.vue'
+import PatientAlertsView from '../../views/PatientAlertsView.vue'
+import PatientAlertPreferenceView from '../../views/PatientAlertPreferenceView.vue'
+import PatientReportSummaryView from '../../views/PatientReportSummaryView.vue'
+import AdminNoticeView from '../../views/AdminNoticeView.vue'
+import AdminAlertRuleView from '../../views/AdminAlertRuleView.vue'
+import AdminLogView from '../../views/AdminLogView.vue'
+import AdminRoleView from '../../views/AdminRoleView.vue'
+import AdminGroupGovernanceView from '../../views/AdminGroupGovernanceView.vue'
+import DoctorPatientInsightView from '../../views/DoctorPatientInsightView.vue'
+import FeedbackView from '../../views/FeedbackView.vue'
+import AdminFeedbackView from '../../views/AdminFeedbackView.vue'
 
 export const appRoutes = [
   {
@@ -28,6 +29,7 @@ export const appRoutes = [
       { path: 'admin/monitor', component: AdminMonitorView, meta: { roles: ['ADMIN'], title: '系统监控' } },
       { path: 'admin/notices', component: AdminNoticeView, meta: { roles: ['ADMIN'], title: '系统公告' } },
       { path: 'admin/alert-rules', component: AdminAlertRuleView, meta: { roles: ['ADMIN'], title: '预警规则' } },
+      { path: 'admin/groups', component: AdminGroupGovernanceView, meta: { roles: ['ADMIN'], title: '群组治理' } },
       { path: 'admin/roles', component: AdminRoleView, meta: { roles: ['ADMIN'], title: '角色权限' } },
       { path: 'admin/logs', component: AdminLogView, meta: { roles: ['ADMIN'], title: '操作日志' } },
       { path: 'admin/feedback', component: AdminFeedbackView, meta: { roles: ['ADMIN'], title: '反馈消息' } },

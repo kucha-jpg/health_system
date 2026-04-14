@@ -3,7 +3,7 @@
     <div class="page-header">
       <div>
         <h3 class="page-title">管理员账号管理</h3>
-        <p class="page-subtitle">按角色与状态筛选账号</p>
+        <p class="page-subtitle">支持按角色与状态快速筛选，支持新增、编辑与启停用</p>
       </div>
       <div class="page-actions">
         <el-button :loading="loading" @click="load">刷新</el-button>
@@ -11,16 +11,12 @@
       </div>
     </div>
 
-    <div class="info-strip">
-      <div>
-        <div class="info-strip-title">账号管理用于维护角色覆盖与账户状态健康</div>
-        <div class="info-strip-desc">筛选：{{ activeFilterText }}</div>
-      </div>
-      <el-tag effect="light">总记录 {{ total }}</el-tag>
+    <div class="soft-tip">
+      当前筛选：{{ query.roleType || '全部角色' }} / {{ query.status === null ? '全部状态' : (query.status === 1 ? '启用' : '禁用') }} / 关键词 {{ query.keyword || '无' }}
     </div>
 
     <div class="query-grid">
-      <el-input v-model="query.keyword" placeholder="用户名/姓名/手机号" clearable @keyup.enter="load" />
+      <el-input v-model="query.keyword" placeholder="用户名/姓名/手机号" clearable @keyup.enter="onSearch" />
       <el-select v-model="query.roleType" placeholder="角色" clearable>
         <el-option label="患者" value="PATIENT" />
         <el-option label="医生" value="DOCTOR" />
@@ -30,29 +26,18 @@
         <el-option label="禁用" :value="0" />
       </el-select>
       <div class="query-actions">
-        <el-button type="primary" plain @click="load">查询</el-button>
+        <el-button type="primary" plain @click="onSearch">查询</el-button>
         <el-button @click="resetQuery">重置</el-button>
       </div>
     </div>
 
-    <div class="kpi-grid">
-      <div class="kpi-card">
-        <div class="kpi-label">当前页列表</div>
-        <div class="kpi-value">{{ users.length }}</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">启用账号</div>
-        <div class="kpi-value">{{ enabledCount }}</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">禁用账号</div>
-        <div class="kpi-value">{{ disabledCount }}</div>
-      </div>
-    </div>
+    <el-row :gutter="10" class="summary-row">
+      <el-col :xs="24" :sm="8"><el-card shadow="never">当前页：{{ users.length }}</el-card></el-col>
+      <el-col :xs="24" :sm="8"><el-card shadow="never">启用账号：{{ enabledCount }}</el-card></el-col>
+      <el-col :xs="24" :sm="8"><el-card shadow="never">禁用账号：{{ disabledCount }}</el-card></el-col>
+    </el-row>
 
-    <el-card class="section-card" shadow="never">
-      <template #header>账号列表</template>
-      <el-table :data="users" border v-loading="loading" empty-text="暂无匹配账号，请调整筛选条件">
+    <el-table :data="users" border v-loading="loading" empty-text="暂无匹配账号，请调整筛选条件">
       <el-table-column prop="id" label="ID" width="80" />
       <el-table-column prop="username" label="用户名" />
       <el-table-column prop="name" label="姓名" />
@@ -69,30 +54,29 @@
           <el-button link type="warning" @click="toggleStatus(scope.row)">{{ scope.row.status === 1 ? '禁用' : '启用' }}</el-button>
         </template>
       </el-table-column>
-      </el-table>
-    </el-card>
+    </el-table>
 
-    <div class="pager-wrap">
+    <div style="margin-top: 12px; display:flex; justify-content:flex-end;">
       <el-pagination
-        v-model:current-page="query.pageNo"
-        v-model:page-size="query.pageSize"
-        layout="total, sizes, prev, pager, next"
+        v-model:current-page="pageNo"
+        v-model:page-size="pageSize"
         :total="total"
-        :page-sizes="[10, 20, 50, 100]"
-        @current-change="load"
-        @size-change="handlePageSizeChange"
+        :page-sizes="[10, 20, 50]"
+        layout="total, sizes, prev, pager, next"
+        @size-change="onPageSizeChange"
+        @current-change="onPageChange"
       />
     </div>
   </el-card>
 
-  <el-dialog v-model="visible" :title="form.id ? '编辑账号' : '新增账号'" width="560px" class="app-dialog-style" :show-close="false" align-center>
+  <el-dialog v-model="visible" :title="form.id ? '编辑账号' : '新增账号'" width="560px">
     <el-form :model="form" label-width="100px">
       <el-form-item label="用户名"><el-input v-model="form.username" :disabled="!!form.id" /></el-form-item>
       <el-form-item label="姓名"><el-input v-model="form.name" /></el-form-item>
       <el-form-item label="手机号"><el-input v-model="form.phone" /></el-form-item>
       <el-form-item v-if="!form.id" label="初始密码"><el-input v-model="form.password" show-password /></el-form-item>
       <el-form-item label="角色">
-        <el-select v-model="form.roleType" class="w-full">
+        <el-select v-model="form.roleType" style="width:100%">
           <el-option label="患者" value="PATIENT" />
           <el-option label="医生" value="DOCTOR" />
         </el-select>
@@ -114,29 +98,33 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { addUserApi, getUsersApi, updateUserApi, updateUserStatusApi } from '../api/modules'
 
 const users = ref([])
-const total = ref(0)
+const allUsers = ref([])
 const visible = ref(false)
 const form = reactive({})
-const query = reactive({ keyword: '', roleType: '', status: null, pageNo: 1, pageSize: 20 })
+const query = reactive({ keyword: '', roleType: '', status: null })
 const loading = ref(false)
 const saving = ref(false)
+const pageNo = ref(1)
+const pageSize = ref(10)
 let timer = null
 
-const enabledCount = computed(() => users.value.filter((u) => u.status === 1).length)
-const disabledCount = computed(() => users.value.filter((u) => u.status !== 1).length)
-const activeFilterText = computed(() => {
-  const role = query.roleType || '全部角色'
-  const status = query.status === null ? '全部状态' : (query.status === 1 ? '启用' : '禁用')
-  const keyword = query.keyword || '无'
-  return `${role} / ${status} / 关键词 ${keyword}`
-})
+const total = computed(() => allUsers.value.length)
+const enabledCount = computed(() => allUsers.value.filter((u) => u.status === 1).length)
+const disabledCount = computed(() => allUsers.value.filter((u) => u.status !== 1).length)
+
+const updatePagedUsers = () => {
+  const start = (pageNo.value - 1) * pageSize.value
+  users.value = allUsers.value.slice(start, start + pageSize.value)
+}
 
 const load = async () => {
   loading.value = true
   try {
-    const res = await getUsersApi(query)
-    users.value = res?.records || []
-    total.value = res?.total || 0
+    allUsers.value = await getUsersApi(query)
+    if ((pageNo.value - 1) * pageSize.value >= total.value && pageNo.value > 1) {
+      pageNo.value = 1
+    }
+    updatePagedUsers()
   } catch (err) {
     ElMessage.error(err?.message || '账号列表加载失败，请稍后重试')
   } finally {
@@ -144,14 +132,24 @@ const load = async () => {
   }
 }
 
-const resetQuery = async () => {
-  Object.assign(query, { keyword: '', roleType: '', status: null, pageNo: 1, pageSize: 20 })
+const onSearch = async () => {
+  pageNo.value = 1
   await load()
 }
 
-const handlePageSizeChange = async () => {
-  query.pageNo = 1
+const resetQuery = async () => {
+  Object.assign(query, { keyword: '', roleType: '', status: null })
+  pageNo.value = 1
   await load()
+}
+
+const onPageChange = () => {
+  updatePagedUsers()
+}
+
+const onPageSizeChange = () => {
+  pageNo.value = 1
+  updatePagedUsers()
 }
 
 const openDialog = (row) => {
@@ -185,18 +183,11 @@ const save = async () => {
 const toggleStatus = async (row) => {
   const nextStatus = row.status === 1 ? 0 : 1
   const actionText = nextStatus === 1 ? '启用' : '禁用'
-  await ElMessageBox.confirm(
-    `确认${actionText}账号 ${row.username} 吗？`,
-    '状态变更确认',
-    {
-      type: 'warning',
-      confirmButtonText: '保存',
-      cancelButtonText: '取消',
-      showClose: false,
-      closeOnClickModal: false,
-      closeOnPressEscape: false
-    }
-  )
+  await ElMessageBox.confirm(`确认${actionText}账号 ${row.username} 吗？`, '状态变更确认', {
+    type: 'warning',
+    confirmButtonText: '确认',
+    cancelButtonText: '取消'
+  })
   await updateUserStatusApi(row.id, nextStatus)
   ElMessage.success(`账号已${actionText}`)
   await load()
@@ -228,19 +219,13 @@ onUnmounted(() => {
   gap: 8px;
 }
 
-.pager-wrap {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 12px;
+.summary-row {
+  margin-bottom: 12px;
 }
 
 @media (max-width: 900px) {
   .query-grid {
     grid-template-columns: 1fr;
-  }
-
-  .pager-wrap {
-    justify-content: center;
   }
 }
 </style>

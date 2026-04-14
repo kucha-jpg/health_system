@@ -15,6 +15,7 @@
           <el-menu-item index="/admin/users">账号管理</el-menu-item>
           <el-menu-item index="/admin/notices">系统公告</el-menu-item>
           <el-menu-item index="/admin/alert-rules">预警规则</el-menu-item>
+          <el-menu-item index="/admin/groups">群组治理</el-menu-item>
           <el-menu-item index="/admin/roles">角色权限</el-menu-item>
           <el-menu-item index="/admin/monitor">系统监控</el-menu-item>
           <el-menu-item index="/admin/logs">操作日志</el-menu-item>
@@ -67,18 +68,9 @@
           <el-select v-model="currentTheme" size="small" class="theme-switch" @change="applyTheme">
             <el-option v-for="item in themeOptions" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
-          <el-button v-if="role === 'PATIENT' && $route.path !== '/patient/report'" size="small" type="primary" plain @click="router.push('/patient/report')">快捷上报</el-button>
           <el-button v-if="role === 'DOCTOR' && $route.path !== '/doctor/alerts'" size="small" type="warning" plain @click="router.push('/doctor/alerts')">查看预警</el-button>
-          <el-button v-if="role === 'ADMIN' && $route.path !== '/admin/feedback'" size="small" type="info" plain @click="router.push('/admin/feedback')">处理反馈</el-button>
           <el-button size="small" @click="logout">退出</el-button>
         </div>
-      </div>
-      <div class="context-strip">
-        <div class="context-main">
-          <span class="context-badge">{{ roleTag }}</span>
-          <span class="context-title">{{ pageTitle }}</span>
-        </div>
-        <div class="context-hint">{{ pageHint }}</div>
       </div>
       <router-view />
     </main>
@@ -90,7 +82,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { authStore } from '../stores/auth'
 import { getPendingFeedbackCountApi, getUnreadFeedbackCountApi, validateSessionApi } from '../api/modules'
-import { subtitleMap, themeOptions } from '../constants/layout'
+import { themeOptions } from '../constants/layout'
 
 const router = useRouter()
 const route = useRoute()
@@ -98,21 +90,11 @@ const role = authStore.role
 const name = authStore.name || '用户'
 let sessionTimer = null
 let feedbackTimer = null
-const SESSION_INTERVAL_VISIBLE_MS = 15000
-const SESSION_INTERVAL_HIDDEN_MS = 60000
-const FEEDBACK_INTERVAL_VISIBLE_MS = 30000
-const FEEDBACK_INTERVAL_HIDDEN_MS = 120000
 const pendingFeedbackCount = ref(0)
 const unreadFeedbackCount = ref(0)
 const currentTheme = ref('mint')
 const isHome = computed(() => route.path === '/home')
-const pageTitle = computed(() => route.meta?.title || '工作首页')
-const roleTag = computed(() => {
-  if (role === 'ADMIN') return '管理员'
-  if (role === 'DOCTOR') return '医生'
-  return '患者'
-})
-const pageHint = computed(() => subtitleMap[role] || '请按当前页面完成对应操作。')
+
 const checkSession = async () => {
   if (!authStore.token) return
   try {
@@ -130,10 +112,7 @@ const checkSession = async () => {
 const handleVisibilityChange = () => {
   if (document.visibilityState === 'visible') {
     checkSession()
-    loadPendingFeedbackCount()
-    loadUnreadFeedbackCount()
   }
-  restartTimers()
 }
 
 const logout = () => {
@@ -178,7 +157,25 @@ const applyTheme = (theme) => {
   window.localStorage.setItem('hs_theme', nextTheme)
 }
 
-const clearTimers = () => {
+onMounted(() => {
+  document.body.setAttribute('data-role', role || 'PATIENT')
+  const savedTheme = window.localStorage.getItem('hs_theme')
+  applyTheme(savedTheme || 'mint')
+  checkSession()
+  loadPendingFeedbackCount()
+  loadUnreadFeedbackCount()
+  sessionTimer = window.setInterval(async () => {
+    await checkSession()
+  }, 5000)
+  feedbackTimer = window.setInterval(async () => {
+    await loadPendingFeedbackCount()
+    await loadUnreadFeedbackCount()
+  }, 10000)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+  window.addEventListener('feedback:read', handleFeedbackRead)
+})
+
+onUnmounted(() => {
   if (sessionTimer) {
     window.clearInterval(sessionTimer)
     sessionTimer = null
@@ -187,39 +184,9 @@ const clearTimers = () => {
     window.clearInterval(feedbackTimer)
     feedbackTimer = null
   }
-}
-
-const restartTimers = () => {
-  clearTimers()
-  const isVisible = document.visibilityState === 'visible'
-  const sessionInterval = isVisible ? SESSION_INTERVAL_VISIBLE_MS : SESSION_INTERVAL_HIDDEN_MS
-  const feedbackInterval = isVisible ? FEEDBACK_INTERVAL_VISIBLE_MS : FEEDBACK_INTERVAL_HIDDEN_MS
-
-  sessionTimer = window.setInterval(async () => {
-    await checkSession()
-  }, sessionInterval)
-
-  feedbackTimer = window.setInterval(async () => {
-    await loadPendingFeedbackCount()
-    await loadUnreadFeedbackCount()
-  }, feedbackInterval)
-}
-
-onMounted(() => {
-  const savedTheme = window.localStorage.getItem('hs_theme')
-  applyTheme(savedTheme || 'mint')
-  checkSession()
-  loadPendingFeedbackCount()
-  loadUnreadFeedbackCount()
-  restartTimers()
-  document.addEventListener('visibilitychange', handleVisibilityChange)
-  window.addEventListener('feedback:read', handleFeedbackRead)
-})
-
-onUnmounted(() => {
-  clearTimers()
   document.removeEventListener('visibilitychange', handleVisibilityChange)
   window.removeEventListener('feedback:read', handleFeedbackRead)
+  document.body.removeAttribute('data-role')
 })
 </script>
 
@@ -227,6 +194,8 @@ onUnmounted(() => {
 .logo-title {
   font-size: 16px;
   font-weight: 700;
+  letter-spacing: 0.2px;
+  font-family: 'Noto Serif SC', 'Noto Sans SC', serif;
 }
 
 .logo {
@@ -236,21 +205,23 @@ onUnmounted(() => {
 }
 
 .logo-mark {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
   display: grid;
   place-items: center;
   font-size: 12px;
   font-weight: 700;
   color: #ffffff;
-  background: linear-gradient(135deg, #1f8f72, #2b6f9c);
+  background: linear-gradient(135deg, var(--brand-1), var(--brand-2));
+  box-shadow: 0 8px 16px rgba(var(--brand-rgb), 0.32);
 }
 
 .logo-sub {
   margin-top: 4px;
   font-size: 12px;
-  opacity: 0.72;
+  color: var(--ink-2);
+  opacity: 0.9;
 }
 
 .menu-badge-item {
@@ -274,67 +245,18 @@ onUnmounted(() => {
   padding: 4px 10px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.56);
+  border: 1px solid rgba(255, 255, 255, 0.64);
 }
 
 .user-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #2f7d32;
-  box-shadow: 0 0 0 3px rgba(47, 125, 50, 0.18);
-}
-
-.context-strip {
-  margin: -2px 2px 10px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.78);
-  background: rgba(255, 255, 255, 0.48);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-}
-
-.context-main {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.context-badge {
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 12px;
-  color: #28515a;
-  border: 1px solid rgba(47, 111, 152, 0.2);
-  background: rgba(255, 255, 255, 0.6);
-  white-space: nowrap;
-}
-
-.context-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: #1d4048;
-}
-
-.context-hint {
-  font-size: 12px;
-  color: #5b747b;
-  text-align: right;
+  background: var(--brand-1);
+  box-shadow: 0 0 0 3px rgba(var(--brand-rgb), 0.22);
 }
 
 @media (max-width: 760px) {
-  .context-strip {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .context-hint {
-    text-align: left;
-  }
-
   .theme-switch {
     width: 100%;
   }
