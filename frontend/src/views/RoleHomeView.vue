@@ -293,7 +293,9 @@ const loadAdminSummary = async () => {
       getAdminFeedbackStatsApi()
     ])
 
-    const userList = Array.isArray(users) ? users : []
+    const userList = Array.isArray(users)
+      ? users
+      : (Array.isArray(users?.records) ? users.records : [])
     const noticeList = Array.isArray(notices) ? notices : []
     const ruleList = Array.isArray(rules) ? rules : []
     const roleList = Array.isArray(roles) ? roles : []

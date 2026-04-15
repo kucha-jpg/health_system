@@ -98,7 +98,6 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { addUserApi, getUsersApi, updateUserApi, updateUserStatusApi } from '../api/modules'
 
 const users = ref([])
-const allUsers = ref([])
 const visible = ref(false)
 const form = reactive({})
 const query = reactive({ keyword: '', roleType: '', status: null })
@@ -106,25 +105,34 @@ const loading = ref(false)
 const saving = ref(false)
 const pageNo = ref(1)
 const pageSize = ref(10)
+const total = ref(0)
 let timer = null
 
-const total = computed(() => allUsers.value.length)
-const enabledCount = computed(() => allUsers.value.filter((u) => u.status === 1).length)
-const disabledCount = computed(() => allUsers.value.filter((u) => u.status !== 1).length)
-
-const updatePagedUsers = () => {
-  const start = (pageNo.value - 1) * pageSize.value
-  users.value = allUsers.value.slice(start, start + pageSize.value)
-}
+const enabledCount = computed(() => users.value.filter((u) => u.status === 1).length)
+const disabledCount = computed(() => users.value.filter((u) => u.status !== 1).length)
 
 const load = async () => {
   loading.value = true
   try {
-    allUsers.value = await getUsersApi(query)
-    if ((pageNo.value - 1) * pageSize.value >= total.value && pageNo.value > 1) {
-      pageNo.value = 1
+    const data = await getUsersApi({
+      ...query,
+      pageNo: pageNo.value,
+      pageSize: pageSize.value
+    })
+
+    const list = Array.isArray(data)
+      ? data
+      : (Array.isArray(data?.records) ? data.records : [])
+
+    users.value = list
+    total.value = Number(data?.total ?? list.length) || 0
+
+    if (Number.isFinite(Number(data?.pageNo))) {
+      pageNo.value = Number(data.pageNo)
     }
-    updatePagedUsers()
+    if (Number.isFinite(Number(data?.pageSize))) {
+      pageSize.value = Number(data.pageSize)
+    }
   } catch (err) {
     ElMessage.error(err?.message || '账号列表加载失败，请稍后重试')
   } finally {
@@ -144,12 +152,12 @@ const resetQuery = async () => {
 }
 
 const onPageChange = () => {
-  updatePagedUsers()
+  load()
 }
 
 const onPageSizeChange = () => {
   pageNo.value = 1
-  updatePagedUsers()
+  load()
 }
 
 const openDialog = (row) => {
