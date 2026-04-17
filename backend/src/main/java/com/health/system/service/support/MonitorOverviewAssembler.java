@@ -4,8 +4,10 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.springframework.stereotype.Component;
 
@@ -29,6 +31,7 @@ public class MonitorOverviewAssembler {
                                         long openAlerts,
                                         List<HealthData> latestHealthData,
                                         List<HealthData> recentMonthData,
+                                        Set<String> enabledRuleIndicators,
                                         List<DoctorGroup> groups,
                                         List<DoctorGroupMember> groupMembers) {
         Map<String, Object> result = new HashMap<>();
@@ -36,17 +39,28 @@ public class MonitorOverviewAssembler {
         result.put("totalHealthData", totalHealthData);
         result.put("openAlerts", openAlerts);
         result.put("latestHealthData", latestHealthData);
-        result.put("indicatorDistribution", buildIndicatorDistribution(recentMonthData));
+        result.put("indicatorDistribution", buildIndicatorDistribution(recentMonthData, enabledRuleIndicators));
         result.put("dailyReportTrend", buildDailyReportTrend(recentMonthData, 14));
         result.put("activeUserStats", buildActiveUserStats(recentMonthData));
         result.put("groupStats", buildGroupStats(groups, groupMembers));
         return result;
     }
 
-    private List<Map<String, Object>> buildIndicatorDistribution(List<HealthData> dataList) {
+    private List<Map<String, Object>> buildIndicatorDistribution(List<HealthData> dataList,
+                                                                 Set<String> enabledRuleIndicators) {
+        Set<String> allowedIndicators = enabledRuleIndicators == null ? Set.of() : new HashSet<>(enabledRuleIndicators);
         Map<String, Integer> counts = new HashMap<>();
+        for (String indicator : allowedIndicators) {
+            if (indicator != null && !indicator.isBlank()) {
+                counts.put(indicator, 0);
+            }
+        }
+
         for (HealthData item : dataList) {
             String key = item.getIndicatorType() == null ? "未知" : item.getIndicatorType();
+            if (!allowedIndicators.isEmpty() && !allowedIndicators.contains(key)) {
+                continue;
+            }
             counts.put(key, counts.getOrDefault(key, 0) + 1);
         }
         return counts.entrySet().stream()

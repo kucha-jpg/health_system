@@ -25,6 +25,7 @@ import com.health.system.entity.HealthData;
 import com.health.system.entity.User;
 import com.health.system.mapper.DoctorGroupMapper;
 import com.health.system.mapper.DoctorGroupMemberMapper;
+import com.health.system.mapper.AlertRuleMapper;
 import com.health.system.mapper.HealthAlertMapper;
 import com.health.system.mapper.HealthDataMapper;
 import com.health.system.mapper.UserMapper;
@@ -41,6 +42,7 @@ public class HealthAlertServiceImpl implements HealthAlertService {
     private final AlertEvaluationEngine alertEvaluationEngine;
     private final DoctorGroupMapper doctorGroupMapper;
     private final DoctorGroupMemberMapper doctorGroupMemberMapper;
+    private final AlertRuleMapper alertRuleMapper;
     private final DoctorAccessSupport doctorAccessSupport;
     private final MonitorOverviewAssembler monitorOverviewAssembler;
 
@@ -50,6 +52,7 @@ public class HealthAlertServiceImpl implements HealthAlertService {
                                   AlertEvaluationEngine alertEvaluationEngine,
                                   DoctorGroupMapper doctorGroupMapper,
                                   DoctorGroupMemberMapper doctorGroupMemberMapper,
+                                  AlertRuleMapper alertRuleMapper,
                                   DoctorAccessSupport doctorAccessSupport,
                                   MonitorOverviewAssembler monitorOverviewAssembler) {
         this.healthAlertMapper = healthAlertMapper;
@@ -58,6 +61,7 @@ public class HealthAlertServiceImpl implements HealthAlertService {
         this.alertEvaluationEngine = alertEvaluationEngine;
         this.doctorGroupMapper = doctorGroupMapper;
         this.doctorGroupMemberMapper = doctorGroupMemberMapper;
+        this.alertRuleMapper = alertRuleMapper;
         this.doctorAccessSupport = doctorAccessSupport;
         this.monitorOverviewAssembler = monitorOverviewAssembler;
     }
@@ -230,12 +234,22 @@ public class HealthAlertServiceImpl implements HealthAlertService {
                 ? List.of()
                 : doctorGroupMemberMapper.selectList(new LambdaQueryWrapper<DoctorGroupMember>()
                 .in(DoctorGroupMember::getGroupId, groups.stream().map(DoctorGroup::getId).toList()));
+
+        var enabledRuleIndicators = alertRuleMapper.selectList(new LambdaQueryWrapper<com.health.system.entity.AlertRule>()
+            .eq(com.health.system.entity.AlertRule::getEnabled, 1)
+            .eq(com.health.system.entity.AlertRule::getDeleted, 0))
+            .stream()
+            .map(com.health.system.entity.AlertRule::getIndicatorType)
+            .filter(StringUtils::hasText)
+            .collect(java.util.stream.Collectors.toSet());
+
         return monitorOverviewAssembler.assemble(
                 totalUsers,
                 totalHealthData,
                 openAlerts,
                 latestHealthData,
                 recentMonthData,
+            enabledRuleIndicators,
                 groups,
                 groupMembers
         );
