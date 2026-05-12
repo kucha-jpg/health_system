@@ -80,6 +80,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ElMessageBox } from 'element-plus'
 import { authStore } from '../stores/auth'
 import { getPendingFeedbackCountApi, getUnreadFeedbackCountApi, validateSessionApi } from '../api/modules'
 import { themeOptions } from '../constants/layout'
@@ -115,9 +116,18 @@ const handleVisibilityChange = () => {
   }
 }
 
-const logout = () => {
-  authStore.clear()
-  router.push('/login')
+const logout = async () => {
+  try {
+    await ElMessageBox.confirm('确认退出当前登录吗？', '退出确认', {
+      confirmButtonText: '确认退出',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    authStore.clear()
+    router.push('/login')
+  } catch (e) {
+    // 用户取消退出，不做跳转
+  }
 }
 
 const goBack = () => {

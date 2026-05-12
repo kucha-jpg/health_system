@@ -12,31 +12,16 @@
           <el-option label="已处理" value="CLOSED" />
         </el-select>
         <el-button :loading="loading" @click="load">刷新</el-button>
+        <span class="actions-note">筛选状态：{{ status || '全部状态' }}</span>
+        <el-tag effect="light">当前页 {{ alerts.length }} 条</el-tag>
       </div>
     </div>
 
-    <div class="info-strip">
-      <div>
-        <div class="info-strip-title">系统将自动跟踪风险变化并提示处理进度</div>
-        <div class="info-strip-desc">筛选状态：{{ status || '全部状态' }}</div>
-      </div>
-      <el-tag effect="light">当前页 {{ alerts.length }} 条</el-tag>
-    </div>
-
-    <div class="kpi-grid">
-      <div class="kpi-card">
-        <div class="kpi-label">未处理预警</div>
-        <div class="kpi-value">{{ openCount }}</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">已处理预警</div>
-        <div class="kpi-value">{{ closedCount }}</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">总记录数</div>
-        <div class="kpi-value">{{ total }}</div>
-      </div>
-    </div>
+    <el-row :gutter="10" class="summary-row">
+      <el-col :xs="24" :sm="8"><el-card shadow="never" class="summary-stat-card summary-stat-card--danger">未处理预警：{{ openCount }}</el-card></el-col>
+      <el-col :xs="24" :sm="8"><el-card shadow="never" class="summary-stat-card">已处理预警：{{ closedCount }}</el-card></el-col>
+      <el-col :xs="24" :sm="8"><el-card shadow="never" class="summary-stat-card">总记录数：{{ total }}</el-card></el-col>
+    </el-row>
 
     <el-table :data="alerts" border v-loading="loading">
       <el-table-column prop="indicatorType" label="指标" width="100" />
@@ -136,3 +121,41 @@ onUnmounted(() => {
   }
 })
 </script>
+
+<style scoped>
+:deep(.page-actions) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.actions-note {
+  color: #5f7982;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  :deep(.page-actions) {
+    flex-wrap: wrap;
+  }
+}
+
+:deep(.page-header) {
+  margin-bottom: 4px;
+}
+
+.summary-row {
+  margin-bottom: 10px;
+}
+
+.summary-stat-card {
+  font-weight: 600;
+  color: #2f4952;
+}
+
+.summary-stat-card--danger {
+  color: #8f2d2d;
+}
+</style>

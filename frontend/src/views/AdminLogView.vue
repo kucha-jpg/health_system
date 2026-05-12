@@ -10,32 +10,12 @@
       </div>
     </div>
 
-    <div class="info-strip">
-      <div>
-        <div class="info-strip-title">操作日志用于审计追踪与慢请求定位</div>
-        <div class="info-strip-desc">日志总数 {{ total }}，可按耗时阈值筛查。</div>
-      </div>
-      <el-tag effect="light">当前页 {{ logs.length }} 条</el-tag>
-    </div>
-
-    <div class="kpi-grid">
-      <div class="kpi-card">
-        <div class="kpi-label">当前页成功日志</div>
-        <div class="kpi-value">{{ successCount }}</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">当前页失败日志</div>
-        <div class="kpi-value">{{ failedCount }}</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">导出相关日志</div>
-        <div class="kpi-value">{{ exportLogCount }}</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">慢导出日志</div>
-        <div class="kpi-value">{{ slowExportCount }}</div>
-      </div>
-    </div>
+    <el-row :gutter="10" class="summary-row">
+      <el-col :xs="24" :sm="12" :lg="6"><el-card shadow="never" class="summary-stat-card">当前页成功日志：{{ successCount }}</el-card></el-col>
+      <el-col :xs="24" :sm="12" :lg="6"><el-card shadow="never" class="summary-stat-card summary-stat-card--danger">当前页失败日志：{{ failedCount }}</el-card></el-col>
+      <el-col :xs="24" :sm="12" :lg="6"><el-card shadow="never" class="summary-stat-card">导出相关日志：{{ exportLogCount }}</el-card></el-col>
+      <el-col :xs="24" :sm="12" :lg="6"><el-card shadow="never" class="summary-stat-card summary-stat-card--warn">慢导出日志：{{ slowExportCount }}</el-card></el-col>
+    </el-row>
 
     <div class="filter-toolbar">
           <el-input v-model="query.keyword" class="w-240" placeholder="用户/路径/信息关键字" clearable />
@@ -392,5 +372,18 @@ onUnmounted(() => {
 <style scoped>
 .w-140 {
   width: 140px;
+}
+
+.summary-stat-card {
+  font-weight: 600;
+  color: #2f4952;
+}
+
+.summary-stat-card--warn {
+  color: #8a4b28;
+}
+
+.summary-stat-card--danger {
+  color: #8f2d2d;
 }
 </style>

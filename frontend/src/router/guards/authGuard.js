@@ -4,7 +4,13 @@ import { validateSessionApi } from '../../api/modules'
 export const registerAuthGuard = (router) => {
   router.beforeEach(async (to, from, next) => {
     if (['/login', '/register'].includes(to.path)) return next()
-    if (!authStore.token) return next('/login')
+    if (!authStore.token) {
+      const notice = authStore.consumeAuthNotice()
+      if (notice) {
+        return next({ path: '/login', query: { notice } })
+      }
+      return next('/login')
+    }
 
     try {
       await validateSessionApi()

@@ -27,18 +27,16 @@
       <el-button @click="resetFilters">重置筛选</el-button>
     </div>
 
-    <div class="info-strip">
-      <div>
-        <div class="info-strip-title">统计范围：{{ summary.range || '-' }}</div>
-        <div class="info-strip-desc">当前筛选后最近数据 {{ filteredLatestData.length }} 条，可直接导出。</div>
-      </div>
-      <el-tag effect="light">图表模式：{{ riskChartType }}</el-tag>
-    </div>
+    <el-row :gutter="10" class="summary-row">
+      <el-col :xs="24" :sm="8"><el-card shadow="never" class="summary-stat-card">统计范围：{{ summary.range || '-' }}</el-card></el-col>
+      <el-col :xs="24" :sm="8"><el-card shadow="never" class="summary-stat-card">当前筛选后最近数据：{{ filteredLatestData.length }} 条</el-card></el-col>
+      <el-col :xs="24" :sm="8"><el-card shadow="never" class="summary-stat-card">图表模式：{{ riskChartType }}</el-card></el-col>
+    </el-row>
 
-    <el-row :gutter="12" class="summary-row">
-      <el-col :xs="24" :sm="8"><el-card>上报总数：{{ summary.reportCount || 0 }}</el-card></el-col>
-      <el-col :xs="24" :sm="8"><el-card>预警总数：{{ summary.alertCount || 0 }}</el-card></el-col>
-      <el-col :xs="24" :sm="8"><el-card>统计范围：{{ summary.range || '-' }}</el-card></el-col>
+    <el-row :gutter="10" class="summary-row summary-row-spaced">
+      <el-col :xs="24" :sm="8"><el-card shadow="never" class="summary-stat-card">上报总数：{{ summary.reportCount || 0 }}</el-card></el-col>
+      <el-col :xs="24" :sm="8"><el-card shadow="never" class="summary-stat-card summary-stat-card--warn">预警总数：{{ summary.alertCount || 0 }}</el-card></el-col>
+      <el-col :xs="24" :sm="8"><el-card shadow="never" class="summary-stat-card">导出范围：当前筛选结果</el-card></el-col>
     </el-row>
 
     <el-row :gutter="12" class="chart-row">
@@ -63,12 +61,21 @@
 
     <el-card>
       <template #header>最近上报（自定义筛选）</template>
-      <el-table :data="filteredLatestData" border v-loading="loading" empty-text="暂无匹配数据">
+      <el-table :data="pagedLatestData" border v-loading="loading" empty-text="暂无匹配数据">
         <el-table-column prop="indicatorType" label="指标" width="100" />
         <el-table-column prop="value" label="数值" width="120" />
         <el-table-column prop="reportTime" label="上报时间" width="180" />
         <el-table-column prop="remark" label="备注" />
       </el-table>
+      <div class="pager-row">
+        <el-pagination
+          v-model:current-page="latestPageNo"
+          v-model:page-size="latestPageSize"
+          :page-sizes="[5, 10, 20]"
+          :total="filteredLatestData.length"
+          layout="total, sizes, prev, pager, next"
+        />
+      </div>
     </el-card>
   </el-card>
 </template>
@@ -86,6 +93,8 @@ const range = ref('week')
 const loading = ref(false)
 const filters = reactive({ indicatorType: '', keyword: '' })
 const riskChartType = ref('line')
+const latestPageNo = ref(1)
+const latestPageSize = ref(10)
 const riskTrendRef = ref(null)
 const typePieRef = ref(null)
 const typeRadarRef = ref(null)
@@ -117,6 +126,11 @@ const filteredLatestData = computed(() => {
     const keywordOk = !keyword || remark.includes(keyword)
     return indicatorOk && keywordOk
   })
+})
+
+const pagedLatestData = computed(() => {
+  const start = (latestPageNo.value - 1) * latestPageSize.value
+  return filteredLatestData.value.slice(start, start + latestPageSize.value)
 })
 
 const renderRiskChart = async () => {
@@ -213,6 +227,7 @@ const load = async () => {
   loading.value = true
   try {
     summary.value = await getPatientReportSummaryApi({ range: range.value })
+    latestPageNo.value = 1
     await renderRiskChart()
     await renderTypeCharts()
   } finally {
@@ -223,6 +238,7 @@ const load = async () => {
 const resetFilters = () => {
   filters.indicatorType = ''
   filters.keyword = ''
+  latestPageNo.value = 1
 }
 
 const csvEscape = (value) => {
@@ -288,6 +304,12 @@ watch(riskChartType, () => {
   renderRiskChart()
 })
 
+watch(filteredLatestData, () => {
+  if ((latestPageNo.value - 1) * latestPageSize.value >= filteredLatestData.value.length) {
+    latestPageNo.value = 1
+  }
+})
+
 const handleResize = () => {
   if (riskTrendChart) riskTrendChart.resize()
   if (typePieChart) typePieChart.resize()
@@ -326,6 +348,10 @@ onUnmounted(() => {
   margin: 12px 0;
 }
 
+.summary-row-spaced {
+  margin-top: 0;
+}
+
 .chart-row {
   margin-bottom: 12px;
 }
@@ -338,5 +364,14 @@ onUnmounted(() => {
 .chart-side {
   width: 100%;
   height: 320px;
+}
+
+.summary-stat-card {
+  font-weight: 600;
+  color: #2f4952;
+}
+
+.summary-stat-card--warn {
+  color: #8a4b28;
 }
 </style>

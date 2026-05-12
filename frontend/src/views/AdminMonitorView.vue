@@ -11,34 +11,17 @@
       </div>
     </div>
 
-    <div class="info-strip">
-      <div>
-        <div class="info-strip-title">先看趋势，再看结构分布，最后定位重点人群与群组</div>
-        <div class="info-strip-desc">最近刷新：{{ lastUpdated || '-' }}</div>
-      </div>
-      <el-tag effect="light">未处理预警 {{ overview.openAlerts || 0 }}</el-tag>
-    </div>
-
     <div v-if="loading" class="skeleton-grid summary-row">
       <div class="skeleton-card"></div>
       <div class="skeleton-card"></div>
       <div class="skeleton-card"></div>
     </div>
 
-    <div v-else class="kpi-grid">
-      <div class="kpi-card">
-        <div class="kpi-label">系统用户总数</div>
-        <div class="kpi-value">{{ overview.totalUsers || 0 }}</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">健康上报总数</div>
-        <div class="kpi-value">{{ overview.totalHealthData || 0 }}</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">未处理预警</div>
-        <div class="kpi-value">{{ overview.openAlerts || 0 }}</div>
-      </div>
-    </div>
+    <el-row v-else :gutter="10" class="summary-row">
+      <el-col :xs="24" :sm="8"><el-card shadow="never" class="summary-stat-card">系统用户总数：{{ overview.totalUsers || 0 }}</el-card></el-col>
+      <el-col :xs="24" :sm="8"><el-card shadow="never" class="summary-stat-card">健康上报总数：{{ overview.totalHealthData || 0 }}</el-card></el-col>
+      <el-col :xs="24" :sm="8"><el-card shadow="never" class="summary-stat-card summary-stat-card--warn">未处理预警：{{ overview.openAlerts || 0 }}</el-card></el-col>
+    </el-row>
 
     <el-row :gutter="12" class="chart-row" v-loading="loading">
       <el-col :xs="24" :lg="14">
@@ -72,18 +55,27 @@
 
     <el-card class="section-card" shadow="never">
       <template #header>最近上报数据</template>
-      <el-table :data="overview.latestHealthData || []" border v-loading="loading" empty-text="暂无数据">
+      <el-table :data="pagedLatestHealthData" border v-loading="loading" empty-text="暂无数据">
         <el-table-column prop="userId" label="患者ID" width="100" />
         <el-table-column prop="indicatorType" label="指标" width="120" />
         <el-table-column prop="value" label="值" width="120" />
         <el-table-column prop="reportTime" label="上报时间" />
       </el-table>
+      <div class="pager-row">
+        <el-pagination
+          v-model:current-page="latestPageNo"
+          v-model:page-size="latestPageSize"
+          :page-sizes="[5, 10, 20]"
+          :total="latestHealthData.length"
+          layout="total, sizes, prev, pager, next"
+        />
+      </div>
     </el-card>
   </el-card>
 </template>
 
 <script setup>
-import { nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import echarts from '../utils/echarts'
 import { ElMessage } from 'element-plus'
 import { getMonitorOverviewApi } from '../api/modules'
@@ -96,7 +88,8 @@ const dailyTrendRef = ref(null)
 const indicatorPieRef = ref(null)
 const groupBarRef = ref(null)
 const userBarRef = ref(null)
-const lastUpdated = ref('')
+const latestPageNo = ref(1)
+const latestPageSize = ref(10)
 let dailyTrendChart = null
 let indicatorPieChart = null
 let groupBarChart = null
@@ -116,6 +109,12 @@ const toIndicatorLabel = (value) => {
   const key = String(value || '').trim()
   return INDICATOR_LABEL_MAP[key] || key
 }
+
+const latestHealthData = computed(() => overview.value?.latestHealthData || [])
+const pagedLatestHealthData = computed(() => {
+  const start = (latestPageNo.value - 1) * latestPageSize.value
+  return latestHealthData.value.slice(start, start + latestPageSize.value)
+})
 
 const renderCharts = async () => {
   await nextTick()
@@ -177,7 +176,7 @@ const load = async () => {
   try {
     const res = await getMonitorOverviewApi()
     overview.value = res || {}
-    lastUpdated.value = new Date().toLocaleString()
+    latestPageNo.value = 1
     await renderCharts()
   } finally {
     loading.value = false
@@ -277,5 +276,14 @@ onUnmounted(() => {
 .chart-main {
   width: 100%;
   height: 300px;
+}
+
+.summary-stat-card {
+  font-weight: 600;
+  color: #2f4952;
+}
+
+.summary-stat-card--warn {
+  color: #8a4b28;
 }
 </style>

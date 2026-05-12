@@ -36,27 +36,14 @@
         <div class="info-strip-title">先看趋势，再看分布，最后在明细中确认风险来源</div>
         <div class="info-strip-desc">当前视图：{{ activeInsightText }}</div>
       </div>
-      <el-tag effect="light">患者 {{ insight.patient?.name || '-' }}</el-tag>
     </div>
 
-    <div class="kpi-grid">
-      <div class="kpi-card">
-        <div class="kpi-label">患者</div>
-        <div class="kpi-value">{{ insight.patient?.name || '-' }}</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">手机号</div>
-        <div class="kpi-value">{{ insight.patient?.phone || '-' }}</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">未处理预警</div>
-        <div class="kpi-value">{{ insight.openAlertCount || 0 }}</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">趋势数据条数</div>
-        <div class="kpi-value">{{ (insight.trendData || []).length }}</div>
-      </div>
-    </div>
+    <el-row :gutter="10" class="summary-row">
+      <el-col :xs="24" :sm="12" :lg="6"><el-card shadow="never" class="summary-stat-card">患者：{{ insight.patient?.name || '-' }}</el-card></el-col>
+      <el-col :xs="24" :sm="12" :lg="6"><el-card shadow="never" class="summary-stat-card">手机号：{{ insight.patient?.phone || '-' }}</el-card></el-col>
+      <el-col :xs="24" :sm="12" :lg="6"><el-card shadow="never" class="summary-stat-card summary-stat-card--warn">未处理预警：{{ insight.openAlertCount || 0 }}</el-card></el-col>
+      <el-col :xs="24" :sm="12" :lg="6"><el-card shadow="never" class="summary-stat-card">趋势数据条数：{{ (insight.trendData || []).length }}</el-card></el-col>
+    </el-row>
 
     <el-card class="section-card" style="margin-bottom: 12px" shadow="never">
       <template #header>患者档案</template>
@@ -91,17 +78,26 @@
 
     <el-card class="section-card" style="margin-bottom: 12px" shadow="never">
       <template #header>健康数据明细</template>
-      <el-table :data="filteredTrendData" border v-loading="loading" empty-text="暂无匹配明细">
+      <el-table :data="pagedTrendData" border v-loading="loading" empty-text="暂无匹配明细">
         <el-table-column prop="indicatorType" label="指标" width="100" />
         <el-table-column prop="value" label="数值" width="120" />
         <el-table-column prop="reportTime" label="上报时间" width="180" />
         <el-table-column prop="remark" label="备注" />
       </el-table>
+      <div class="pager-row">
+        <el-pagination
+          v-model:current-page="trendPageNo"
+          v-model:page-size="trendPageSize"
+          :page-sizes="[10, 20, 50]"
+          :total="filteredTrendData.length"
+          layout="total, sizes, prev, pager, next"
+        />
+      </div>
     </el-card>
 
     <el-card class="section-card" shadow="never">
       <template #header>最近预警记录</template>
-      <el-table :data="filteredAlerts" border v-loading="loading" empty-text="暂无匹配预警">
+      <el-table :data="pagedAlerts" border v-loading="loading" empty-text="暂无匹配预警">
         <el-table-column prop="indicatorType" label="指标" width="90" />
         <el-table-column prop="value" label="数值" width="110" />
         <el-table-column prop="level" label="等级" width="90" />
@@ -109,7 +105,18 @@
         <el-table-column prop="reasonText" label="原因" />
         <el-table-column prop="createTime" label="触发时间" width="180" />
       </el-table>
+      <div class="pager-row">
+        <el-pagination
+          v-model:current-page="alertPageNo"
+          v-model:page-size="alertPageSize"
+          :page-sizes="[10, 20, 50]"
+          :total="filteredAlerts.length"
+          layout="total, sizes, prev, pager, next"
+        />
+      </div>
     </el-card>
+
+    <el-button class="floating-top-btn" circle @click="scrollToTop">顶</el-button>
   </el-card>
 </template>
 
@@ -128,6 +135,10 @@ const loading = ref(false)
 const query = reactive({ indicatorType: '', timeRange: 'month' })
 const filters = reactive({ remarkKeyword: '', alertStatus: '' })
 const trendChartType = ref('line')
+const trendPageNo = ref(1)
+const trendPageSize = ref(10)
+const alertPageNo = ref(1)
+const alertPageSize = ref(10)
 const trendRef = ref(null)
 const alertPieRef = ref(null)
 const indicatorBarRef = ref(null)
@@ -146,6 +157,16 @@ const filteredAlerts = computed(() => {
   const source = insight.value?.recentAlerts || []
   if (!filters.alertStatus) return source
   return source.filter((item) => item.status === filters.alertStatus)
+})
+
+const pagedTrendData = computed(() => {
+  const start = (trendPageNo.value - 1) * trendPageSize.value
+  return filteredTrendData.value.slice(start, start + trendPageSize.value)
+})
+
+const pagedAlerts = computed(() => {
+  const start = (alertPageNo.value - 1) * alertPageSize.value
+  return filteredAlerts.value.slice(start, start + alertPageSize.value)
 })
 
 const activeInsightText = computed(() => {
@@ -235,6 +256,8 @@ const load = async () => {
   loading.value = true
   try {
     insight.value = await getDoctorPatientInsightApi(patientUserId, query)
+    trendPageNo.value = 1
+    alertPageNo.value = 1
     await renderChart()
     await renderAlertPie()
     await renderIndicatorBar()
@@ -246,10 +269,28 @@ const load = async () => {
 const resetFilters = () => {
   filters.remarkKeyword = ''
   filters.alertStatus = ''
+  trendPageNo.value = 1
+  alertPageNo.value = 1
+}
+
+const scrollToTop = () => {
+  window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 watch(trendChartType, () => {
   renderChart()
+})
+
+watch(filteredTrendData, () => {
+  if ((trendPageNo.value - 1) * trendPageSize.value >= filteredTrendData.value.length) {
+    trendPageNo.value = 1
+  }
+})
+
+watch(filteredAlerts, () => {
+  if ((alertPageNo.value - 1) * alertPageSize.value >= filteredAlerts.value.length) {
+    alertPageNo.value = 1
+  }
 })
 
 const handleResize = () => {
@@ -286,6 +327,26 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+:deep(.page-actions) {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.summary-row {
+  margin-bottom: 12px;
+}
+
+.summary-stat-card {
+  font-weight: 600;
+  color: #2f4952;
+}
+
+.summary-stat-card--warn {
+  color: #8a4b28;
+}
+
 .chart-row {
   margin-bottom: 12px;
 }
@@ -293,5 +354,16 @@ onUnmounted(() => {
 .trend-chart {
   width: 100%;
   height: 300px;
+}
+
+.floating-top-btn {
+  position: fixed;
+  right: 20px;
+  bottom: 120px;
+  z-index: 20;
+  border: 1px solid rgba(64, 158, 255, 0.55);
+  background: rgba(255, 255, 255, 0.72);
+  color: #2f4952;
+  backdrop-filter: blur(4px);
 }
 </style>

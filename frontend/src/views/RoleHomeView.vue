@@ -1,90 +1,120 @@
 <template>
-  <el-card class="page-shell role-home-v2">
+  <el-card class="page-shell role-home-v2 fade-in-page">
     <div class="page-header">
       <div>
         <h3 class="page-title">工作首页</h3>
         <p class="page-subtitle">{{ subtitle }}</p>
       </div>
+      <div class="page-actions">
+        <el-button :loading="noticeLoading" @click="loadNotices">刷新公告</el-button>
+      </div>
     </div>
 
-    <template v-if="role === 'ADMIN'">
-      <div class="overview-grid overview-grid-admin" v-loading="loading">
-        <button
-          v-for="card in adminCards"
-          :key="card.key"
-          type="button"
-          :class="['overview-card', { 'overview-card--highlight': card.key === 'monitor' }]"
-          @click="router.push(card.path)"
-        >
-          <div class="overview-head">
-            <h4>{{ card.title }}</h4>
+    <div class="work-home-block">
+      <template v-if="role === 'ADMIN'">
+        <div class="overview-grid overview-grid-admin" v-loading="loading">
+          <button
+            v-for="card in adminCards"
+            :key="card.key"
+            type="button"
+            :class="['overview-card', { 'overview-card--highlight': card.key === 'monitor' }]"
+            @click="router.push(card.path)"
+          >
+            <div class="overview-head">
+              <h4>{{ card.title }}</h4>
+            </div>
+            <p class="overview-main">{{ card.main }}</p>
+            <p class="overview-sub">{{ card.sub }}</p>
+          </button>
+        </div>
+      </template>
+
+      <template v-else>
+        <div class="overview-grid overview-grid-role" v-loading="roleLoading">
+          <button
+            v-for="card in roleCards"
+            :key="card.key"
+            type="button"
+            :class="['overview-card', { 'overview-card--highlight': card.highlight }]"
+            @click="router.push(card.path)"
+          >
+            <div class="overview-head">
+              <h4>{{ card.title }}</h4>
+            </div>
+            <p class="overview-main">{{ card.main }}</p>
+            <p class="overview-sub">{{ card.sub }}</p>
+          </button>
+        </div>
+
+        <div v-if="role === 'PATIENT'" class="patient-rich-grid">
+          <div class="guide-card">
+            <h4>今日三步</h4>
+            <ul class="focus-list">
+              <li v-for="text in roleSteps" :key="text">{{ text }}</li>
+            </ul>
           </div>
-          <p class="overview-main">{{ card.main }}</p>
-          <p class="overview-sub">{{ card.sub }}</p>
+          <div class="guide-card">
+            <h4>健康提醒</h4>
+            <ul class="focus-list">
+              <li v-for="text in patientHints" :key="text">{{ text }}</li>
+            </ul>
+          </div>
+          <div class="guide-card patient-metric-card">
+            <div class="patient-metric-item">
+              <span>累计上报</span>
+              <strong>{{ patientSummary.totalReports }}</strong>
+            </div>
+            <div class="patient-metric-item">
+              <span>未处理预警</span>
+              <strong>{{ patientSummary.openAlerts }}</strong>
+            </div>
+            <div class="patient-metric-item">
+              <span>未读反馈</span>
+              <strong>{{ patientSummary.unreadFeedback }}</strong>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <div class="section-divider" aria-hidden="true"></div>
+
+    <el-card class="notice-section" shadow="never" v-loading="noticeLoading">
+      <template #header>
+        <div class="notice-header">
+          <span>平台公告</span>
+          <el-button v-if="role === 'ADMIN'" link type="primary" @click="router.push('/admin/notices')">去管理公告</el-button>
+        </div>
+      </template>
+
+      <div v-if="noticeList.length" class="notice-grid">
+        <button
+          v-for="item in noticeList"
+          :key="item.id"
+          type="button"
+          class="notice-card"
+          @click="openNotice(item)"
+        >
+          <div class="notice-top">
+            <strong>{{ item.title || '未命名公告' }}</strong>
+            <el-tag size="small" effect="plain">{{ roleLabel(item.targetRole) }}</el-tag>
+          </div>
+          <p class="notice-snippet">{{ excerpt(item.content) }}</p>
+          <div class="notice-time">{{ item.createTime || '-' }}</div>
         </button>
       </div>
-    </template>
 
-    <template v-else>
-      <div class="overview-grid overview-grid-role" v-loading="roleLoading">
-        <button
-          v-for="card in roleCards"
-          :key="card.key"
-          type="button"
-          :class="['overview-card', { 'overview-card--highlight': card.highlight }]"
-          @click="router.push(card.path)"
-        >
-          <div class="overview-head">
-            <h4>{{ card.title }}</h4>
-          </div>
-          <p class="overview-main">{{ card.main }}</p>
-          <p class="overview-sub">{{ card.sub }}</p>
-        </button>
-      </div>
-
-      <div v-if="role === 'DOCTOR'" class="role-guide-grid">
-        <div class="guide-card">
-          <h4>今日三步</h4>
-          <ul class="focus-list">
-            <li v-for="text in roleSteps" :key="text">{{ text }}</li>
-          </ul>
-        </div>
-        <div class="guide-card">
-          <h4>首页说明</h4>
-          <p>{{ roleTip }}</p>
-        </div>
-      </div>
-
-      <div v-else class="patient-rich-grid">
-        <div class="guide-card">
-          <h4>今日三步</h4>
-          <ul class="focus-list">
-            <li v-for="text in roleSteps" :key="text">{{ text }}</li>
-          </ul>
-        </div>
-        <div class="guide-card">
-          <h4>健康提醒</h4>
-          <ul class="focus-list">
-            <li v-for="text in patientHints" :key="text">{{ text }}</li>
-          </ul>
-        </div>
-        <div class="guide-card patient-metric-card">
-          <div class="patient-metric-item">
-            <span>累计上报</span>
-            <strong>{{ patientSummary.totalReports }}</strong>
-          </div>
-          <div class="patient-metric-item">
-            <span>未处理预警</span>
-            <strong>{{ patientSummary.openAlerts }}</strong>
-          </div>
-          <div class="patient-metric-item">
-            <span>未读反馈</span>
-            <strong>{{ patientSummary.unreadFeedback }}</strong>
-          </div>
-        </div>
-      </div>
-    </template>
+      <el-empty v-else description="暂无可见公告" :image-size="68" />
+    </el-card>
   </el-card>
+
+  <el-dialog v-model="noticeVisible" width="720px" :title="currentNotice?.title || '公告详情'">
+    <div class="notice-dialog-meta">
+      <el-tag effect="light">{{ roleLabel(currentNotice?.targetRole) }}</el-tag>
+      <span>{{ currentNotice?.createTime || '-' }}</span>
+    </div>
+    <div class="notice-dialog-content" v-html="currentNotice?.content || '-'" />
+  </el-dialog>
 </template>
 
 <script setup>
@@ -102,6 +132,7 @@ import {
   listAlertRulesApi,
   listHealthDataApi,
   listNoticesApi,
+  listVisibleNoticesApi,
   listOperationLogsPageApi,
   listRolesApi
 } from '../api/modules'
@@ -110,6 +141,10 @@ const router = useRouter()
 const role = authStore.role
 const loading = ref(false)
 const roleLoading = ref(false)
+const noticeLoading = ref(false)
+const noticeList = ref([])
+const noticeVisible = ref(false)
+const currentNotice = ref(null)
 let timer = null
 
 const adminSummary = reactive({
@@ -267,11 +302,6 @@ const roleSteps = computed(() => {
   ]
 })
 
-const roleTip = computed(() => {
-  if (role === 'DOCTOR') return '医生首页聚焦“风险处理 -> 协作执行 -> 反馈闭环”，让每日任务更聚焦。'
-  return '患者首页聚焦“持续上报 -> 风险感知 -> 建议执行”，帮助形成稳定健康节奏。'
-})
-
 const patientHints = computed(() => [
   patientSummary.openAlerts > 0 ? '优先处理预警详情，必要时联系医生。' : '当前无未处理预警，继续保持稳定上报。',
   patientSummary.unreadFeedback > 0 ? '你有新的反馈回复，建议及时查看。' : '反馈通道暂无未读消息。',
@@ -296,7 +326,7 @@ const loadAdminSummary = async () => {
     const userList = Array.isArray(users)
       ? users
       : (Array.isArray(users?.records) ? users.records : [])
-    const noticeList = Array.isArray(notices) ? notices : []
+    const noticeListAll = Array.isArray(notices) ? notices : []
     const ruleList = Array.isArray(rules) ? rules : []
     const roleList = Array.isArray(roles) ? roles : []
 
@@ -304,9 +334,9 @@ const loadAdminSummary = async () => {
     adminSummary.users.enabled = userList.filter((item) => item.status === 1).length
     adminSummary.users.disabled = userList.filter((item) => item.status !== 1).length
 
-    adminSummary.notices.total = noticeList.length
-    adminSummary.notices.published = noticeList.filter((item) => item.status === 1).length
-    adminSummary.notices.offline = noticeList.filter((item) => item.status !== 1).length
+    adminSummary.notices.total = noticeListAll.length
+    adminSummary.notices.published = noticeListAll.filter((item) => item.status === 1).length
+    adminSummary.notices.offline = noticeListAll.filter((item) => item.status !== 1).length
 
     adminSummary.rules.total = ruleList.length
     adminSummary.rules.enabled = ruleList.filter((item) => item.enabled === 1).length
@@ -361,13 +391,45 @@ const loadRoleSummary = async () => {
   }
 }
 
+const excerpt = (html) => String(html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || '暂无内容'
+
+const roleLabel = (targetRole) => {
+  const normalized = String(targetRole || '').trim().toUpperCase()
+  if (normalized === 'DOCTOR') return '医生'
+  if (normalized === 'PATIENT') return '患者'
+  return '全员'
+}
+
+const openNotice = (item) => {
+  currentNotice.value = item
+  noticeVisible.value = true
+}
+
+const loadNotices = async () => {
+  noticeLoading.value = true
+  try {
+    const list = await listVisibleNoticesApi()
+    noticeList.value = Array.isArray(list) ? list.slice(0, 6) : []
+  } finally {
+    noticeLoading.value = false
+  }
+}
+
 onMounted(() => {
   if (role === 'ADMIN') {
     loadAdminSummary()
-    timer = window.setInterval(loadAdminSummary, 15000)
+    loadNotices()
+    timer = window.setInterval(() => {
+      loadAdminSummary()
+      loadNotices()
+    }, 15000)
   } else {
     loadRoleSummary()
-    timer = window.setInterval(loadRoleSummary, 15000)
+    loadNotices()
+    timer = window.setInterval(() => {
+      loadRoleSummary()
+      loadNotices()
+    }, 15000)
   }
 })
 
@@ -387,21 +449,91 @@ onUnmounted(() => {
   gap: 10px;
 }
 
+.work-home-block {
+  border: 1px solid rgba(31, 143, 114, 0.16);
+  border-radius: 14px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.36);
+}
+
+.section-divider {
+  height: 1px;
+  margin: 14px 2px 10px;
+  background: linear-gradient(90deg, rgba(31, 143, 114, 0), rgba(31, 143, 114, 0.45), rgba(31, 143, 114, 0));
+}
+
+.notice-block {
+  border: 1px solid rgba(64, 158, 255, 0.18);
+  border-radius: 14px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.44);
+}
+
+.notice-section {
+  margin-bottom: 0;
+}
+
+.notice-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.notice-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr;
+}
+
+.notice-card {
+  text-align: left;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.74);
+  background: rgba(255, 255, 255, 0.54);
+  padding: 10px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.notice-card:hover {
+  border-color: rgba(var(--brand-rgb), 0.65);
+  transform: translateY(-1px);
+}
+
+.notice-snippet {
+  margin: 8px 0;
+  font-size: 13px;
+  color: #4d6972;
+  line-height: 1.6;
+}
+
+.notice-time {
+  font-size: 12px;
+  color: #69828a;
+}
+
+.notice-dialog-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  color: #607e87;
+}
+
+.notice-dialog-content {
+  max-height: 56vh;
+  overflow: auto;
+  line-height: 1.75;
+}
+
 .overview-grid {
   display: grid;
   gap: 8px;
+  align-items: stretch;
 }
 
 .overview-grid-admin {
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-}
-
-.overview-grid-admin .overview-card {
-  grid-column: span 3;
-}
-
-.overview-grid-admin .overview-card:last-child {
-  grid-column: span 6;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .overview-grid-role {
@@ -415,6 +547,10 @@ onUnmounted(() => {
   border: 1px solid rgba(255, 255, 255, 0.74);
   background: rgba(255, 255, 255, 0.5);
   cursor: pointer;
+  min-height: 118px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
 }
 
 .overview-card:hover {
@@ -523,9 +659,8 @@ onUnmounted(() => {
 }
 
 @media (max-width: 900px) {
-  .overview-grid-admin .overview-card,
-  .overview-grid-admin .overview-card:last-child {
-    grid-column: span 6;
+  .overview-grid-admin {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .overview-grid-role,
@@ -549,11 +684,6 @@ onUnmounted(() => {
   .patient-rich-grid,
   .patient-metric-card {
     grid-template-columns: 1fr;
-  }
-
-  .overview-grid-admin .overview-card,
-  .overview-grid-admin .overview-card:last-child {
-    grid-column: auto;
   }
 }
 </style>

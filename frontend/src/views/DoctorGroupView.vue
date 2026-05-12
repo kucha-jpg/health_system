@@ -11,11 +11,18 @@
       </div>
     </div>
 
-    <div class="soft-tip">
-      当前共 {{ groups.length }} 个群组。建议先维护成员，再开展随访协作。
+    <el-row :gutter="10" class="summary-row">
+      <el-col :xs="24" :sm="8"><el-card shadow="never" class="summary-stat-card">群组总数：{{ groups.length }}</el-card></el-col>
+      <el-col :xs="24" :sm="8"><el-card shadow="never" class="summary-stat-card">含描述群组：{{ describedCount }}</el-card></el-col>
+      <el-col :xs="24" :sm="8"><el-card shadow="never" class="summary-stat-card">当前页群组：{{ pagedGroups.length }}</el-card></el-col>
+    </el-row>
+
+    <div class="filter-toolbar filter-toolbar-compact">
+      <el-input v-model="keyword" class="w-240" clearable placeholder="按群组名称或描述筛选" />
+      <el-button @click="resetFilter">重置筛选</el-button>
     </div>
 
-    <el-table :data="groups" border v-loading="loading" empty-text="暂无群组，点击右上角“新建群组”开始">
+    <el-table :data="pagedGroups" border v-loading="loading" empty-text="暂无群组，点击右上角“新建群组”开始">
       <el-table-column prop="id" label="ID" width="80" />
       <el-table-column prop="groupName" label="群组名称" />
       <el-table-column prop="description" label="描述" show-overflow-tooltip />
@@ -26,6 +33,16 @@
         </template>
       </el-table-column>
     </el-table>
+
+    <div class="pager-row">
+      <el-pagination
+        v-model:current-page="pageNo"
+        v-model:page-size="pageSize"
+        :total="filteredGroups.length"
+        :page-sizes="[10, 20, 50]"
+        layout="total, sizes, prev, pager, next"
+      />
+    </div>
   </el-card>
 
   <el-dialog v-model="createDialogVisible" title="新建群组" width="520px">
@@ -92,7 +109,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
@@ -116,6 +133,9 @@ const memberSaving = ref(false)
 const createDialogVisible = ref(false)
 const memberDialogVisible = ref(false)
 const addMemberVisible = ref(false)
+const keyword = ref('')
+const pageNo = ref(1)
+const pageSize = ref(10)
 const createForm = ref({ groupName: '', description: '' })
 const memberForm = ref({ memberType: 'PATIENT', userId: '' })
 const memberTypeOptions = [
@@ -123,16 +143,45 @@ const memberTypeOptions = [
   { label: '医生', value: 'DOCTOR' }
 ]
 
+const describedCount = computed(() => groups.value.filter((item) => String(item.description || '').trim()).length)
+
+const filteredGroups = computed(() => {
+  const key = String(keyword.value || '').trim().toLowerCase()
+  if (!key) return groups.value
+  return groups.value.filter((item) => {
+    const name = String(item.groupName || '').toLowerCase()
+    const desc = String(item.description || '').toLowerCase()
+    return name.includes(key) || desc.includes(key)
+  })
+})
+
+const pagedGroups = computed(() => {
+  const start = (pageNo.value - 1) * pageSize.value
+  return filteredGroups.value.slice(start, start + pageSize.value)
+})
+
 const load = async () => {
   loading.value = true
   try {
     groups.value = await getDoctorGroupsApi()
+    pageNo.value = 1
   } catch (err) {
     ElMessage.error(err?.message || '群组数据加载失败，请稍后重试')
   } finally {
     loading.value = false
   }
 }
+
+const resetFilter = () => {
+  keyword.value = ''
+  pageNo.value = 1
+}
+
+watch(filteredGroups, () => {
+  if ((pageNo.value - 1) * pageSize.value >= filteredGroups.value.length) {
+    pageNo.value = 1
+  }
+})
 
 const openCreateDialog = () => {
   createForm.value = { groupName: '', description: '' }
@@ -228,6 +277,15 @@ onMounted(load)
 </script>
 
 <style scoped>
+.summary-row {
+  margin-bottom: 10px;
+}
+
+.summary-stat-card {
+  font-weight: 600;
+  color: #2f4952;
+}
+
 .member-toolbar {
   display: flex;
   align-items: center;

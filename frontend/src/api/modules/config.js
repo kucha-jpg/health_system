@@ -2,6 +2,7 @@ import http from '../http'
 
 export const listNoticesApi = (params) => http.get('/admin/config/notices', { params })
 export const listVisibleNoticesApi = () => http.get('/notices')
+
 export const createNoticeApi = (payload) => http.post('/admin/config/notices', payload)
 export const updateNoticeApi = (payload) => http.put('/admin/config/notices', payload)
 export const deleteNoticeApi = (id) => http.delete(`/admin/config/notices/${id}`)

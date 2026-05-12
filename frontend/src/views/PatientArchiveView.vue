@@ -18,16 +18,11 @@
       <el-tag type="success" effect="light">完整度 {{ completeness }}%</el-tag>
     </div>
 
-    <div class="kpi-grid">
-      <div class="kpi-card">
-        <div class="kpi-label">已填写字段</div>
-        <div class="kpi-value">{{ filledCount }}/5</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">建议更新时间</div>
-        <div class="kpi-value">每周</div>
-      </div>
-    </div>
+    <el-row :gutter="10" class="summary-row">
+      <el-col :xs="24" :sm="8"><el-card shadow="never" class="summary-stat-card">已填写字段：{{ filledCount }}/5</el-card></el-col>
+      <el-col :xs="24" :sm="8"><el-card shadow="never" class="summary-stat-card">建议更新时间：每周</el-card></el-col>
+      <el-col :xs="24" :sm="8"><el-card shadow="never" class="summary-stat-card summary-stat-card--accent">最近更新时间：{{ form.updateTime || '-' }}</el-card></el-col>
+    </el-row>
 
     <el-card class="section-card" shadow="never">
       <template #header>基础档案信息</template>
@@ -73,3 +68,18 @@ const save = async () => {
 
 onMounted(load)
 </script>
+
+<style scoped>
+.summary-row {
+  margin-bottom: 12px;
+}
+
+.summary-stat-card {
+  font-weight: 600;
+  color: #2f4952;
+}
+
+.summary-stat-card--accent {
+  color: #255c4a;
+}
+</style>

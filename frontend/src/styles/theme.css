@@ -538,6 +538,16 @@ body::after {
   box-shadow: 0 24px 52px rgba(12, 38, 48, 0.28) !important;
 }
 
+.el-overlay.is-message-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.el-overlay.is-message-box .el-message-box {
+  margin-top: 0 !important;
+}
+
 .el-message-box__header {
   padding: 16px 16px 8px !important;
 }
@@ -573,6 +583,13 @@ body::after {
 
 .el-message-box__btns .el-button:not(.el-button--primary) {
   order: 2;
+}
+
+.el-message {
+  top: 50% !important;
+  left: 50% !important;
+  right: auto !important;
+  transform: translate(-50%, -50%) !important;
 }
 
 .sidebar .el-menu {

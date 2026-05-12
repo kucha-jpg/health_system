@@ -39,9 +39,9 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { loginApi } from '../api/modules'
 import { authStore } from '../stores/auth'
 import { AUTH_UI_COPY } from '../constants/auth-ui'
@@ -51,6 +51,20 @@ const route = useRoute()
 const form = reactive({ username: '', password: '' })
 const submitting = ref(false)
 const copy = AUTH_UI_COPY.login
+
+const showAuthNotice = async (notice) => {
+  if (!notice) return
+  try {
+    await ElMessageBox.alert(notice, '登录提示', {
+      type: 'warning',
+      confirmButtonText: '知道了',
+      closeOnClickModal: true,
+      closeOnPressEscape: true
+    })
+  } catch (error) {
+    // Ignore close errors to avoid blocking navigation.
+  }
+}
 
 const onLogin = async () => {
   if (!form.username || !form.password) {
@@ -72,16 +86,21 @@ const onLogin = async () => {
 onMounted(() => {
   const queryNotice = typeof route.query.notice === 'string' ? route.query.notice : ''
   const notice = queryNotice || authStore.consumeAuthNotice()
-  if (!notice) return
-  ElMessage.error({
-    message: notice,
-    duration: 12000,
-    showClose: true
-  })
+  showAuthNotice(notice)
   if (queryNotice) {
     router.replace('/login')
   }
 })
+
+watch(
+  () => route.query.notice,
+  (value) => {
+    const notice = typeof value === 'string' ? value : ''
+    if (!notice) return
+    showAuthNotice(notice)
+    router.replace('/login')
+  }
+)
 </script>
 
 <style scoped>
