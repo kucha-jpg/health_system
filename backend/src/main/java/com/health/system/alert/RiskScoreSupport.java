@@ -1,7 +1,10 @@
 package com.health.system.alert;
 
+import com.health.system.entity.HealthData;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.List;
 
 public final class RiskScoreSupport {
 
@@ -87,5 +90,79 @@ public final class RiskScoreSupport {
             }
         }
         return max;
+    }
+
+    public static BigDecimal linearPredictDecimal(List<HealthData> records) {
+        if (records == null || records.size() < 2) {
+            return null;
+        }
+        List<HealthData> sorted = records.stream()
+                .filter(item -> item.getReportTime() != null && item.getValue() != null)
+                .sorted((a, b) -> a.getReportTime().compareTo(b.getReportTime()))
+                .toList();
+        if (sorted.size() < 2) {
+            return null;
+        }
+        double n = sorted.size();
+        double sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+        for (int i = 0; i < sorted.size(); i++) {
+            double y;
+            try {
+                y = Double.parseDouble(sorted.get(i).getValue());
+            } catch (NumberFormatException ex) {
+                return null;
+            }
+            double x = i + 1;
+            sumX += x;
+            sumY += y;
+            sumXY += x * y;
+            sumXX += x * x;
+        }
+        double denominator = n * sumXX - sumX * sumX;
+        if (denominator == 0) {
+            return null;
+        }
+        double k = (n * sumXY - sumX * sumY) / denominator;
+        double b = (sumY - k * sumX) / n;
+        return BigDecimal.valueOf(k * (n + 1) + b);
+    }
+
+    public static int linearPredictInt(List<HealthData> records, int defaultResult) {
+        if (records == null || records.size() < 2) {
+            return defaultResult;
+        }
+        List<HealthData> sorted = records.stream()
+                .filter(item -> item.getReportTime() != null && item.getValue() != null)
+                .sorted((a, b) -> a.getReportTime().compareTo(b.getReportTime()))
+                .toList();
+        if (sorted.size() < 2) {
+            return defaultResult;
+        }
+        double n = sorted.size();
+        double sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+        for (int i = 0; i < sorted.size(); i++) {
+            String[] arr = sorted.get(i).getValue().split("/");
+            if (arr.length < 1) {
+                return defaultResult;
+            }
+            int y;
+            try {
+                y = Integer.parseInt(arr[0]);
+            } catch (NumberFormatException ex) {
+                return defaultResult;
+            }
+            double x = i + 1;
+            sumX += x;
+            sumY += y;
+            sumXY += x * y;
+            sumXX += x * x;
+        }
+        double denominator = n * sumXX - sumX * sumX;
+        if (denominator == 0) {
+            return defaultResult;
+        }
+        double k = (n * sumXY - sumX * sumY) / denominator;
+        double b = (sumY - k * sumX) / n;
+        return (int) Math.round(k * (n + 1) + b);
     }
 }

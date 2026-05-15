@@ -3,7 +3,6 @@
     <div class="page-header">
       <div>
         <h3 class="page-title">历史上报数据</h3>
-        <p class="page-subtitle">支持按指标和时间范围快速筛选</p>
       </div>
       <div class="page-actions">
         <el-button :loading="loading" @click="load">刷新</el-button>
@@ -68,7 +67,15 @@
     </div>
   </el-card>
 
-  <el-dialog v-model="visible" title="编辑健康数据">
+  <el-dialog
+    v-model="visible"
+    title="编辑健康数据"
+    center
+    align-center
+    :close-on-click-modal="false"
+    :close-on-press-escape="false"
+    :show-close="false"
+  >
     <el-form :model="form" label-width="100px">
       <el-form-item label="指标"><el-input v-model="form.indicatorType" disabled /></el-form-item>
       <el-form-item label="数值"><el-input v-model="form.value" /></el-form-item>
@@ -99,6 +106,7 @@ const total = ref(0)
 
 const load = async () => {
   loading.value = true
+  if (trendChart) { trendChart.dispose(); trendChart = null }
   try {
     const res = await listHealthDataApi(query)
     list.value = res?.list || []
@@ -123,17 +131,23 @@ const resetFilter = () => {
   load()
 }
 
-const parseNumericValue = (item) => {
+const parseNumericValue = (item, field) => {
   if (!item) return null
   const type = item.indicatorType
   if (type === '血压') {
     const arr = String(item.value || '').split('/')
     if (arr.length !== 2) return null
-    const systolic = Number(arr[0])
-    return Number.isFinite(systolic) ? systolic : null
+    const val = Number(field === 'diastolic' ? arr[1] : arr[0])
+    return Number.isFinite(val) ? val : null
   }
   const n = Number(item.value)
   return Number.isFinite(n) ? n : null
+}
+
+const isBloodPressure = () => {
+  const selectedType = query.indicator_type
+  const source = list.value
+  return (selectedType || (source.length > 0 ? source[0].indicatorType : '')) === '血压'
 }
 
 const resolveThresholds = () => {
@@ -143,8 +157,8 @@ const resolveThresholds = () => {
   const type = selectedType || inferredType
   if (type === '血压') {
     return [
-      { yAxis: 140, lineStyle: { color: '#e6a23c' }, label: { formatter: '偏高阈值 140' } },
-      { yAxis: 180, lineStyle: { color: '#f56c6c' }, label: { formatter: '危急阈值 180' } }
+      { yAxis: 140, lineStyle: { color: '#e6a23c' }, label: { formatter: '收缩压偏高 140' } },
+      { yAxis: 180, lineStyle: { color: '#f56c6c' }, label: { formatter: '收缩压危急 180' } }
     ]
   }
   if (type === '血糖') {
@@ -174,20 +188,43 @@ const renderTrend = async () => {
 
   const sorted = [...list.value].sort((a, b) => String(a.reportTime).localeCompare(String(b.reportTime)))
   const xAxis = sorted.map((item) => item.reportTime)
-  const yAxis = sorted.map((item) => parseNumericValue(item))
   const thresholds = resolveThresholds()
+  const bp = isBloodPressure()
 
+  const series = bp
+    ? [
+        {
+          name: '收缩压',
+          type: 'line',
+          smooth: true,
+          data: sorted.map((item) => parseNumericValue(item, 'systolic')),
+          connectNulls: false,
+          markLine: thresholds.length > 0 ? { symbol: 'none', data: thresholds } : undefined
+        },
+        {
+          name: '舒张压',
+          type: 'line',
+          smooth: true,
+          data: sorted.map((item) => parseNumericValue(item, 'diastolic')),
+          connectNulls: false,
+          lineStyle: { type: 'dashed' }
+        }
+      ]
+    : [{
+        type: 'line',
+        smooth: true,
+        data: sorted.map((item) => parseNumericValue(item)),
+        connectNulls: false,
+        markLine: thresholds.length > 0 ? { symbol: 'none', data: thresholds } : undefined
+      }]
+
+  trendChart.clear()
   trendChart.setOption({
     tooltip: { trigger: 'axis' },
+    legend: bp ? { data: ['收缩压', '舒张压'] } : undefined,
     xAxis: { type: 'category', data: xAxis },
     yAxis: { type: 'value' },
-    series: [{
-      type: 'line',
-      smooth: true,
-      data: yAxis,
-      connectNulls: false,
-      markLine: thresholds.length > 0 ? { symbol: 'none', data: thresholds } : undefined
-    }]
+    series
   })
 }
 
@@ -202,6 +239,14 @@ const openEdit = (row) => {
 }
 
 const saveEdit = async () => {
+  await ElMessageBox.confirm('确认修改该条健康数据？', '修改确认', {
+    type: 'warning',
+    confirmButtonText: '确认',
+    cancelButtonText: '取消',
+    closeOnClickModal: false,
+    closeOnPressEscape: false,
+    showClose: false
+  })
   saving.value = true
   try {
     await updateHealthDataApi(form.id, form)
@@ -214,7 +259,14 @@ const saveEdit = async () => {
 }
 
 const remove = async (id) => {
-  await ElMessageBox.confirm('确认删除该条健康数据吗？', '删除确认', { type: 'warning' })
+  await ElMessageBox.confirm('确认删除该条健康数据吗？', '删除确认', {
+    type: 'warning',
+    confirmButtonText: '确认',
+    cancelButtonText: '取消',
+    closeOnClickModal: false,
+    closeOnPressEscape: false,
+    showClose: false
+  })
   await deleteHealthDataApi(id)
   ElMessage.success('删除成功')
   await load()

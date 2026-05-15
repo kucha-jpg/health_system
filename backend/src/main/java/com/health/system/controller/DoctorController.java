@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -76,12 +77,28 @@ public class DoctorController {
         return ApiResponse.success("添加成功", null);
     }
 
+    @DeleteMapping("/groups/{id}/patients/{patientUserId}")
+    public ApiResponse<Void> removePatient(Authentication authentication,
+                                           @PathVariable Long id,
+                                           @PathVariable Long patientUserId) {
+        doctorGroupService.removePatientFromGroup(authentication.getName(), id, patientUserId);
+        return ApiResponse.success("移除成功", null);
+    }
+
     @PostMapping("/groups/{id}/doctors")
     public ApiResponse<Void> addDoctor(Authentication authentication,
                                        @PathVariable Long id,
                                        @Valid @RequestBody DoctorGroupAddDoctorDTO dto) {
         doctorGroupService.addDoctorToGroup(authentication.getName(), id, dto.getDoctorUserId());
         return ApiResponse.success("添加成功", null);
+    }
+
+    @DeleteMapping("/groups/{id}/doctors/{doctorUserId}")
+    public ApiResponse<Void> removeDoctor(Authentication authentication,
+                                          @PathVariable Long id,
+                                          @PathVariable Long doctorUserId) {
+        doctorGroupService.removeDoctorFromGroup(authentication.getName(), id, doctorUserId);
+        return ApiResponse.success("移除成功", null);
     }
 
     @GetMapping("/groups/{id}/patients")

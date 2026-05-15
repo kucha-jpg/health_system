@@ -33,6 +33,8 @@ public class PatientReportServiceImpl implements PatientReportService {
     private final HealthAlertMapper healthAlertMapper;
     private final Executor reportSummaryExecutor;
 
+    private static final long TASK_MAX_AGE_MINUTES = 30;
+
     private final ConcurrentHashMap<String, SummaryTask> tasks = new ConcurrentHashMap<>();
 
     public PatientReportServiceImpl(UserMapper userMapper,
@@ -85,6 +87,7 @@ public class PatientReportServiceImpl implements PatientReportService {
 
     @Override
     public Map<String, Object> submitSummaryTask(String username, String range) {
+        evictExpiredTasks();
         String normalizedRange = "month".equalsIgnoreCase(range) ? "month" : "week";
         String taskId = UUID.randomUUID().toString().replace("-", "");
         SummaryTask task = SummaryTask.running(taskId, username, normalizedRange);
@@ -123,7 +126,15 @@ public class PatientReportServiceImpl implements PatientReportService {
         if (task.getErrorMessage() != null) {
             result.put("error", task.getErrorMessage());
         }
+        if (!"RUNNING".equals(task.getStatus())) {
+            tasks.remove(taskId);
+        }
         return result;
+    }
+
+    private void evictExpiredTasks() {
+        LocalDateTime cutoff = LocalDateTime.now().minusMinutes(TASK_MAX_AGE_MINUTES);
+        tasks.values().removeIf(task -> task.getCreatedAt().isBefore(cutoff));
     }
 
     private List<Map<String, Object>> buildRiskTrend(List<HealthAlert> alerts) {

@@ -4,7 +4,6 @@
       <div class="page-header">
         <div>
           <h3 class="page-title">预警规则管理</h3>
-          <p class="page-subtitle">维护高/中风险阈值，支持启停与指标联动配置</p>
         </div>
         <div class="page-actions">
           <el-button @click="load">刷新</el-button>
@@ -43,7 +42,6 @@
       <div class="page-header">
         <div>
           <h3 class="page-title">健康指标类型管理</h3>
-          <p class="page-subtitle">统一维护可上报指标与展示名称，支持启停控制</p>
         </div>
         <div class="page-actions">
           <el-button type="primary" @click="openIndicatorDialog()">新增指标</el-button>
@@ -59,9 +57,10 @@
           <el-tag :type="scope.row.enabled === 1 ? 'success' : 'info'">{{ scope.row.enabled === 1 ? '启用' : '停用' }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="140">
+      <el-table-column label="操作" width="180">
         <template #default="scope">
           <el-button link type="primary" @click="openIndicatorDialog(scope.row)">编辑</el-button>
+          <el-button link type="danger" @click="deleteIndicator(scope.row)">删除</el-button>
         </template>
       </el-table-column>
       <template #empty>
@@ -75,7 +74,15 @@
     </el-card>
   </div>
 
-  <el-dialog v-model="visible" title="预警规则">
+  <el-dialog
+    v-model="visible"
+    title="预警规则"
+    center
+    align-center
+    :close-on-click-modal="false"
+    :close-on-press-escape="false"
+    :show-close="false"
+  >
     <el-form :model="form" label-width="110px">
       <el-form-item label="指标类型">
         <el-select v-model="form.indicatorType" style="width:100%" :disabled="!!form.id">
@@ -103,7 +110,15 @@
     </template>
   </el-dialog>
 
-  <el-dialog v-model="indicatorVisible" title="健康指标类型">
+  <el-dialog
+    v-model="indicatorVisible"
+    title="健康指标类型"
+    center
+    align-center
+    :close-on-click-modal="false"
+    :close-on-press-escape="false"
+    :show-close="false"
+  >
     <el-form :model="indicatorForm" label-width="110px">
       <el-form-item label="指标类型">
         <el-input v-model="indicatorForm.indicatorType" :disabled="!!indicatorForm.id" placeholder="例如：血压" />
@@ -124,10 +139,11 @@
 
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   createAlertRuleApi,
   createIndicatorTypeApi,
+  deleteIndicatorTypeApi,
   listAlertRulesApi,
   listIndicatorTypesApi,
   updateAlertRuleApi,
@@ -155,14 +171,30 @@ const openDialog = (row) => {
 }
 
 const save = async () => {
-  if (form.id) {
-    await updateAlertRuleApi(form)
-  } else {
-    await createAlertRuleApi(form)
+  try {
+    await ElMessageBox.confirm(form.id ? '确认修改该预警规则？' : '确认新增该预警规则？', '保存确认', {
+      type: 'warning',
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      closeOnClickModal: false,
+      closeOnPressEscape: false,
+      showClose: false
+    })
+  } catch {
+    return
   }
-  ElMessage.success('保存成功')
-  visible.value = false
-  await load()
+  try {
+    if (form.id) {
+      await updateAlertRuleApi(form)
+    } else {
+      await createAlertRuleApi(form)
+    }
+    ElMessage.success('保存成功')
+    visible.value = false
+    await load()
+  } catch (err) {
+    ElMessage.error(err?.message || '保存规则失败，请稍后重试')
+  }
 }
 
 const openIndicatorDialog = (row) => {
@@ -171,14 +203,56 @@ const openIndicatorDialog = (row) => {
 }
 
 const saveIndicator = async () => {
-  if (indicatorForm.id) {
-    await updateIndicatorTypeApi(indicatorForm)
-  } else {
-    await createIndicatorTypeApi(indicatorForm)
+  try {
+    await ElMessageBox.confirm(indicatorForm.id ? '确认修改该指标类型？' : '确认新增该指标类型？', '保存确认', {
+      type: 'warning',
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      closeOnClickModal: false,
+      closeOnPressEscape: false,
+      showClose: false
+    })
+  } catch {
+    return
   }
-  ElMessage.success('保存成功')
-  indicatorVisible.value = false
-  await load()
+  try {
+    if (indicatorForm.id) {
+      await updateIndicatorTypeApi(indicatorForm)
+    } else {
+      await createIndicatorTypeApi(indicatorForm)
+    }
+    ElMessage.success('保存成功')
+    indicatorVisible.value = false
+    await load()
+  } catch (err) {
+    ElMessage.error(err?.message || '保存指标类型失败，请稍后重试')
+  }
+}
+
+const deleteIndicator = async (row) => {
+  try {
+    await ElMessageBox.confirm(
+      `确认删除指标类型「${row.displayName || row.indicatorType}」吗？删除后关联的预警规则可能失效。`,
+      '删除确认',
+      {
+        type: 'warning',
+        confirmButtonText: '确认删除',
+        cancelButtonText: '取消',
+        closeOnClickModal: false,
+        closeOnPressEscape: false,
+        showClose: false
+      }
+    )
+  } catch {
+    return
+  }
+  try {
+    await deleteIndicatorTypeApi(row.id)
+    ElMessage.success('已删除')
+    await load()
+  } catch (err) {
+    ElMessage.error(err?.message || '删除指标类型失败，请稍后重试')
+  }
 }
 
 onMounted(load)

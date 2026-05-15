@@ -5,16 +5,16 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.health.system.alert.IndicatorTypes;
 import com.health.system.common.BusinessException;
 import com.health.system.common.CacheNames;
+import com.health.system.config.CacheEvictionSupport;
 import com.health.system.dto.HealthDataDTO;
 import com.health.system.entity.HealthData;
 import com.health.system.entity.User;
@@ -31,23 +31,21 @@ public class HealthDataServiceImpl implements HealthDataService {
     private final UserMapper userMapper;
     private final HealthAlertService healthAlertService;
     private final HealthIndicatorTypeService healthIndicatorTypeService;
+    private final CacheEvictionSupport cacheEvictionSupport;
 
     public HealthDataServiceImpl(HealthDataMapper healthDataMapper,
                                  UserMapper userMapper,
                                  HealthAlertService healthAlertService,
-                                 HealthIndicatorTypeService healthIndicatorTypeService) {
+                                 HealthIndicatorTypeService healthIndicatorTypeService,
+                                 CacheEvictionSupport cacheEvictionSupport) {
         this.healthDataMapper = healthDataMapper;
         this.userMapper = userMapper;
         this.healthAlertService = healthAlertService;
         this.healthIndicatorTypeService = healthIndicatorTypeService;
+        this.cacheEvictionSupport = cacheEvictionSupport;
     }
 
     @Override
-        @Caching(evict = {
-            @CacheEvict(cacheNames = CacheNames.PATIENT_REPORT_SUMMARY, allEntries = true),
-            @CacheEvict(cacheNames = CacheNames.PATIENT_HEALTH_DATA_LIST, allEntries = true),
-            @CacheEvict(cacheNames = CacheNames.DOCTOR_PATIENT_INSIGHT, allEntries = true)
-        })
     public void create(String username, HealthDataDTO dto) {
         Long userId = getCurrentUserId(username);
         validateData(dto.getIndicatorType(), dto.getValue());
@@ -60,6 +58,8 @@ public class HealthDataServiceImpl implements HealthDataService {
         data.setRemark(dto.getRemark());
         healthDataMapper.insert(data);
         healthAlertService.evaluateAndCreateAlert(userId, data.getId(), data.getIndicatorType(), data.getValue());
+
+        evictPatientCaches(username);
     }
 
     @Override
@@ -101,11 +101,6 @@ public class HealthDataServiceImpl implements HealthDataService {
     }
 
     @Override
-        @Caching(evict = {
-            @CacheEvict(cacheNames = CacheNames.PATIENT_REPORT_SUMMARY, allEntries = true),
-            @CacheEvict(cacheNames = CacheNames.PATIENT_HEALTH_DATA_LIST, allEntries = true),
-            @CacheEvict(cacheNames = CacheNames.DOCTOR_PATIENT_INSIGHT, allEntries = true)
-        })
     public void update(String username, Long id, HealthDataDTO dto) {
         Long userId = getCurrentUserId(username);
         HealthData old = healthDataMapper.selectById(id);
@@ -120,14 +115,11 @@ public class HealthDataServiceImpl implements HealthDataService {
         healthDataMapper.updateById(old);
         healthAlertService.deleteByHealthDataId(old.getId());
         healthAlertService.evaluateAndCreateAlert(userId, old.getId(), old.getIndicatorType(), old.getValue());
+
+        evictPatientCaches(username);
     }
 
     @Override
-        @Caching(evict = {
-            @CacheEvict(cacheNames = CacheNames.PATIENT_REPORT_SUMMARY, allEntries = true),
-            @CacheEvict(cacheNames = CacheNames.PATIENT_HEALTH_DATA_LIST, allEntries = true),
-            @CacheEvict(cacheNames = CacheNames.DOCTOR_PATIENT_INSIGHT, allEntries = true)
-        })
     public void delete(String username, Long id) {
         Long userId = getCurrentUserId(username);
         HealthData old = healthDataMapper.selectById(id);
@@ -136,6 +128,20 @@ public class HealthDataServiceImpl implements HealthDataService {
         }
         healthAlertService.deleteByHealthDataId(id);
         healthDataMapper.deleteById(id);
+
+        evictPatientCaches(username);
+    }
+
+    private void evictPatientCaches(String username) {
+        String prefix = username + "::";
+        cacheEvictionSupport.evictByPrefix(CacheNames.PATIENT_HEALTH_DATA_LIST, prefix);
+        cacheEvictionSupport.evictByPrefix(CacheNames.PATIENT_REPORT_SUMMARY, prefix);
+        // Cross-user caches that can't be scoped to a single patient:
+        // DOCTOR_PATIENT_INSIGHT keys are prefixed with doctorUsername, DOCTOR_OPEN_ALERTS likewise.
+        // ADMIN_MONITOR_OVERVIEW is a single global key. Clear all.
+        cacheEvictionSupport.evictByPrefix(CacheNames.DOCTOR_PATIENT_INSIGHT, "");
+        cacheEvictionSupport.evictByPrefix(CacheNames.DOCTOR_OPEN_ALERTS, "");
+        cacheEvictionSupport.evictByPrefix(CacheNames.ADMIN_MONITOR_OVERVIEW, "");
     }
 
     private void validateData(String indicatorType, String value) {
@@ -146,30 +152,30 @@ public class HealthDataServiceImpl implements HealthDataService {
             throw BusinessException.badRequest("指标类型未启用或不存在");
         }
         switch (indicatorType) {
-            case "血压" -> {
+            case IndicatorTypes.BLOOD_PRESSURE -> {
                 if (!value.matches("^[1-9]\\d{1,2}/[1-9]\\d{1,2}$")) {
                     throw BusinessException.badRequest("血压格式必须为xx/xx，且为正数");
                 }
             }
-            case "血糖" -> {
+            case IndicatorTypes.BLOOD_SUGAR -> {
                 BigDecimal v = parsePositiveNumber(value, "血糖必须是正数");
                 if (v.compareTo(BigDecimal.valueOf(30)) > 0) {
                     throw BusinessException.badRequest("血糖必须在0-30之间");
                 }
             }
-            case "体重" -> {
+            case IndicatorTypes.WEIGHT -> {
                 BigDecimal v = parsePositiveNumber(value, "体重必须是正数");
                 if (v.compareTo(BigDecimal.valueOf(500)) > 0) {
                     throw BusinessException.badRequest("体重数值异常，请确认后再提交");
                 }
             }
-            case "服药" -> {
+            case IndicatorTypes.MEDICATION -> {
                 if (!("已服药".equals(value) || "未服药".equals(value) || "1".equals(value) || "0".equals(value))) {
                     throw BusinessException.badRequest("服药值仅支持 已服药/未服药/1/0");
                 }
             }
             default -> {
-                // Extensible indicator types can be configured by admin and use relaxed value validation.
+                // Extensible indicator types: admin-configured, relaxed validation.
             }
         }
     }
@@ -187,7 +193,9 @@ public class HealthDataServiceImpl implements HealthDataService {
     }
 
     private Long getCurrentUserId(String username) {
-        User user = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, username));
+        User user = userMapper.selectOne(new LambdaQueryWrapper<User>()
+                .select(User::getId, User::getRoleType, User::getStatus)
+                .eq(User::getUsername, username));
         if (user == null) {
             throw BusinessException.notFound("用户不存在");
         }

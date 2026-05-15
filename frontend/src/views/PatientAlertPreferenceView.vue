@@ -3,7 +3,6 @@
     <div class="page-header">
       <div>
         <h3 class="page-title">个性化预警阈值</h3>
-        <p class="page-subtitle">支持按个人健康状态调整阈值，系统判定将优先使用个人阈值</p>
       </div>
       <div class="page-actions">
         <el-button :loading="loading" @click="load">刷新</el-button>

@@ -3,7 +3,6 @@
     <div class="page-header">
       <div>
         <h3 class="page-title">健康数据上报</h3>
-        <p class="page-subtitle">记录每日健康数据</p>
       </div>
       <div class="page-actions">
         <el-button type="primary" @click="submit">提交上报</el-button>
@@ -15,19 +14,13 @@
         <div class="info-strip-title">保持连续上报可提升预警准确性</div>
         <div class="info-strip-desc">血压示例 120/80，血糖示例 6.1，体重示例 65。</div>
       </div>
-      <el-tag effect="light">当前指标：{{ form.indicatorType }}</el-tag>
     </div>
 
-    <div class="kpi-grid">
-      <div class="kpi-card">
-        <div class="kpi-label">上报时间</div>
-        <div class="kpi-value">{{ form.reportTime ? '已设置' : '未设置' }}</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">录入状态</div>
-        <div class="kpi-value">{{ form.value ? '待提交' : '待填写' }}</div>
-      </div>
-    </div>
+    <el-row :gutter="10" class="summary-row">
+      <el-col :xs="24" :sm="8"><el-card shadow="never">当前指标：{{ form.indicatorType }}</el-card></el-col>
+      <el-col :xs="24" :sm="8"><el-card shadow="never">上报时间：{{ form.reportTime ? '已设置' : '未设置' }}</el-card></el-col>
+      <el-col :xs="24" :sm="8"><el-card shadow="never">录入状态：{{ form.value ? '待提交' : '待填写' }}</el-card></el-col>
+    </el-row>
 
     <el-card class="section-card" shadow="never">
       <template #header>当日健康数据</template>
@@ -65,10 +58,14 @@ import { reportHealthDataApi } from '../api/modules'
 
 const form = reactive({ indicatorType: '血压', value: '', reportTime: '', remark: '' })
 
-const fillNow = () => {
+const nowString = () => {
   const pad = (n) => String(n).padStart(2, '0')
   const d = new Date()
-  form.reportTime = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+}
+
+const fillNow = () => {
+  form.reportTime = nowString()
 }
 
 const fillSample = () => {
@@ -80,16 +77,18 @@ const fillSample = () => {
 
 const validate = () => {
   if (!form.value) return '数值不能为空'
-  if (form.indicatorType === '血压' && !/^[1-9]\d{1,2}\/[1-9]\d{1,2}$/.test(form.value)) return '血压格式应为xx/xx'
-  if (form.indicatorType === '血糖') {
-    const v = Number(form.value)
+  const type = (form.indicatorType || '').trim()
+  const val = (form.value || '').trim()
+  if (type === '血压' && !/^[1-9]\d{1,2}\/[1-9]\d{1,2}$/.test(val)) return '血压格式应为xx/xx'
+  if (type === '血糖') {
+    const v = Number(val)
     if (!(v > 0 && v <= 30)) return '血糖必须在0-30之间'
   }
-  if (form.indicatorType === '体重') {
-    const v = Number(form.value)
+  if (type === '体重') {
+    const v = Number(val)
     if (!(v > 0)) return '体重必须为正数'
   }
-  if (form.indicatorType === '服药' && !['已服药', '未服药', '1', '0'].includes(form.value)) return '服药仅支持 已服药/未服药/1/0'
+  if (type === '服药' && !['已服药', '未服药', '1', '0'].includes(val)) return '服药仅支持 已服药/未服药/1/0'
   return ''
 }
 
@@ -99,9 +98,18 @@ const submit = async () => {
     ElMessage.error(err)
     return
   }
+  if (!form.reportTime) {
+    form.reportTime = nowString()
+  }
   await reportHealthDataApi(form)
   ElMessage.success('上报成功')
   form.value = ''
   form.remark = ''
 }
 </script>
+
+<style scoped>
+.summary-row {
+  margin-bottom: 12px;
+}
+</style>

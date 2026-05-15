@@ -12,4 +12,6 @@ public class DoctorGroup extends BaseEntity {
     private Long doctorId;
     private String groupName;
     private String description;
+    private String governanceStatus;
+    private String targetDept;
 }

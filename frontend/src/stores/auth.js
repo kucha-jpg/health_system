@@ -1,3 +1,7 @@
+/**
+ * @typedef {{ token: string, userInfo: { roleType: string, name: string, username: string, id: number } }} AuthPayload
+ */
+
 const TOKEN_KEY = 'token'
 const ROLE_KEY = 'roleType'
 const NAME_KEY = 'name'
@@ -23,6 +27,10 @@ export const authStore = {
   get username() {
     return sessionStorage.getItem(USERNAME_KEY) || ''
   },
+
+  /**
+   * @param {AuthPayload} payload
+   */
   setAuth(payload) {
     sessionStorage.setItem(TOKEN_KEY, payload.token)
     sessionStorage.setItem(ROLE_KEY, payload.userInfo.roleType)
@@ -37,16 +45,21 @@ export const authStore = {
       })
     }
   },
+
   clear() {
     sessionStorage.removeItem(TOKEN_KEY)
     sessionStorage.removeItem(ROLE_KEY)
     sessionStorage.removeItem(NAME_KEY)
     sessionStorage.removeItem(USERNAME_KEY)
   },
+
+  /** @param {string} message */
   setAuthNotice(message) {
     if (!message) return
     sessionStorage.setItem(AUTH_NOTICE_KEY, message)
   },
+
+  /** @returns {string} */
   consumeAuthNotice() {
     const message = sessionStorage.getItem(AUTH_NOTICE_KEY) || ''
     if (message) {

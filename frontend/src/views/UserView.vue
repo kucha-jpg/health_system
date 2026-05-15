@@ -3,7 +3,6 @@
     <div class="page-header">
       <div>
         <h3 class="page-title">管理员账号管理</h3>
-        <p class="page-subtitle">支持按角色与状态快速筛选，支持新增、编辑与启停用</p>
       </div>
       <div class="page-actions">
         <el-button :loading="loading" @click="load">刷新</el-button>
@@ -48,7 +47,7 @@
           <el-tag :type="scope.row.status === 1 ? 'success' : 'danger'">{{ scope.row.status === 1 ? '启用' : '禁用' }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="280">
+      <el-table-column label="操作" width="220">
         <template #default="scope">
           <el-button link type="primary" @click="openDialog(scope.row)">编辑</el-button>
           <el-button link type="warning" @click="toggleStatus(scope.row)">{{ scope.row.status === 1 ? '禁用' : '启用' }}</el-button>
@@ -69,7 +68,16 @@
     </div>
   </el-card>
 
-  <el-dialog v-model="visible" :title="form.id ? '编辑账号' : '新增账号'" width="560px">
+  <el-dialog
+    v-model="visible"
+    :title="form.id ? '编辑账号' : '新增账号'"
+    width="560px"
+    center
+    align-center
+    :close-on-click-modal="false"
+    :close-on-press-escape="false"
+    :show-close="false"
+  >
     <el-form :model="form" label-width="100px">
       <el-form-item label="用户名"><el-input v-model="form.username" :disabled="!!form.id" /></el-form-item>
       <el-form-item label="姓名"><el-input v-model="form.name" /></el-form-item>
@@ -170,6 +178,18 @@ const save = async () => {
     ElMessage.warning('请完整填写用户名、姓名和手机号')
     return
   }
+  try {
+    await ElMessageBox.confirm(form.id ? '确认修改该账号？' : '确认创建该账号？', '保存确认', {
+      type: 'warning',
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      closeOnClickModal: false,
+      closeOnPressEscape: false,
+      showClose: false
+    })
+  } catch {
+    return
+  }
   saving.value = true
   try {
     if (form.id) {
@@ -194,7 +214,10 @@ const toggleStatus = async (row) => {
   await ElMessageBox.confirm(`确认${actionText}账号 ${row.username} 吗？`, '状态变更确认', {
     type: 'warning',
     confirmButtonText: '确认',
-    cancelButtonText: '取消'
+    cancelButtonText: '取消',
+    closeOnClickModal: false,
+    closeOnPressEscape: false,
+    showClose: false
   })
   await updateUserStatusApi(row.id, nextStatus)
   ElMessage.success(`账号已${actionText}`)

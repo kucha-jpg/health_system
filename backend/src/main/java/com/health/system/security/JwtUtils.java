@@ -20,16 +20,18 @@ public class JwtUtils {
     @Value("${jwt.expiration}")
     private Long expiration;
 
-        public String generateToken(String username, String role, Long userId, Long loginVersion) {
+    private volatile SecretKey cachedSecretKey;
+
+    public String generateToken(String username, String role, Long userId, Long loginVersion) {
         Date now = new Date();
-        Date exp = new Date(now.getTime() + expiration);
+        Date exp = new Date(now.getTime() + (expiration != null ? expiration : 86400000L));
         return Jwts.builder()
                 .subject(username)
-            .claims(Map.of(
-                "role", role,
-                "userId", userId,
-                "loginVersion", loginVersion == null ? 0L : loginVersion
-            ))
+                .claims(Map.of(
+                        "role", role,
+                        "userId", userId,
+                        "loginVersion", loginVersion == null ? 0L : loginVersion
+                ))
                 .issuedAt(now)
                 .expiration(exp)
                 .signWith(secretKey())
@@ -45,6 +47,13 @@ public class JwtUtils {
     }
 
     private SecretKey secretKey() {
-        return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+        if (cachedSecretKey == null) {
+            synchronized (this) {
+                if (cachedSecretKey == null) {
+                    cachedSecretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+                }
+            }
+        }
+        return cachedSecretKey;
     }
 }

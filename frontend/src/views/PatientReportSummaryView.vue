@@ -3,7 +3,6 @@
     <div class="page-header">
       <div>
         <h3 class="page-title">健康周报/月报</h3>
-        <p class="page-subtitle">周报月报与趋势分析</p>
       </div>
       <div class="page-actions">
         <el-radio-group v-model="range" @change="load">
@@ -83,6 +82,7 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import echarts from '../utils/echarts'
+import { csvEscape, downloadCsv } from '../utils/csv'
 import { ElMessage } from 'element-plus'
 import { getPatientReportSummaryApi } from '../api/modules'
 import { CHART_PALETTE, CHART_SPLIT_LINE, RISK_COLORS } from '../constants/chart-theme'
@@ -239,14 +239,6 @@ const resetFilters = () => {
   filters.indicatorType = ''
   filters.keyword = ''
   latestPageNo.value = 1
-}
-
-const csvEscape = (value) => {
-  const text = String(value ?? '')
-  if (text.includes(',') || text.includes('"') || text.includes('\n')) {
-    return `"${text.replace(/"/g, '""')}"`
-  }
-  return text
 }
 
 const exportCsv = () => {

@@ -36,3 +36,11 @@ security:
     max-requests: ${AUTH_RATE_LIMIT_MAX_REQUESTS:10}
     window-seconds: ${AUTH_RATE_LIMIT_WINDOW_SECONDS:60}
     cleanup-interval-seconds: ${AUTH_RATE_LIMIT_CLEANUP_INTERVAL_SECONDS:300}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha

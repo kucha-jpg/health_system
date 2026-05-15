@@ -1,6 +1,7 @@
 package com.health.system.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.health.system.dto.LoginRequest;
 import com.health.system.dto.RegisterRequest;
 import com.health.system.common.BusinessException;
@@ -60,15 +61,17 @@ public class AuthServiceImpl implements AuthService {
             throw BusinessException.forbidden("该账号已被禁用");
         }
 
-        Long currentVersion = user.getLoginVersion();
-        long nextVersion = (currentVersion == null ? 0L : currentVersion) + 1L;
+        long prevVersion = user.getLoginVersion() == null ? 0L : user.getLoginVersion();
+        long nextVersion = prevVersion + 1;
         try {
-            user.setLoginVersion(nextVersion);
-            userMapper.updateById(user);
+            userMapper.update(null, new LambdaUpdateWrapper<User>()
+                    .eq(User::getId, user.getId())
+                    .setSql("login_version = COALESCE(login_version, 0) + 1"));
         } catch (Exception ex) {
-            // Backward compatibility: if login_version is not ready in DB, keep login available.
-            nextVersion = currentVersion == null ? 0L : currentVersion;
-            log.warn("Skip login version update for user {} due to {}", username, ex.getMessage());
+            log.warn("DB version increment failed for user {}, using local fallback", username);
+            userMapper.update(null, new LambdaUpdateWrapper<User>()
+                    .eq(User::getId, user.getId())
+                    .set(User::getLoginVersion, nextVersion));
         }
 
         String token = jwtUtils.generateToken(user.getUsername(), user.getRoleType(), user.getId(), nextVersion);
@@ -87,7 +90,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public void register(RegisterRequest request) {
+    public Map<String, Object> register(RegisterRequest request) {
         User exists = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, request.getUsername()));
         if (exists != null) {
             safeSaveOperationLog(request.getUsername(), "ANONYMOUS", "POST", "/api/auth/register", false, "REGISTER_FAILED_DUPLICATE_USERNAME");
@@ -101,7 +104,7 @@ public class AuthServiceImpl implements AuthService {
         user.setName(request.getName());
         user.setRoleType("PATIENT");
         user.setStatus(1);
-        user.setLoginVersion(0L);
+        user.setLoginVersion(1L);
         userMapper.insert(user);
 
         Role patientRole = roleMapper.selectOne(new LambdaQueryWrapper<Role>()
@@ -115,7 +118,20 @@ public class AuthServiceImpl implements AuthService {
         userRole.setUserId(user.getId());
         userRole.setRoleId(patientRoleId);
         userRoleMapper.insert(userRole);
+
+        String token = jwtUtils.generateToken(user.getUsername(), "PATIENT", user.getId(), 1L);
+        Map<String, Object> userInfo = new HashMap<>();
+        userInfo.put("id", user.getId());
+        userInfo.put("username", user.getUsername());
+        userInfo.put("name", user.getName());
+        userInfo.put("phone", user.getPhone());
+        userInfo.put("roleType", "PATIENT");
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("token", token);
+        result.put("userInfo", userInfo);
         safeSaveOperationLog(request.getUsername(), "PATIENT", "POST", "/api/auth/register", true, "REGISTER_SUCCESS");
+        return result;
     }
 
     private void safeSaveOperationLog(String username,

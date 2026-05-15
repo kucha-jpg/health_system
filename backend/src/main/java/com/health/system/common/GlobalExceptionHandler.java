@@ -1,5 +1,7 @@
 package com.health.system.common;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -8,6 +10,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(BusinessException.class)
     public ApiResponse<Void> handleBusiness(BusinessException ex) {
@@ -30,6 +34,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ApiResponse<Void> handleException(Exception ex) {
-        return ApiResponse.fail(ErrorCode.INTERNAL_ERROR.code(), ex.getMessage());
+        log.error("Unhandled exception", ex);
+        return ApiResponse.fail(ErrorCode.INTERNAL_ERROR.code(), "系统内部错误，请稍后重试");
     }
 }

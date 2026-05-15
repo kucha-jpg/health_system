@@ -6,9 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -18,6 +16,7 @@ import com.health.system.alert.AlertDecision;
 import com.health.system.alert.AlertEvaluationEngine;
 import com.health.system.common.BusinessException;
 import com.health.system.common.CacheNames;
+import com.health.system.config.CacheEvictionSupport;
 import com.health.system.entity.DoctorGroup;
 import com.health.system.entity.DoctorGroupMember;
 import com.health.system.entity.HealthAlert;
@@ -45,6 +44,7 @@ public class HealthAlertServiceImpl implements HealthAlertService {
     private final AlertRuleMapper alertRuleMapper;
     private final DoctorAccessSupport doctorAccessSupport;
     private final MonitorOverviewAssembler monitorOverviewAssembler;
+    private final CacheEvictionSupport cacheEvictionSupport;
 
     public HealthAlertServiceImpl(HealthAlertMapper healthAlertMapper,
                                   HealthDataMapper healthDataMapper,
@@ -54,7 +54,8 @@ public class HealthAlertServiceImpl implements HealthAlertService {
                                   DoctorGroupMemberMapper doctorGroupMemberMapper,
                                   AlertRuleMapper alertRuleMapper,
                                   DoctorAccessSupport doctorAccessSupport,
-                                  MonitorOverviewAssembler monitorOverviewAssembler) {
+                                  MonitorOverviewAssembler monitorOverviewAssembler,
+                                  CacheEvictionSupport cacheEvictionSupport) {
         this.healthAlertMapper = healthAlertMapper;
         this.healthDataMapper = healthDataMapper;
         this.userMapper = userMapper;
@@ -64,18 +65,12 @@ public class HealthAlertServiceImpl implements HealthAlertService {
         this.alertRuleMapper = alertRuleMapper;
         this.doctorAccessSupport = doctorAccessSupport;
         this.monitorOverviewAssembler = monitorOverviewAssembler;
+        this.cacheEvictionSupport = cacheEvictionSupport;
     }
 
     @Override
-        @Caching(evict = {
-            @CacheEvict(cacheNames = CacheNames.PATIENT_REPORT_SUMMARY, allEntries = true),
-            @CacheEvict(cacheNames = CacheNames.DOCTOR_OPEN_ALERTS, allEntries = true),
-            @CacheEvict(cacheNames = CacheNames.PATIENT_ALERT_LIST, allEntries = true),
-            @CacheEvict(cacheNames = CacheNames.ADMIN_MONITOR_OVERVIEW, allEntries = true),
-            @CacheEvict(cacheNames = CacheNames.DOCTOR_PATIENT_INSIGHT, allEntries = true)
-        })
     public void evaluateAndCreateAlert(Long userId, Long healthDataId, String indicatorType, String value) {
-        AlertDecision decision = evaluate(userId, indicatorType, value);
+        AlertDecision decision = alertEvaluationEngine.evaluate(userId, indicatorType, value);
         if (decision == null) {
             return;
         }
@@ -89,7 +84,6 @@ public class HealthAlertServiceImpl implements HealthAlertService {
         if (existing != null) {
             existing.setHealthDataId(healthDataId);
             existing.setValue(value);
-            existing.setLevel(decision.level());
             existing.setRiskScore(decision.riskScore());
             existing.setRiskLevel(decision.riskLevel());
             existing.setReasonText(decision.reasonText());
@@ -101,7 +95,6 @@ public class HealthAlertServiceImpl implements HealthAlertService {
         alert.setHealthDataId(healthDataId);
         alert.setIndicatorType(indicatorType);
         alert.setValue(value);
-        alert.setLevel(decision.level());
         alert.setRiskScore(decision.riskScore());
         alert.setRiskLevel(decision.riskLevel());
         alert.setReasonCode(decision.reasonCode());
@@ -111,13 +104,6 @@ public class HealthAlertServiceImpl implements HealthAlertService {
     }
 
     @Override
-    @Caching(evict = {
-            @CacheEvict(cacheNames = CacheNames.PATIENT_REPORT_SUMMARY, allEntries = true),
-            @CacheEvict(cacheNames = CacheNames.DOCTOR_OPEN_ALERTS, allEntries = true),
-            @CacheEvict(cacheNames = CacheNames.PATIENT_ALERT_LIST, allEntries = true),
-            @CacheEvict(cacheNames = CacheNames.ADMIN_MONITOR_OVERVIEW, allEntries = true),
-            @CacheEvict(cacheNames = CacheNames.DOCTOR_PATIENT_INSIGHT, allEntries = true)
-    })
     public void deleteByHealthDataId(Long healthDataId) {
         healthAlertMapper.delete(new LambdaQueryWrapper<HealthAlert>().eq(HealthAlert::getHealthDataId, healthDataId));
     }
@@ -131,8 +117,8 @@ public class HealthAlertServiceImpl implements HealthAlertService {
                                               String sortBy,
                                               Integer pageNo,
                                               Integer pageSize) {
-                                            User doctor = doctorAccessSupport.requireDoctor(doctorUsername);
-                                            Set<Long> patientIds = doctorAccessSupport.resolveAccessiblePatientIds(doctor.getId());
+        User doctor = doctorAccessSupport.requireDoctor(doctorUsername);
+        Set<Long> patientIds = doctorAccessSupport.resolveAccessiblePatientIds(doctor.getId());
         int safePageNo = Math.min(Math.max(pageNo == null ? 1 : pageNo, 1), 1000);
         int safePageSize = Math.min(Math.max(pageSize == null ? 20 : pageSize, 1), 100);
         if (patientIds.isEmpty()) {
@@ -187,13 +173,6 @@ public class HealthAlertServiceImpl implements HealthAlertService {
     }
 
     @Override
-        @Caching(evict = {
-            @CacheEvict(cacheNames = CacheNames.PATIENT_REPORT_SUMMARY, allEntries = true),
-            @CacheEvict(cacheNames = CacheNames.DOCTOR_OPEN_ALERTS, allEntries = true),
-            @CacheEvict(cacheNames = CacheNames.PATIENT_ALERT_LIST, allEntries = true),
-            @CacheEvict(cacheNames = CacheNames.ADMIN_MONITOR_OVERVIEW, allEntries = true),
-            @CacheEvict(cacheNames = CacheNames.DOCTOR_PATIENT_INSIGHT, allEntries = true)
-        })
     public void handleAlert(String doctorUsername, Long id, String handleRemark) {
         User doctor = doctorAccessSupport.requireDoctor(doctorUsername);
         HealthAlert alert = healthAlertMapper.selectById(id);
@@ -209,6 +188,13 @@ public class HealthAlertServiceImpl implements HealthAlertService {
         alert.setHandledTime(LocalDateTime.now());
         alert.setHandleRemark(handleRemark);
         healthAlertMapper.updateById(alert);
+
+        User patient = userMapper.selectById(alert.getUserId());
+        String patientPrefix = (patient != null ? patient.getUsername() : String.valueOf(alert.getUserId())) + "::";
+        cacheEvictionSupport.evictByPrefix(CacheNames.DOCTOR_OPEN_ALERTS, doctorUsername + "::");
+        cacheEvictionSupport.evictByPrefix(CacheNames.PATIENT_ALERT_LIST, patientPrefix);
+        cacheEvictionSupport.evictByPrefix(CacheNames.PATIENT_REPORT_SUMMARY, patientPrefix);
+        cacheEvictionSupport.evictByPrefix(CacheNames.ADMIN_MONITOR_OVERVIEW, "");
     }
 
     @Override
@@ -222,26 +208,32 @@ public class HealthAlertServiceImpl implements HealthAlertService {
                 .last("limit 10"));
 
         LocalDateTime monthStart = LocalDateTime.now().minusDays(30);
-        List<HealthData> recentMonthData = healthDataMapper.selectList(new LambdaQueryWrapper<HealthData>()
-                .ge(HealthData::getReportTime, monthStart)
-                .orderByDesc(HealthData::getReportTime)
-                .last("limit 5000"));
+        // Limit to 2000 rows for recent month health data (enough for 30-day trend charts)
+        List<HealthData> recentMonthData = healthDataMapper.selectPage(
+                new Page<>(1, 2000),
+                new LambdaQueryWrapper<HealthData>()
+                        .ge(HealthData::getReportTime, monthStart)
+                        .orderByDesc(HealthData::getReportTime))
+                .getRecords();
 
-        List<DoctorGroup> groups = doctorGroupMapper.selectList(new LambdaQueryWrapper<DoctorGroup>()
-                .orderByDesc(DoctorGroup::getCreateTime)
-                .last("limit 200"));
+        // Limit to 200 most recent groups for overview stats
+        List<DoctorGroup> groups = doctorGroupMapper.selectPage(
+                new Page<>(1, 200),
+                new LambdaQueryWrapper<DoctorGroup>()
+                        .orderByDesc(DoctorGroup::getCreateTime))
+                .getRecords();
         List<DoctorGroupMember> groupMembers = groups.isEmpty()
                 ? List.of()
                 : doctorGroupMemberMapper.selectList(new LambdaQueryWrapper<DoctorGroupMember>()
                 .in(DoctorGroupMember::getGroupId, groups.stream().map(DoctorGroup::getId).toList()));
 
         var enabledRuleIndicators = alertRuleMapper.selectList(new LambdaQueryWrapper<com.health.system.entity.AlertRule>()
-            .eq(com.health.system.entity.AlertRule::getEnabled, 1)
-            .eq(com.health.system.entity.AlertRule::getDeleted, 0))
-            .stream()
-            .map(com.health.system.entity.AlertRule::getIndicatorType)
-            .filter(StringUtils::hasText)
-            .collect(java.util.stream.Collectors.toSet());
+                .eq(com.health.system.entity.AlertRule::getEnabled, 1)
+                .eq(com.health.system.entity.AlertRule::getDeleted, 0))
+                .stream()
+                .map(com.health.system.entity.AlertRule::getIndicatorType)
+                .filter(StringUtils::hasText)
+                .collect(java.util.stream.Collectors.toSet());
 
         return monitorOverviewAssembler.assemble(
                 totalUsers,
@@ -249,7 +241,7 @@ public class HealthAlertServiceImpl implements HealthAlertService {
                 openAlerts,
                 latestHealthData,
                 recentMonthData,
-            enabledRuleIndicators,
+                enabledRuleIndicators,
                 groups,
                 groupMembers
         );
@@ -263,9 +255,4 @@ public class HealthAlertServiceImpl implements HealthAlertService {
         result.put("pageSize", pageSize);
         return result;
     }
-
-    private AlertDecision evaluate(Long userId, String indicatorType, String value) {
-        return alertEvaluationEngine.evaluate(userId, indicatorType, value);
-    }
-
 }

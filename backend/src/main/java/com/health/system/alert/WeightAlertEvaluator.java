@@ -12,6 +12,9 @@ import java.util.List;
 @Component
 public class WeightAlertEvaluator implements AlertEvaluator {
 
+    private static final int RECENT_DAYS = 14;
+    private static final int RECENT_LIMIT = 20;
+
     private final HealthDataMapper healthDataMapper;
 
     public WeightAlertEvaluator(HealthDataMapper healthDataMapper) {
@@ -36,12 +39,12 @@ public class WeightAlertEvaluator implements AlertEvaluator {
         BigDecimal medium = RiskScoreSupport.parseDecimalRule(context.mediumRule(), BigDecimal.valueOf(90));
 
         List<HealthData> recentData = healthDataMapper.selectList(new LambdaQueryWrapper<HealthData>()
-            .eq(HealthData::getUserId, context.userId())
-            .eq(HealthData::getIndicatorType, IndicatorTypes.WEIGHT)
-            .ge(HealthData::getReportTime, LocalDateTime.now().minusDays(14))
-            .orderByDesc(HealthData::getReportTime)
-            .last("limit 20"));
-        BigDecimal predicted = linearPredictNextDecimal(recentData);
+                .eq(HealthData::getUserId, context.userId())
+                .eq(HealthData::getIndicatorType, IndicatorTypes.WEIGHT)
+                .ge(HealthData::getReportTime, LocalDateTime.now().minusDays(RECENT_DAYS))
+                .orderByDesc(HealthData::getReportTime)
+                .last("limit " + RECENT_LIMIT));
+        BigDecimal predicted = RiskScoreSupport.linearPredictDecimal(recentData);
 
         if (value.compareTo(high) >= 0) {
             int score = RiskScoreSupport.severeScore(RiskScoreSupport.ratio(value, high));
@@ -67,43 +70,5 @@ public class WeightAlertEvaluator implements AlertEvaluator {
             return new AlertDecision("MEDIUM", score, RiskScoreSupport.riskLevel(score), reasonCode, reasonText);
         }
         return null;
-    }
-
-    private BigDecimal linearPredictNextDecimal(List<HealthData> records) {
-        if (records == null || records.size() < 2) {
-            return null;
-        }
-        List<HealthData> sorted = records.stream()
-            .filter(item -> item.getReportTime() != null && item.getValue() != null)
-            .sorted((a, b) -> a.getReportTime().compareTo(b.getReportTime()))
-                .toList();
-        if (sorted.size() < 2) {
-            return null;
-        }
-        double n = sorted.size();
-        double sumX = 0;
-        double sumY = 0;
-        double sumXY = 0;
-        double sumXX = 0;
-        for (int i = 0; i < sorted.size(); i++) {
-            double y;
-            try {
-                y = Double.parseDouble(sorted.get(i).getValue());
-            } catch (NumberFormatException ex) {
-                return null;
-            }
-            double x = i + 1;
-            sumX += x;
-            sumY += y;
-            sumXY += x * y;
-            sumXX += x * x;
-        }
-        double denominator = n * sumXX - sumX * sumX;
-        if (denominator == 0) {
-            return null;
-        }
-        double k = (n * sumXY - sumX * sumY) / denominator;
-        double b = (sumY - k * sumX) / n;
-        return BigDecimal.valueOf(k * (n + 1) + b);
     }
 }

@@ -3,7 +3,6 @@
     <div class="page-header">
       <div>
         <h3 class="page-title">我的预警详情</h3>
-        <p class="page-subtitle">风险变化与处理进度</p>
       </div>
       <div class="page-actions">
         <el-select v-model="status" class="w-170" @change="onStatusChanged">

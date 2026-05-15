@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.health.system.common.BusinessException;
 import com.health.system.common.CacheNames;
 import com.health.system.dto.AdminFeedbackReplyDTO;
@@ -65,21 +66,14 @@ public class FeedbackMessageServiceImpl implements FeedbackMessageService {
 
         int safePageNo = Math.min(Math.max(pageNo, 1), 1000);
         int safePageSize = Math.min(Math.max(pageSize, 1), 100);
-        int offset = (safePageNo - 1) * safePageSize;
 
-        LambdaQueryWrapper<FeedbackMessage> countWrapper = new LambdaQueryWrapper<FeedbackMessage>()
-                .eq(FeedbackMessage::getSenderUserId, user.getId());
-        applyDateRange(countWrapper, startTime, endTime);
-        long total = feedbackMessageMapper.selectCount(countWrapper);
-
-        LambdaQueryWrapper<FeedbackMessage> pageWrapper = new LambdaQueryWrapper<FeedbackMessage>()
+        LambdaQueryWrapper<FeedbackMessage> wrapper = new LambdaQueryWrapper<FeedbackMessage>()
                 .eq(FeedbackMessage::getSenderUserId, user.getId())
-                .orderByDesc(FeedbackMessage::getCreateTime)
-                .last("limit " + offset + "," + safePageSize);
-        applyDateRange(pageWrapper, startTime, endTime);
+                .orderByDesc(FeedbackMessage::getCreateTime);
+        applyDateRange(wrapper, startTime, endTime);
 
-        List<FeedbackMessage> records = feedbackMessageMapper.selectList(pageWrapper);
-        return pagedResult(records, total, safePageNo, safePageSize);
+        Page<FeedbackMessage> page = feedbackMessageMapper.selectPage(new Page<>(safePageNo, safePageSize), wrapper);
+        return pagedResult(page.getRecords(), page.getTotal(), safePageNo, safePageSize);
     }
 
     @Override
@@ -98,20 +92,14 @@ public class FeedbackMessageServiceImpl implements FeedbackMessageService {
         int pageSize = pageSizeObj == null ? 10 : pageSizeObj;
         int safePageNo = Math.min(Math.max(pageNo, 1), 1000);
         int safePageSize = Math.min(Math.max(pageSize, 1), 100);
-        int offset = (safePageNo - 1) * safePageSize;
-
-        LambdaQueryWrapper<FeedbackMessage> countWrapper = new LambdaQueryWrapper<>();
-        applyAdminFilters(countWrapper, query);
-        long total = feedbackMessageMapper.selectCount(countWrapper);
 
         LambdaQueryWrapper<FeedbackMessage> pageWrapper = new LambdaQueryWrapper<>();
         applyAdminFilters(pageWrapper, query);
         pageWrapper.orderByAsc(FeedbackMessage::getStatus)
-                .orderByDesc(FeedbackMessage::getCreateTime)
-                .last("limit " + offset + "," + safePageSize);
+                .orderByDesc(FeedbackMessage::getCreateTime);
 
-        List<FeedbackMessage> records = feedbackMessageMapper.selectList(pageWrapper);
-        return pagedResult(records, total, safePageNo, safePageSize);
+        Page<FeedbackMessage> page = feedbackMessageMapper.selectPage(new Page<>(safePageNo, safePageSize), pageWrapper);
+        return pagedResult(page.getRecords(), page.getTotal(), safePageNo, safePageSize);
     }
 
     @Override

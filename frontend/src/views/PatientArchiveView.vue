@@ -3,7 +3,6 @@
     <div class="page-header">
       <div>
         <h3 class="page-title">个人健康档案</h3>
-        <p class="page-subtitle">维护病史与用药信息</p>
       </div>
       <div class="page-actions">
         <el-button type="primary" @click="save">保存档案</el-button>
@@ -39,7 +38,7 @@
 
 <script setup>
 import { computed, onMounted, reactive } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { getArchiveApi, saveArchiveApi } from '../api/modules'
 
 const form = reactive({ name: '', age: null, medicalHistory: '', medicationHistory: '', allergyHistory: '' })
@@ -62,7 +61,16 @@ const load = async () => {
 }
 
 const save = async () => {
+  await ElMessageBox.confirm('确认保存档案？', '保存确认', {
+    type: 'warning',
+    confirmButtonText: '确认',
+    cancelButtonText: '取消',
+    closeOnClickModal: false,
+    closeOnPressEscape: false,
+    showClose: false
+  })
   await saveArchiveApi(form)
+  await load()
   ElMessage.success('保存成功')
 }
 

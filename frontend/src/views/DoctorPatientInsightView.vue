@@ -1,9 +1,13 @@
 <template>
   <el-card class="page-shell">
+    <el-breadcrumb separator="/" class="page-breadcrumb">
+      <el-breadcrumb-item :to="{ path: '/home' }">工作首页</el-breadcrumb-item>
+      <el-breadcrumb-item :to="{ path: '/doctor/groups' }">群组管理</el-breadcrumb-item>
+      <el-breadcrumb-item>患者洞察</el-breadcrumb-item>
+    </el-breadcrumb>
     <div class="page-header">
       <div>
         <h3 class="page-title">患者档案与趋势洞察</h3>
-        <p class="page-subtitle">患者档案与风险趋势</p>
       </div>
       <div class="page-actions">
         <el-select v-model="query.indicatorType" class="w-130" clearable placeholder="指标类型" @change="load">
@@ -31,6 +35,14 @@
       <el-button @click="resetFilters">重置筛选</el-button>
     </div>
 
+    <div v-if="errorMessage" class="error-state">
+      <div class="error-state-icon">!</div>
+      <div class="error-state-title">{{ errorMessage }}</div>
+      <div class="error-state-desc">该患者不在您的管辖范围内，或患者不存在</div>
+      <el-button type="primary" @click="router.push('/doctor/groups')">返回群组管理</el-button>
+    </div>
+
+    <template v-else>
     <div class="info-strip">
       <div>
         <div class="info-strip-title">先看趋势，再看分布，最后在明细中确认风险来源</div>
@@ -45,16 +57,7 @@
       <el-col :xs="24" :sm="12" :lg="6"><el-card shadow="never" class="summary-stat-card">趋势数据条数：{{ (insight.trendData || []).length }}</el-card></el-col>
     </el-row>
 
-    <el-card class="section-card" style="margin-bottom: 12px" shadow="never">
-      <template #header>患者档案</template>
-      <el-descriptions :column="2" border>
-        <el-descriptions-item label="姓名">{{ insight.archive?.name || insight.patient?.name || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="年龄">{{ insight.archive?.age ?? '-' }}</el-descriptions-item>
-        <el-descriptions-item label="既往病史">{{ insight.archive?.medicalHistory || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="用药史">{{ insight.archive?.medicationHistory || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="过敏史">{{ insight.archive?.allergyHistory || '-' }}</el-descriptions-item>
-      </el-descriptions>
-    </el-card>
+    <PatientArchiveCard :archive="insight.archive" :patient-name="insight.patient?.name" />
 
     <el-row :gutter="12" class="chart-row">
       <el-col :xs="24" :lg="15">
@@ -117,21 +120,24 @@
     </el-card>
 
     <el-button class="floating-top-btn" circle @click="scrollToTop">顶</el-button>
+    </template>
   </el-card>
 </template>
 
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import echarts from '../utils/echarts'
 import { getDoctorPatientInsightApi } from '../api/modules'
 import { CHART_PALETTE, CHART_SPLIT_LINE, RISK_COLORS } from '../constants/chart-theme'
-import { showFirstVisitGuide } from '../composables/useFirstVisitGuide'
+import PatientArchiveCard from './components/PatientArchiveCard.vue'
 
 const route = useRoute()
-const patientUserId = route.params.patientUserId
+const router = useRouter()
 const insight = ref({})
 const loading = ref(false)
+const errorMessage = ref('')
 const query = reactive({ indicatorType: '', timeRange: 'month' })
 const filters = reactive({ remarkKeyword: '', alertStatus: '' })
 const trendChartType = ref('line')
@@ -198,6 +204,7 @@ const renderChart = async () => {
   const list = insight.value?.trendData || []
   const xAxis = list.map((item) => item.reportTime)
   const yAxis = list.map((item) => parseTrendValue(item))
+  trendChart.clear()
   trendChart.setOption({
     color: [CHART_PALETTE[1]],
     tooltip: { trigger: 'axis' },
@@ -216,6 +223,7 @@ const renderAlertPie = async () => {
   const source = insight.value?.recentAlerts || []
   const open = source.filter((item) => item.status === 'OPEN').length
   const closed = source.filter((item) => item.status === 'CLOSED').length
+  alertPieChart.clear()
   alertPieChart.setOption({
     color: [RISK_COLORS.OPEN, RISK_COLORS.CLOSED],
     tooltip: { trigger: 'item' },
@@ -243,6 +251,7 @@ const renderIndicatorBar = async () => {
   })
   const names = Object.keys(counts)
   const values = names.map((name) => counts[name])
+  indicatorBarChart.clear()
   indicatorBarChart.setOption({
     color: [CHART_PALETTE[0]],
     tooltip: { trigger: 'axis' },
@@ -254,13 +263,17 @@ const renderIndicatorBar = async () => {
 
 const load = async () => {
   loading.value = true
+  errorMessage.value = ''
   try {
-    insight.value = await getDoctorPatientInsightApi(patientUserId, query)
+    insight.value = await getDoctorPatientInsightApi(route.params.patientUserId, query)
     trendPageNo.value = 1
     alertPageNo.value = 1
     await renderChart()
     await renderAlertPie()
     await renderIndicatorBar()
+  } catch (err) {
+    insight.value = {}
+    errorMessage.value = err?.response?.data?.msg || err?.message || '加载患者数据失败'
   } finally {
     loading.value = false
   }
@@ -299,13 +312,12 @@ const handleResize = () => {
   if (indicatorBarChart) indicatorBarChart.resize()
 }
 
+watch(() => route.params.patientUserId, () => {
+  if (route.params.patientUserId) load()
+})
+
 onMounted(() => {
   load()
-  showFirstVisitGuide({
-    storageKey: `guide_doctor_patient_insight_v1_${patientUserId}`,
-    title: '患者洞察引导',
-    message: '建议先按时间范围查看趋势，再结合预警状态分布与指标频次判断风险来源，最后在明细表过滤备注进行复核。'
-  }).catch(() => {})
   window.addEventListener('resize', handleResize)
 })
 
@@ -327,6 +339,10 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.page-breadcrumb {
+  margin-bottom: 10px;
+}
+
 :deep(.page-actions) {
   display: flex;
   flex-wrap: nowrap;
@@ -354,6 +370,39 @@ onUnmounted(() => {
 .trend-chart {
   width: 100%;
   height: 300px;
+}
+
+.error-state {
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.error-state-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(245, 108, 108, 0.12);
+  color: #f56c6c;
+  font-size: 24px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+}
+
+.error-state-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink-1);
+}
+
+.error-state-desc {
+  font-size: 13px;
+  color: var(--ink-2);
 }
 
 .floating-top-btn {

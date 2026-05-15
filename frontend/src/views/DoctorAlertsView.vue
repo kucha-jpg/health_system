@@ -3,7 +3,6 @@
     <div class="page-header">
       <div>
         <h3 class="page-title">医生预警工作台</h3>
-        <p class="page-subtitle">聚焦高风险患者，支持快捷筛选与分页查看</p>
       </div>
       <div class="page-actions">
         <el-button :loading="loading" @click="loadData">刷新</el-button>
@@ -37,7 +36,11 @@
     </div>
 
     <el-table :data="alerts" v-loading="loading" border empty-text="暂无匹配预警，试试调整筛选条件">
-      <el-table-column prop="userId" label="患者ID" width="90" />
+      <el-table-column prop="userId" label="患者ID" width="90">
+        <template #default="scope">
+          <router-link :to="`/doctor/patients/${scope.row.userId}`" class="patient-link">{{ scope.row.userId }}</router-link>
+        </template>
+      </el-table-column>
       <el-table-column prop="indicatorType" label="指标" width="90" />
       <el-table-column prop="value" label="数值" width="120" />
       <el-table-column prop="level" label="等级" width="90" />
@@ -156,7 +159,13 @@ const riskTagType = (level) => {
 }
 
 const handle = async (row) => {
-  const { value } = await ElMessageBox.prompt('请输入处理意见', '预警闭环', { confirmButtonText: '确认', cancelButtonText: '取消' })
+  const { value } = await ElMessageBox.prompt('请输入处理意见', '预警闭环', {
+    confirmButtonText: '确认',
+    cancelButtonText: '取消',
+    closeOnClickModal: false,
+    closeOnPressEscape: false,
+    showClose: false
+  })
   await handleDoctorAlertApi(row.id, { handleRemark: value })
   ElMessage.success('处理成功')
   await loadData()
@@ -166,7 +175,10 @@ const quickHandle = async (row) => {
   await ElMessageBox.confirm('将使用默认处理意见“已电话随访，建议持续监测”，确认继续？', '一键闭环', {
     confirmButtonText: '确认',
     cancelButtonText: '取消',
-    type: 'warning'
+    type: 'warning',
+    closeOnClickModal: false,
+    closeOnPressEscape: false,
+    showClose: false
   })
   await handleDoctorAlertApi(row.id, { handleRemark: '已电话随访，建议持续监测' })
   ElMessage.success('已快速完成闭环处理')
@@ -232,5 +244,15 @@ onUnmounted(() => {
 :deep(.el-card__body) {
   padding-top: 14px;
   padding-bottom: 14px;
+}
+
+.patient-link {
+  color: var(--brand-1);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.patient-link:hover {
+  text-decoration: underline;
 }
 </style>

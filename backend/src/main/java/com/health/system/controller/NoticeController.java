@@ -23,7 +23,9 @@ public class NoticeController {
 
     @GetMapping
     public ApiResponse<List<SystemNotice>> listOnline(Authentication authentication) {
-        return ApiResponse.success(systemNoticeService.listNotices(false, null, null, null, resolveRoleType(authentication)));
+        String roleType = resolveRoleType(authentication);
+        String username = authentication != null ? authentication.getName() : null;
+        return ApiResponse.success(systemNoticeService.listNoticesForUser(false, null, null, null, roleType, username));
     }
 
     private String resolveRoleType(Authentication authentication) {

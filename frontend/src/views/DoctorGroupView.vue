@@ -3,7 +3,6 @@
     <div class="page-header">
       <div>
         <h3 class="page-title">医生群组管理</h3>
-        <p class="page-subtitle">聚焦团队分工与患者归属，统一维护成员关系</p>
       </div>
       <div class="page-actions">
         <el-button :loading="loading" @click="load">刷新</el-button>
@@ -45,7 +44,16 @@
     </div>
   </el-card>
 
-  <el-dialog v-model="createDialogVisible" title="新建群组" width="520px">
+  <el-dialog
+    v-model="createDialogVisible"
+    title="新建群组"
+    width="520px"
+    center
+    align-center
+    :close-on-click-modal="false"
+    :close-on-press-escape="false"
+    :show-close="false"
+  >
     <el-form :model="createForm" label-width="92px">
       <el-form-item label="群组名称">
         <el-input v-model="createForm.groupName" maxlength="64" show-word-limit placeholder="例如：心血管随访组" />
@@ -60,7 +68,16 @@
     </template>
   </el-dialog>
 
-  <el-dialog v-model="memberDialogVisible" :title="`成员管理 - ${activeGroup?.groupName || ''}`" width="860px">
+  <el-dialog
+    v-model="memberDialogVisible"
+    :title="`成员管理 - ${activeGroup?.groupName || ''}`"
+    width="860px"
+    center
+    align-center
+    :close-on-click-modal="true"
+    :close-on-press-escape="false"
+    :show-close="false"
+  >
     <div class="member-toolbar">
       <div class="member-count">患者 {{ patients.length }} 人</div>
       <div class="member-count">医生 {{ doctors.length }} 人</div>
@@ -74,9 +91,10 @@
           <el-table-column prop="username" label="用户名" />
           <el-table-column prop="name" label="姓名" />
           <el-table-column prop="phone" label="手机号" />
-          <el-table-column label="操作" width="160">
+          <el-table-column label="操作" width="220">
             <template #default="scope">
-              <el-button link type="primary" @click="goPatientInsight(scope.row)">查看档案与趋势</el-button>
+              <el-button link type="primary" @click="goPatientInsight(scope.row)">查看档案</el-button>
+              <el-button link type="danger" @click="removePatient(scope.row)">移除</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -87,12 +105,26 @@
           <el-table-column prop="username" label="用户名" />
           <el-table-column prop="name" label="姓名" />
           <el-table-column prop="phone" label="手机号" />
+          <el-table-column label="操作" width="100">
+            <template #default="scope">
+              <el-button link type="danger" @click="removeDoctor(scope.row)">移除</el-button>
+            </template>
+          </el-table-column>
         </el-table>
       </el-tab-pane>
     </el-tabs>
   </el-dialog>
 
-  <el-dialog v-model="addMemberVisible" :title="`添加成员 - ${activeGroup?.groupName || ''}`" width="520px">
+  <el-dialog
+    v-model="addMemberVisible"
+    :title="`添加成员 - ${activeGroup?.groupName || ''}`"
+    width="520px"
+    center
+    align-center
+    :close-on-click-modal="false"
+    :close-on-press-escape="false"
+    :show-close="false"
+  >
     <el-form :model="memberForm" label-width="90px">
       <el-form-item label="成员类型">
         <el-segmented v-model="memberForm.memberType" :options="memberTypeOptions" />
@@ -111,14 +143,16 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   addDoctorGroupDoctorApi,
   addDoctorGroupPatientApi,
   createDoctorGroupApi,
   getDoctorGroupsApi,
   listDoctorGroupDoctorsApi,
-  listDoctorGroupPatientsApi
+  listDoctorGroupPatientsApi,
+  removeDoctorGroupDoctorApi,
+  removeDoctorGroupPatientApi
 } from '../api/modules'
 
 const router = useRouter()
@@ -194,6 +228,18 @@ const createGroup = async () => {
     ElMessage.warning('请输入群组名称')
     return
   }
+  try {
+    await ElMessageBox.confirm('确认创建该群组？', '创建确认', {
+      type: 'warning',
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      closeOnClickModal: false,
+      closeOnPressEscape: false,
+      showClose: false
+    })
+  } catch {
+    return
+  }
   saving.value = true
   try {
     await createDoctorGroupApi({
@@ -252,6 +298,20 @@ const submitAddMember = async () => {
     return
   }
 
+  try {
+    const roleLabel = memberForm.value.memberType === 'PATIENT' ? '患者' : '医生'
+    await ElMessageBox.confirm(`确认添加该${roleLabel}(ID:${userId})到群组？`, '添加确认', {
+      type: 'warning',
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      closeOnClickModal: false,
+      closeOnPressEscape: false,
+      showClose: false
+    })
+  } catch {
+    return
+  }
+
   memberSaving.value = true
   try {
     if (memberForm.value.memberType === 'PATIENT') {
@@ -271,6 +331,52 @@ const submitAddMember = async () => {
 
 const goPatientInsight = (row) => {
   router.push(`/doctor/patients/${row.id}`)
+}
+
+const removePatient = async (row) => {
+  if (!activeGroup.value) return
+  try {
+    await ElMessageBox.confirm(`确定将患者 ${row.name || row.username} 移出群组？`, '移除确认', {
+      type: 'warning',
+      confirmButtonText: '确认移除',
+      cancelButtonText: '取消',
+      closeOnClickModal: false,
+      closeOnPressEscape: false,
+      showClose: false
+    })
+  } catch {
+    return
+  }
+  try {
+    await removeDoctorGroupPatientApi(activeGroup.value.id, row.id)
+    ElMessage.success('患者已移除')
+    await loadMembers(activeGroup.value.id)
+  } catch (err) {
+    ElMessage.error(err?.message || '移除失败')
+  }
+}
+
+const removeDoctor = async (row) => {
+  if (!activeGroup.value) return
+  try {
+    await ElMessageBox.confirm(`确定将医生 ${row.name || row.username} 移出群组？`, '移除确认', {
+      type: 'warning',
+      confirmButtonText: '确认移除',
+      cancelButtonText: '取消',
+      closeOnClickModal: false,
+      closeOnPressEscape: false,
+      showClose: false
+    })
+  } catch {
+    return
+  }
+  try {
+    await removeDoctorGroupDoctorApi(activeGroup.value.id, row.id)
+    ElMessage.success('医生已移除')
+    await loadMembers(activeGroup.value.id)
+  } catch (err) {
+    ElMessage.error(err?.message || '移除失败')
+  }
 }
 
 onMounted(load)

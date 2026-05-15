@@ -51,6 +51,7 @@ public class PatientArchiveServiceImpl implements PatientArchiveService {
         if (archive.getId() == null) {
             patientArchiveMapper.insert(archive);
         } else {
+            archive.setUpdateTime(null);
             patientArchiveMapper.updateById(archive);
         }
     }
@@ -66,7 +67,9 @@ public class PatientArchiveServiceImpl implements PatientArchiveService {
     }
 
     private Long getCurrentUserId(String username) {
-        User user = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, username));
+        User user = userMapper.selectOne(new LambdaQueryWrapper<User>()
+                .select(User::getId, User::getRoleType, User::getStatus)
+                .eq(User::getUsername, username));
         if (user == null) {
             throw BusinessException.notFound("用户不存在");
         }

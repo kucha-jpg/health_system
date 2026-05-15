@@ -17,5 +17,9 @@ public interface DoctorGroupService {
 
     void addPatientToGroup(String doctorUsername, Long groupId, Long patientUserId);
 
+    void removePatientFromGroup(String doctorUsername, Long groupId, Long patientUserId);
+
     List<User> listGroupPatients(String doctorUsername, Long groupId);
+
+    void removeDoctorFromGroup(String doctorUsername, Long groupId, Long doctorUserId);
 }

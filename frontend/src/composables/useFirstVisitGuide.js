@@ -13,7 +13,10 @@ export const showFirstVisitGuide = async ({
   await nextTick()
   await ElMessageBox.alert(message, title, {
     confirmButtonText,
-    type: 'info'
+    type: 'info',
+    closeOnClickModal: false,
+    closeOnPressEscape: false,
+    showClose: false
   })
   window.localStorage.setItem(storageKey, '1')
   return true

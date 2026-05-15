@@ -3,7 +3,6 @@
     <div class="page-header">
       <div>
         <h3 class="page-title">角色权限管理</h3>
-        <p class="page-subtitle">统一维护系统角色权限字符串，保持鉴权规则清晰可控</p>
       </div>
       <div class="page-actions">
         <el-button @click="load">刷新</el-button>
@@ -47,7 +46,10 @@ const edit = async (row) => {
   const { value } = await ElMessageBox.prompt('请输入新的权限字符串', `编辑 ${row.roleName}`, {
     inputValue: row.permission,
     confirmButtonText: '保存',
-    cancelButtonText: '取消'
+    cancelButtonText: '取消',
+    closeOnClickModal: false,
+    closeOnPressEscape: false,
+    showClose: false
   })
   await updateRolePermissionApi({ id: row.id, permission: value })
   ElMessage.success('更新成功')

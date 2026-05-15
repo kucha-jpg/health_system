@@ -3,7 +3,6 @@
     <div class="page-header">
       <div>
         <h3 class="page-title">系统操作日志</h3>
-        <p class="page-subtitle">检索与导出操作日志</p>
       </div>
       <div class="page-actions">
         <el-button @click="load">刷新</el-button>
@@ -125,8 +124,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { listOperationLogsPageApi } from '../api/modules'
-import { authStore } from '../stores/auth'
+import { listOperationLogsPageApi, exportOperationLogsApi } from '../api/modules'
 
 const logs = ref([])
 const total = ref(0)
@@ -298,52 +296,48 @@ const exportLogs = async () => {
       await ElMessageBox.confirm(
         `当前导出条数为 ${exportLimit.value}，可能耗时较长，是否继续？`,
         '导出确认',
-        { type: 'warning' }
+        {
+          type: 'warning',
+          confirmButtonText: '确认',
+          cancelButtonText: '取消',
+          closeOnClickModal: false,
+          closeOnPressEscape: false,
+          showClose: false
+        }
       )
     } catch {
       return
     }
   }
 
-  const params = new URLSearchParams()
-  params.append('limit', String(exportLimit.value))
-  if (query.value.keyword) params.append('keyword', query.value.keyword)
-  if (query.value.roleType) params.append('roleType', query.value.roleType)
+  const apiParams = { limit: String(exportLimit.value) }
+  if (query.value.keyword) apiParams.keyword = query.value.keyword
+  if (query.value.roleType) apiParams.roleType = query.value.roleType
   if (query.value.success !== null && query.value.success !== undefined) {
-    params.append('success', String(query.value.success))
+    apiParams.success = String(query.value.success)
   }
   if (query.value.range?.length === 2) {
-    params.append('startTime', query.value.range[0])
-    params.append('endTime', query.value.range[1])
+    apiParams.startTime = query.value.range[0]
+    apiParams.endTime = query.value.range[1]
   }
 
-  const url = `/api/admin/logs/export?${params.toString()}`
-  const res = await fetch(url, {
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${authStore.token}`
+  try {
+    const { blob, requestedLimit, effectiveLimit } = await exportOperationLogsApi(apiParams)
+    const objectUrl = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = objectUrl
+    link.download = `operation_logs_${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(objectUrl)
+    if (effectiveLimit < requestedLimit) {
+      ElMessage.warning(`导出成功，已按上限裁剪：请求 ${requestedLimit} 条，实际 ${effectiveLimit} 条`)
+    } else {
+      ElMessage.success(`导出成功：${effectiveLimit} 条`)
     }
-  })
-  if (!res.ok) {
+  } catch {
     ElMessage.error('导出失败')
-    return
-  }
-
-  const blob = await res.blob()
-  const requestedLimit = Number(res.headers.get('X-Requested-Limit') || exportLimit.value)
-  const effectiveLimit = Number(res.headers.get('X-Effective-Limit') || exportLimit.value)
-  const objectUrl = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = objectUrl
-  link.download = `operation_logs_${new Date().toISOString().slice(0, 10)}.csv`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(objectUrl)
-  if (effectiveLimit < requestedLimit) {
-    ElMessage.warning(`导出成功，已按上限裁剪：请求 ${requestedLimit} 条，实际 ${effectiveLimit} 条`)
-  } else {
-    ElMessage.success(`导出成功：${effectiveLimit} 条`)
   }
 }
 
@@ -358,7 +352,7 @@ onMounted(() => {
   }
   query.value.range = recent7DaysRange()
   load()
-  timer = window.setInterval(load, 5000)
+  timer = window.setInterval(load, 10000)
 })
 
 onUnmounted(() => {

@@ -3,7 +3,6 @@
     <div class="page-header">
       <div>
         <h3 class="page-title">系统监控总览</h3>
-        <p class="page-subtitle">平台数据总览</p>
       </div>
       <div class="page-actions">
         <el-button @click="exportCsv">导出监控概览</el-button>
@@ -77,9 +76,10 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import echarts from '../utils/echarts'
+import { csvEscape, downloadCsv } from '../utils/csv'
 import { ElMessage } from 'element-plus'
 import { getMonitorOverviewApi } from '../api/modules'
-import { CHART_PALETTE, CHART_SPLIT_LINE } from '../constants/chart-theme'
+import { CHART_PALETTE, CHART_SPLIT_LINE, toIndicatorLabel } from '../constants/chart-theme'
 import { showFirstVisitGuide } from '../composables/useFirstVisitGuide'
 
 const overview = ref({})
@@ -95,21 +95,6 @@ let indicatorPieChart = null
 let groupBarChart = null
 let userBarChart = null
 
-const INDICATOR_LABEL_MAP = {
-  BLOOD_PRESSURE: '血压',
-  BLOOD_SUGAR: '血糖',
-  WEIGHT: '体重',
-  MEDICATION: '服药',
-  HEART_RATE: '心率',
-  TEMPERATURE: '体温',
-  OXYGEN_SATURATION: '血氧'
-}
-
-const toIndicatorLabel = (value) => {
-  const key = String(value || '').trim()
-  return INDICATOR_LABEL_MAP[key] || key
-}
-
 const latestHealthData = computed(() => overview.value?.latestHealthData || [])
 const pagedLatestHealthData = computed(() => {
   const start = (latestPageNo.value - 1) * latestPageSize.value
@@ -121,6 +106,7 @@ const renderCharts = async () => {
 
   if (dailyTrendRef.value) {
     if (!dailyTrendChart) dailyTrendChart = echarts.init(dailyTrendRef.value)
+    dailyTrendChart.clear()
     const trend = overview.value?.dailyReportTrend || []
     dailyTrendChart.setOption({
       color: [CHART_PALETTE[1]],
@@ -133,6 +119,7 @@ const renderCharts = async () => {
 
   if (indicatorPieRef.value) {
     if (!indicatorPieChart) indicatorPieChart = echarts.init(indicatorPieRef.value)
+    indicatorPieChart.clear()
     const source = overview.value?.indicatorDistribution || []
     indicatorPieChart.setOption({
       color: CHART_PALETTE,
@@ -148,6 +135,7 @@ const renderCharts = async () => {
 
   if (groupBarRef.value) {
     if (!groupBarChart) groupBarChart = echarts.init(groupBarRef.value)
+    groupBarChart.clear()
     const source = overview.value?.groupStats || []
     groupBarChart.setOption({
       color: [CHART_PALETTE[0]],
@@ -160,6 +148,7 @@ const renderCharts = async () => {
 
   if (userBarRef.value) {
     if (!userBarChart) userBarChart = echarts.init(userBarRef.value)
+    userBarChart.clear()
     const source = overview.value?.activeUserStats || []
     userBarChart.setOption({
       color: [CHART_PALETTE[2]],
@@ -181,14 +170,6 @@ const load = async () => {
   } finally {
     loading.value = false
   }
-}
-
-const csvEscape = (value) => {
-  const text = String(value ?? '')
-  if (text.includes(',') || text.includes('"') || text.includes('\n')) {
-    return `"${text.replace(/"/g, '""')}"`
-  }
-  return text
 }
 
 const exportCsv = () => {

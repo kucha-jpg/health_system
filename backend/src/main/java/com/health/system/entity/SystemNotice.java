@@ -12,5 +12,6 @@ public class SystemNotice extends BaseEntity {
     private String title;
     private String content;
     private String targetRole;
+    private String targetUsername;
     private Integer status;
 }

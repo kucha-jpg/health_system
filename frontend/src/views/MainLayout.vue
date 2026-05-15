@@ -1,6 +1,6 @@
 <template>
   <div class="layout">
-    <aside class="sidebar">
+    <aside class="sidebar" :class="{ 'sidebar--hidden': sidebarCollapsed }">
       <div class="logo">
         <div class="logo-mark">H+</div>
         <div>
@@ -9,12 +9,12 @@
         </div>
       </div>
       <el-menu :default-active="$route.path" router>
-        <el-menu-item index="/home">工作首页</el-menu-item>
+        <el-menu-item index="/home">{{ role === 'ADMIN' ? '工作首页' : '首页' }}</el-menu-item>
 
         <el-menu-item-group v-if="role === 'ADMIN'" title="管理中心">
           <el-menu-item index="/admin/users">账号管理</el-menu-item>
           <el-menu-item index="/admin/notices">系统公告</el-menu-item>
-          <el-menu-item index="/admin/alert-rules">预警规则</el-menu-item>
+          <el-menu-item index="/admin/alert-rules">预警与指标配置</el-menu-item>
           <el-menu-item index="/admin/groups">群组治理</el-menu-item>
           <el-menu-item index="/admin/roles">角色权限</el-menu-item>
           <el-menu-item index="/admin/monitor">系统监控</el-menu-item>
@@ -27,7 +27,7 @@
           </el-menu-item>
         </el-menu-item-group>
 
-        <el-menu-item-group v-if="role === 'DOCTOR'" title="医生中心">
+        <template v-if="role === 'DOCTOR'">
           <el-menu-item index="/doctor/alerts">医生工作台</el-menu-item>
           <el-menu-item index="/doctor/groups">群组管理</el-menu-item>
           <el-menu-item index="/feedback">
@@ -36,7 +36,7 @@
               <el-badge v-if="unreadFeedbackCount > 0" :value="unreadFeedbackCount" :max="99" />
             </span>
           </el-menu-item>
-        </el-menu-item-group>
+        </template>
 
         <el-menu-item-group v-if="role === 'PATIENT'" title="患者中心">
           <el-menu-item index="/patient/archive">个人档案</el-menu-item>
@@ -57,6 +57,9 @@
     <main class="main-content">
       <div class="topbar">
         <div class="topbar-left">
+          <button class="sidebar-toggle" @click="toggleSidebar" aria-label="切换侧边栏">
+            <span></span><span></span><span></span>
+          </button>
           <el-button v-if="!isHome" size="small" plain @click="goBack">返回</el-button>
           <span v-else class="topbar-back-spacer" aria-hidden="true"></span>
           <span class="topbar-user">
@@ -68,7 +71,18 @@
           <el-select v-model="currentTheme" size="small" class="theme-switch" @change="applyTheme">
             <el-option v-for="item in themeOptions" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
-          <el-button v-if="role === 'DOCTOR' && $route.path !== '/doctor/alerts'" size="small" type="warning" plain @click="router.push('/doctor/alerts')">查看预警</el-button>
+          <template v-if="role === 'DOCTOR'">
+            <div class="patient-search">
+              <input
+                v-model="patientSearchId"
+                class="patient-search-input"
+                placeholder="患者ID"
+                @keyup.enter="searchPatient"
+              />
+              <el-button size="small" type="primary" @click="searchPatient">查患者</el-button>
+            </div>
+            <el-button v-if="$route.path !== '/doctor/alerts'" size="small" type="warning" plain @click="router.push('/doctor/alerts')">查看预警</el-button>
+          </template>
           <el-button size="small" @click="logout">退出</el-button>
         </div>
       </div>
@@ -80,7 +94,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { authStore } from '../stores/auth'
 import { getPendingFeedbackCountApi, getUnreadFeedbackCountApi, validateSessionApi } from '../api/modules'
 import { themeOptions } from '../constants/layout'
@@ -89,6 +103,18 @@ const router = useRouter()
 const route = useRoute()
 const role = authStore.role
 const name = authStore.name || '用户'
+const sidebarCollapsed = ref(false)
+const toggleSidebar = () => { sidebarCollapsed.value = !sidebarCollapsed.value }
+const patientSearchId = ref('')
+const searchPatient = () => {
+  const id = String(patientSearchId.value || '').trim()
+  if (!id) {
+    ElMessage.warning('请输入患者ID')
+    return
+  }
+  patientSearchId.value = ''
+  router.push(`/doctor/patients/${id}`)
+}
 let sessionTimer = null
 let feedbackTimer = null
 const pendingFeedbackCount = ref(0)
@@ -121,7 +147,10 @@ const logout = async () => {
     await ElMessageBox.confirm('确认退出当前登录吗？', '退出确认', {
       confirmButtonText: '确认退出',
       cancelButtonText: '取消',
-      type: 'warning'
+      type: 'warning',
+      closeOnClickModal: false,
+      closeOnPressEscape: false,
+      showClose: false
     })
     authStore.clear()
     router.push('/login')
@@ -176,7 +205,7 @@ onMounted(() => {
   loadUnreadFeedbackCount()
   sessionTimer = window.setInterval(async () => {
     await checkSession()
-  }, 5000)
+  }, 10000)
   feedbackTimer = window.setInterval(async () => {
     await loadPendingFeedbackCount()
     await loadUnreadFeedbackCount()
@@ -201,6 +230,33 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.sidebar-toggle {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 32px;
+  height: 32px;
+  padding: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.sidebar-toggle:hover {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.sidebar-toggle span {
+  display: block;
+  width: 100%;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--ink-2);
+}
+
 .logo-title {
   font-size: 16px;
   font-weight: 700;
@@ -247,6 +303,34 @@ onUnmounted(() => {
   flex-wrap: wrap;
 }
 
+.patient-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.patient-search-input {
+  width: 100px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid rgba(var(--brand-rgb), 0.3);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+  color: var(--ink-1);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.patient-search-input:focus {
+  border-color: rgba(var(--brand-rgb), 0.6);
+}
+
+.patient-search-input::placeholder {
+  color: var(--ink-2);
+  opacity: 0.6;
+}
+
 .theme-switch {
   width: 104px;
 }
@@ -266,7 +350,15 @@ onUnmounted(() => {
   box-shadow: 0 0 0 3px rgba(var(--brand-rgb), 0.22);
 }
 
-@media (max-width: 760px) {
+@media (max-width: 900px) {
+  .sidebar-toggle {
+    display: flex;
+  }
+
+  .sidebar--hidden {
+    display: none;
+  }
+
   .theme-switch {
     width: 100%;
   }

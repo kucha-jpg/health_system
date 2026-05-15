@@ -7,7 +7,9 @@ import java.util.regex.Pattern;
 
 public final class SecurityInputSanitizer {
 
-    private static final Pattern SQLI_PATTERN = Pattern.compile("(--|/\\*|\\*/|;|\\b(select|union|drop|insert|update|delete|truncate|alter)\\b)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern SQLI_PATTERN = Pattern.compile(
+            "(--|/\\*|\\*/|\\b(select|union|drop|insert|update|delete|truncate|alter)\\b)",
+            Pattern.CASE_INSENSITIVE);
     private static final Set<String> ROLE_TYPES = Set.of("ADMIN", "DOCTOR", "PATIENT");
 
     private SecurityInputSanitizer() {

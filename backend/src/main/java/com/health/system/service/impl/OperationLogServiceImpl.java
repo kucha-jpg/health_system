@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.health.system.dto.OperationLogQueryDTO;
 import com.health.system.entity.OperationLog;
 import com.health.system.mapper.OperationLogMapper;
@@ -38,12 +39,12 @@ public class OperationLogServiceImpl implements OperationLogService {
     @Override
     public List<OperationLog> latestLogs(int limit, OperationLogQueryDTO query) {
         LambdaQueryWrapper<OperationLog> wrapper = new LambdaQueryWrapper<OperationLog>()
-                .orderByDesc(OperationLog::getCreateTime)
-                .last("limit " + Math.max(limit, 1));
+                .orderByDesc(OperationLog::getCreateTime);
 
         applyFilters(wrapper, query);
 
-        return operationLogMapper.selectList(wrapper);
+        Page<OperationLog> page = operationLogMapper.selectPage(new Page<>(1, Math.max(limit, 1)), wrapper);
+        return page.getRecords();
     }
 
     @Override
@@ -54,28 +55,21 @@ public class OperationLogServiceImpl implements OperationLogService {
         int pageSize = safeInt(pageSizeObj, 20);
         int safePageNo = Math.min(Math.max(pageNo, 1), 1000);
         int safePageSize = Math.min(Math.max(pageSize, 1), 200);
-        int offset = (safePageNo - 1) * safePageSize;
-
-        LambdaQueryWrapper<OperationLog> countWrapper = new LambdaQueryWrapper<>();
-        applyFilters(countWrapper, query);
-        long total = operationLogMapper.selectCount(countWrapper);
 
         LambdaQueryWrapper<OperationLog> pageWrapper = new LambdaQueryWrapper<OperationLog>()
-                .orderByDesc(OperationLog::getCreateTime)
-                .last("limit " + offset + "," + safePageSize);
+                .orderByDesc(OperationLog::getCreateTime);
         applyFilters(pageWrapper, query);
 
-        List<OperationLog> records = operationLogMapper.selectList(pageWrapper);
+        Page<OperationLog> page = operationLogMapper.selectPage(new Page<>(safePageNo, safePageSize), pageWrapper);
         Map<String, Object> result = new HashMap<>();
-        result.put("records", records);
-        result.put("total", total);
+        result.put("records", page.getRecords());
+        result.put("total", page.getTotal());
         result.put("pageNo", safePageNo);
         result.put("pageSize", safePageSize);
         return result;
     }
 
     private void applyFilters(LambdaQueryWrapper<OperationLog> wrapper, OperationLogQueryDTO query) {
-
         String keyword = query == null ? null : query.getKeyword();
         String roleType = query == null ? null : query.getRoleType();
         Integer success = query == null ? null : query.getSuccess();

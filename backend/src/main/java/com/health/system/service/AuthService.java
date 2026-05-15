@@ -8,5 +8,5 @@ import java.util.Map;
 public interface AuthService {
     Map<String, Object> login(LoginRequest request);
 
-    void register(RegisterRequest request);
+    Map<String, Object> register(RegisterRequest request);
 }

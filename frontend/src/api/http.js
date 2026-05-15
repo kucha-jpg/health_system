@@ -2,16 +2,22 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import { authStore } from '../stores/auth'
 
+/**
+ * Central HTTP client with auth token injection and unified error handling.
+ * Response interceptor unwraps `data` from the standard ApiResponse envelope.
+ * Supports __skipErrorToast and __skipAuthRedirect per-request flags.
+ */
 const http = axios.create({
   baseURL: '/api',
   timeout: 10000
 })
 
+/** @param {string} message */
 const showError = (message) => {
   ElMessage.error({
     message,
     duration: 5000,
-    showClose: true
+    showClose: false
   })
 }
 

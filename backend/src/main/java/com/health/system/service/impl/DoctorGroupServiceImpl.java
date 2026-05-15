@@ -6,13 +6,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.health.system.common.BusinessException;
 import com.health.system.common.CacheNames;
+import com.health.system.config.CacheEvictionSupport;
 import com.health.system.dto.DoctorGroupDTO;
 import com.health.system.entity.DoctorGroup;
 import com.health.system.entity.DoctorGroupDoctorMember;
@@ -33,24 +32,23 @@ public class DoctorGroupServiceImpl implements DoctorGroupService {
     private final DoctorGroupMemberMapper doctorGroupMemberMapper;
     private final UserMapper userMapper;
     private final DoctorAccessSupport doctorAccessSupport;
+    private final CacheEvictionSupport cacheEvictionSupport;
 
     public DoctorGroupServiceImpl(DoctorGroupMapper doctorGroupMapper,
                                   DoctorGroupDoctorMemberMapper doctorGroupDoctorMemberMapper,
                                   DoctorGroupMemberMapper doctorGroupMemberMapper,
                                   UserMapper userMapper,
-                                  DoctorAccessSupport doctorAccessSupport) {
+                                  DoctorAccessSupport doctorAccessSupport,
+                                  CacheEvictionSupport cacheEvictionSupport) {
         this.doctorGroupMapper = doctorGroupMapper;
         this.doctorGroupDoctorMemberMapper = doctorGroupDoctorMemberMapper;
         this.doctorGroupMemberMapper = doctorGroupMemberMapper;
         this.userMapper = userMapper;
         this.doctorAccessSupport = doctorAccessSupport;
+        this.cacheEvictionSupport = cacheEvictionSupport;
     }
 
     @Override
-        @Caching(evict = {
-            @CacheEvict(cacheNames = CacheNames.DOCTOR_PATIENT_INSIGHT, allEntries = true),
-            @CacheEvict(cacheNames = CacheNames.DOCTOR_OPEN_ALERTS, allEntries = true)
-        })
     public void createGroup(String doctorUsername, DoctorGroupDTO dto) {
         User doctor = doctorAccessSupport.requireDoctor(doctorUsername);
         DoctorGroup group = new DoctorGroup();
@@ -58,6 +56,7 @@ public class DoctorGroupServiceImpl implements DoctorGroupService {
         group.setGroupName(dto.getGroupName());
         group.setDescription(dto.getDescription());
         doctorGroupMapper.insert(group);
+        evictGroupRelatedCaches();
     }
 
     @Override
@@ -75,16 +74,20 @@ public class DoctorGroupServiceImpl implements DoctorGroupService {
             return ownedGroups;
         }
 
-        List<Long> memberGroupIds = myMemberships.stream().map(DoctorGroupDoctorMember::getGroupId).toList();
-        List<DoctorGroup> memberGroups = doctorGroupMapper.selectBatchIds(memberGroupIds);
-
+        List<Long> memberGroupIds = myMemberships.stream()
+                .map(DoctorGroupDoctorMember::getGroupId)
+                .distinct()
+                .toList();
         Map<Long, DoctorGroup> merged = new LinkedHashMap<>();
         for (DoctorGroup item : ownedGroups) {
             merged.put(item.getId(), item);
         }
-        for (DoctorGroup item : memberGroups) {
-            if (item != null) {
-                merged.put(item.getId(), item);
+        if (!memberGroupIds.isEmpty()) {
+            List<DoctorGroup> memberGroups = doctorGroupMapper.selectBatchIds(memberGroupIds);
+            for (DoctorGroup item : memberGroups) {
+                if (item != null) {
+                    merged.putIfAbsent(item.getId(), item);
+                }
             }
         }
 
@@ -94,10 +97,6 @@ public class DoctorGroupServiceImpl implements DoctorGroupService {
     }
 
     @Override
-        @Caching(evict = {
-            @CacheEvict(cacheNames = CacheNames.DOCTOR_PATIENT_INSIGHT, allEntries = true),
-            @CacheEvict(cacheNames = CacheNames.DOCTOR_OPEN_ALERTS, allEntries = true)
-        })
     public void addDoctorToGroup(String doctorUsername, Long groupId, Long doctorUserId) {
         User operator = doctorAccessSupport.requireDoctor(doctorUsername);
         DoctorGroup group = doctorGroupMapper.selectById(groupId);
@@ -117,6 +116,11 @@ public class DoctorGroupServiceImpl implements DoctorGroupService {
             return;
         }
 
+        int restored = doctorGroupDoctorMemberMapper.restoreDeletedByGroupAndDoctor(groupId, doctorUserId);
+        if (restored > 0) {
+            evictGroupRelatedCaches();
+            return;
+        }
         DoctorGroupDoctorMember exists = doctorGroupDoctorMemberMapper.selectOne(new LambdaQueryWrapper<DoctorGroupDoctorMember>()
                 .eq(DoctorGroupDoctorMember::getGroupId, groupId)
                 .eq(DoctorGroupDoctorMember::getDoctorUserId, doctorUserId));
@@ -128,6 +132,7 @@ public class DoctorGroupServiceImpl implements DoctorGroupService {
         member.setGroupId(groupId);
         member.setDoctorUserId(doctorUserId);
         doctorGroupDoctorMemberMapper.insert(member);
+        evictGroupRelatedCaches();
     }
 
     @Override
@@ -160,16 +165,17 @@ public class DoctorGroupServiceImpl implements DoctorGroupService {
     }
 
     @Override
-        @Caching(evict = {
-            @CacheEvict(cacheNames = CacheNames.DOCTOR_PATIENT_INSIGHT, allEntries = true),
-            @CacheEvict(cacheNames = CacheNames.DOCTOR_OPEN_ALERTS, allEntries = true)
-        })
     public void addPatientToGroup(String doctorUsername, Long groupId, Long patientUserId) {
         User doctor = doctorAccessSupport.requireDoctor(doctorUsername);
         doctorAccessSupport.assertGroupAccessible(doctor.getId(), groupId);
         User patient = userMapper.selectById(patientUserId);
         if (patient == null || !"PATIENT".equals(patient.getRoleType())) {
             throw BusinessException.notFound("患者不存在");
+        }
+        int restored = doctorGroupMemberMapper.restoreDeletedByGroupAndPatient(groupId, patientUserId);
+        if (restored > 0) {
+            evictGroupRelatedCaches();
+            return;
         }
         DoctorGroupMember exists = doctorGroupMemberMapper.selectOne(new LambdaQueryWrapper<DoctorGroupMember>()
                 .eq(DoctorGroupMember::getGroupId, groupId)
@@ -181,6 +187,44 @@ public class DoctorGroupServiceImpl implements DoctorGroupService {
         member.setGroupId(groupId);
         member.setPatientUserId(patientUserId);
         doctorGroupMemberMapper.insert(member);
+        evictGroupRelatedCaches();
+    }
+
+    @Override
+    public void removePatientFromGroup(String doctorUsername, Long groupId, Long patientUserId) {
+        User doctor = doctorAccessSupport.requireDoctor(doctorUsername);
+        doctorAccessSupport.assertGroupAccessible(doctor.getId(), groupId);
+        DoctorGroupMember member = doctorGroupMemberMapper.selectOne(new LambdaQueryWrapper<DoctorGroupMember>()
+                .eq(DoctorGroupMember::getGroupId, groupId)
+                .eq(DoctorGroupMember::getPatientUserId, patientUserId));
+        if (member == null) {
+            throw BusinessException.notFound("该患者不在群组中");
+        }
+        doctorGroupMemberMapper.deleteById(member.getId());
+        evictGroupRelatedCaches();
+    }
+
+    @Override
+    public void removeDoctorFromGroup(String doctorUsername, Long groupId, Long doctorUserId) {
+        User operator = doctorAccessSupport.requireDoctor(doctorUsername);
+        DoctorGroup group = doctorGroupMapper.selectById(groupId);
+        if (group == null) {
+            throw BusinessException.notFound("群组不存在");
+        }
+        if (!operator.getId().equals(group.getDoctorId())) {
+            throw BusinessException.forbidden("仅群组创建者可移除协作医生");
+        }
+        if (operator.getId().equals(doctorUserId)) {
+            throw BusinessException.badRequest("不能移除群组创建者自身");
+        }
+        DoctorGroupDoctorMember member = doctorGroupDoctorMemberMapper.selectOne(new LambdaQueryWrapper<DoctorGroupDoctorMember>()
+                .eq(DoctorGroupDoctorMember::getGroupId, groupId)
+                .eq(DoctorGroupDoctorMember::getDoctorUserId, doctorUserId));
+        if (member == null) {
+            throw BusinessException.notFound("该医生不在群组中");
+        }
+        doctorGroupDoctorMemberMapper.deleteById(member.getId());
+        evictGroupRelatedCaches();
     }
 
     @Override
@@ -199,4 +243,10 @@ public class DoctorGroupServiceImpl implements DoctorGroupService {
         return patients;
     }
 
+    private void evictGroupRelatedCaches() {
+        // Group membership changes affect all doctors' alert views and patient insights.
+        // Use clear() since the set of affected doctors is not known at this point.
+        cacheEvictionSupport.evictByPrefix(CacheNames.DOCTOR_OPEN_ALERTS, "");
+        cacheEvictionSupport.evictByPrefix(CacheNames.DOCTOR_PATIENT_INSIGHT, "");
+    }
 }

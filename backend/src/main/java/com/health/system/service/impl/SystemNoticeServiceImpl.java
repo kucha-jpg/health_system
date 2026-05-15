@@ -28,6 +28,15 @@ public class SystemNoticeServiceImpl implements SystemNoticeService {
 
     @Override
     public List<SystemNotice> listNotices(boolean includeOffline, String keyword, Integer status, String targetRole, String visibleRoleType) {
+        return doListNotices(includeOffline, keyword, status, targetRole, visibleRoleType, null);
+    }
+
+    @Override
+    public List<SystemNotice> listNoticesForUser(boolean includeOffline, String keyword, Integer status, String targetRole, String visibleRoleType, String visibleUsername) {
+        return doListNotices(includeOffline, keyword, status, targetRole, visibleRoleType, visibleUsername);
+    }
+
+    private List<SystemNotice> doListNotices(boolean includeOffline, String keyword, Integer status, String targetRole, String visibleRoleType, String visibleUsername) {
         String safeKeyword = SecurityInputSanitizer.sanitizeKeyword(keyword, 100, "公告关键词");
         String safeTargetRole = normalizeAudience(targetRole, false);
         String safeVisibleRoleType = normalizeVisibleRoleType(visibleRoleType);
@@ -48,7 +57,7 @@ public class SystemNoticeServiceImpl implements SystemNoticeService {
         List<SystemNotice> notices = systemNoticeMapper.selectList(wrapper);
         return notices.stream()
                 .filter(item -> matchesTargetRoleFilter(item, safeTargetRole))
-                .filter(item -> matchesVisibleRole(item, safeVisibleRoleType))
+                .filter(item -> matchesVisibleRole(item, safeVisibleRoleType, visibleUsername))
                 .toList();
     }
 
@@ -58,6 +67,7 @@ public class SystemNoticeServiceImpl implements SystemNoticeService {
         notice.setTitle(dto.getTitle());
         notice.setContent(NoticeContentSanitizer.sanitizeRichHtml(dto.getContent()));
         notice.setTargetRole(normalizeAudience(dto.getTargetRole(), true));
+        notice.setTargetUsername(StringUtils.hasText(dto.getTargetUsername()) ? dto.getTargetUsername().trim() : null);
         notice.setStatus(dto.getStatus());
         systemNoticeMapper.insert(notice);
     }
@@ -71,6 +81,7 @@ public class SystemNoticeServiceImpl implements SystemNoticeService {
         exists.setTitle(dto.getTitle());
         exists.setContent(NoticeContentSanitizer.sanitizeRichHtml(dto.getContent()));
         exists.setTargetRole(normalizeAudience(dto.getTargetRole(), true));
+        exists.setTargetUsername(StringUtils.hasText(dto.getTargetUsername()) ? dto.getTargetUsername().trim() : null);
         exists.setStatus(dto.getStatus());
         systemNoticeMapper.updateById(exists);
     }
@@ -112,9 +123,13 @@ public class SystemNoticeServiceImpl implements SystemNoticeService {
         return filterTargetRole.equals(resolveAudience(item));
     }
 
-    private boolean matchesVisibleRole(SystemNotice item, String visibleRoleType) {
+    private boolean matchesVisibleRole(SystemNotice item, String visibleRoleType, String visibleUsername) {
         if (!StringUtils.hasText(visibleRoleType)) {
             return true;
+        }
+        // Targeted notice: only show to the specific user
+        if (StringUtils.hasText(item.getTargetUsername())) {
+            return StringUtils.hasText(visibleUsername) && item.getTargetUsername().equals(visibleUsername);
         }
         String audience = resolveAudience(item);
         return AUDIENCE_ALL.equals(audience) || visibleRoleType.equals(audience);

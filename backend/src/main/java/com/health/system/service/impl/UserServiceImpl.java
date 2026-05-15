@@ -84,6 +84,9 @@ public class UserServiceImpl implements UserService {
         userMapper.insert(user);
 
         Role role = roleMapper.selectOne(new LambdaQueryWrapper<Role>().eq(Role::getRoleName, dto.getRoleType()));
+        if (role == null) {
+            throw BusinessException.notFound("系统未配置" + dto.getRoleType() + "角色");
+        }
         UserRole userRole = new UserRole();
         userRole.setUserId(user.getId());
         userRole.setRoleId(role.getId());
@@ -103,6 +106,9 @@ public class UserServiceImpl implements UserService {
         userMapper.updateById(user);
 
         Role role = roleMapper.selectOne(new LambdaQueryWrapper<Role>().eq(Role::getRoleName, dto.getRoleType()));
+        if (role == null) {
+            throw BusinessException.notFound("系统未配置" + dto.getRoleType() + "角色");
+        }
         UserRole userRole = userRoleMapper.selectOne(new LambdaQueryWrapper<UserRole>().eq(UserRole::getUserId, user.getId()));
         if (userRole != null) {
             userRole.setRoleId(role.getId());

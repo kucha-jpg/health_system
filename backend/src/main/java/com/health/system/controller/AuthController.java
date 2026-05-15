@@ -29,9 +29,8 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ApiResponse<Void> register(@Valid @RequestBody RegisterRequest request) {
-        authService.register(request);
-        return ApiResponse.success("注册成功", null);
+    public ApiResponse<Map<String, Object>> register(@Valid @RequestBody RegisterRequest request) {
+        return ApiResponse.success("注册成功", authService.register(request));
     }
 
     @GetMapping("/ping")

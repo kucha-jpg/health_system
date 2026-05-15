@@ -21,3 +21,18 @@ export const CHART_SPLIT_LINE = {
     type: 'dashed'
   }
 }
+
+export const INDICATOR_LABEL_MAP = {
+  BLOOD_PRESSURE: '血压',
+  BLOOD_SUGAR: '血糖',
+  WEIGHT: '体重',
+  MEDICATION: '服药',
+  HEART_RATE: '心率',
+  TEMPERATURE: '体温',
+  OXYGEN_SATURATION: '血氧'
+}
+
+export const toIndicatorLabel = (value) => {
+  const key = String(value || '').trim()
+  return INDICATOR_LABEL_MAP[key] || key
+}

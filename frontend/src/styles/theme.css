@@ -291,10 +291,6 @@ body::after {
   font-family: 'Noto Serif SC', 'Noto Sans SC', serif;
 }
 
-.page-subtitle {
-  display: none;
-}
-
 .page-actions {
   display: inline-flex;
   align-items: center;
@@ -302,7 +298,22 @@ body::after {
   flex-wrap: wrap;
 }
 
-.page-actions .el-button,
+.page-actions .el-button {
+  min-height: 34px;
+  border: 1px solid rgba(var(--brand-rgb), 0.26) !important;
+  border-radius: 8px !important;
+  background: rgba(255, 255, 255, 0.56) !important;
+  padding: 6px 14px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+  font-weight: 500;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.page-actions .el-button:hover {
+  background: rgba(255, 255, 255, 0.78) !important;
+  border-color: rgba(var(--brand-rgb), 0.5) !important;
+}
+
 .page-actions .el-input,
 .page-actions .el-select,
 .page-actions .el-date-editor {
@@ -310,12 +321,15 @@ body::after {
 }
 
 .soft-tip {
-  padding: 9px 12px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.66);
-  background: rgba(255, 255, 255, 0.44);
+  padding: 8px 14px;
+  margin: 10px 0 12px;
+  max-width: 680px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.4);
   font-size: 12px;
   color: var(--ink-2);
+  line-height: 1.6;
 }
 
 .empty-state {
@@ -585,11 +599,13 @@ body::after {
   order: 2;
 }
 
-.el-message {
+body > .el-message {
   top: 50% !important;
   left: 50% !important;
   right: auto !important;
+  bottom: auto !important;
   transform: translate(-50%, -50%) !important;
+  margin-top: 0 !important;
 }
 
 .sidebar .el-menu {
@@ -655,6 +671,102 @@ body::after {
   }
 }
 
+.filter-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.filter-toolbar > .el-input { max-width: 240px; min-width: 140px; }
+.filter-toolbar > .el-select { min-width: 120px; width: auto; max-width: 160px; }
+.filter-toolbar > .el-date-editor { max-width: 320px; }
+.filter-toolbar > .el-input-number { max-width: 160px; }
+
+.filter-toolbar-compact > .el-input { max-width: 200px; }
+.filter-toolbar-compact > .el-select { max-width: 140px; }
+
+.filter-toolbar-secondary {
+  margin-top: 2px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.filter-toolbar .text-note {
+  font-size: 12px;
+  color: var(--ink-2);
+  white-space: nowrap;
+  margin-right: 4px;
+}
+
+.query-grid {
+  display: grid;
+  grid-template-columns: 220px 140px 140px 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+  align-items: center;
+}
+
+.query-grid > .el-input { max-width: 260px; }
+
+.query-grid .query-actions {
+  display: inline-flex;
+  gap: 8px;
+  justify-self: end;
+}
+
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.filter-row > .el-input { max-width: 200px; }
+.filter-row > .el-select { max-width: 150px; }
+
+.pager-row {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.chart-row {
+  margin-bottom: 12px;
+}
+
+.summary-row {
+  margin-bottom: 10px;
+}
+
+.summary-row .el-card {
+  padding: 8px 14px !important;
+}
+
+.summary-stat-card {
+  font-weight: 600;
+  color: #2f4952;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.summary-stat-card--warn { color: #8a4b28; }
+.summary-stat-card--danger { color: #8f2d2d; }
+
+.w-100 { width: 100px; }
+.w-120 { width: 120px; }
+.w-130 { width: 130px; }
+.w-140 { width: 140px; }
+.w-160 { width: 160px; }
+.w-170 { width: 170px; }
+.w-180 { width: 180px; }
+.w-220 { width: 220px; }
+.w-240 { width: 240px; }
+.w-320 { width: 320px; }
+.w-360 { width: 360px; }
+
 @media (max-width: 900px) {
   .layout {
     flex-direction: column;
@@ -674,5 +786,40 @@ body::after {
 
   .topbar {
     align-items: flex-start;
+  }
+
+  .query-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .query-grid .query-actions {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .filter-toolbar > .el-input,
+  .filter-toolbar > .el-select,
+  .filter-toolbar > .el-date-editor {
+    max-width: 100%;
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .query-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-toolbar > .el-input,
+  .filter-toolbar > .el-select,
+  .filter-toolbar > .el-date-editor,
+  .filter-toolbar > .el-input-number {
+    max-width: 100%;
+    min-width: 0;
   }
 }

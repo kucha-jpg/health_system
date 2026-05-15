@@ -6,16 +6,20 @@
 
       <el-form :model="form" class="auth-form" @submit.prevent>
         <el-form-item>
-          <el-input v-model="form.username" :placeholder="copy.usernamePlaceholder" size="large" @keyup.enter="onRegister" />
+          <el-input v-model="form.username" :placeholder="copy.usernamePlaceholder" size="large" @blur="validateUsername" @keyup.enter="onRegister" />
+          <p v-if="errors.username" class="field-error">{{ errors.username }}</p>
         </el-form-item>
         <el-form-item>
-          <el-input v-model="form.name" :placeholder="copy.namePlaceholder" size="large" @keyup.enter="onRegister" />
+          <el-input v-model="form.name" :placeholder="copy.namePlaceholder" size="large" @blur="validateName" @keyup.enter="onRegister" />
+          <p v-if="errors.name" class="field-error">{{ errors.name }}</p>
         </el-form-item>
         <el-form-item>
-          <el-input v-model="form.phone" :placeholder="copy.phonePlaceholder" size="large" @keyup.enter="onRegister" />
+          <el-input v-model="form.phone" :placeholder="copy.phonePlaceholder" size="large" @blur="validatePhone" @keyup.enter="onRegister" />
+          <p v-if="errors.phone" class="field-error">{{ errors.phone }}</p>
         </el-form-item>
         <el-form-item>
-          <el-input v-model="form.password" type="password" show-password :placeholder="copy.passwordPlaceholder" size="large" @keyup.enter="onRegister" />
+          <el-input v-model="form.password" type="password" show-password :placeholder="copy.passwordPlaceholder" size="large" @blur="validatePassword" @keyup.enter="onRegister" />
+          <p v-if="errors.password" class="field-error">{{ errors.password }}</p>
         </el-form-item>
 
         <div class="auth-actions">
@@ -32,36 +36,66 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { registerApi } from '../api/modules'
+import { authStore } from '../stores/auth'
 import { AUTH_UI_COPY } from '../constants/auth-ui'
 
 const router = useRouter()
 const form = reactive({ username: '', name: '', phone: '', password: '' })
+const errors = reactive({ username: '', name: '', phone: '', password: '' })
 const submitting = ref(false)
 const phoneReg = /^1[3-9]\d{9}$/
+const usernameReg = /^[a-zA-Z0-9_一-龥]+$/
+const nameReg = /^[a-zA-Z一-龥]+$/
 const copy = AUTH_UI_COPY.register
 
+const validateUsername = () => {
+  if (!form.username) { errors.username = '请输入账号' }
+  else if (form.username.length < 4 || form.username.length > 20) { errors.username = '账号需在4-20位' }
+  else if (!usernameReg.test(form.username)) { errors.username = '账号仅支持字母、数字、下划线和中文' }
+}
+const validateName = () => {
+  if (!form.name) { errors.name = '请输入姓名' }
+  else if (form.name.length < 2 || form.name.length > 20) { errors.name = '姓名需在2-20位' }
+  else if (!nameReg.test(form.name)) { errors.name = '姓名仅支持中文和字母' }
+}
+const validatePhone = () => {
+  if (!form.phone) { errors.phone = '请输入手机号' }
+  else if (!phoneReg.test(form.phone)) { errors.phone = '手机号格式不正确' }
+}
+const validatePassword = () => {
+  if (!form.password) { errors.password = '请输入密码' }
+  else if (form.password.length < 6 || form.password.length > 20) { errors.password = '密码长度需在6-20位' }
+}
+
+watch(() => form.username, () => { errors.username = '' })
+watch(() => form.name, () => { errors.name = '' })
+watch(() => form.phone, () => { errors.phone = '' })
+watch(() => form.password, () => { errors.password = '' })
+
 const onRegister = async () => {
-  if (!form.username || !form.name || !form.phone || !form.password) {
-    ElMessage.error('请完整填写注册信息')
-    return
-  }
-  if (!phoneReg.test(form.phone)) {
-    ElMessage.error('手机号格式不正确')
-    return
-  }
-  if (form.password.length < 6 || form.password.length > 20) {
-    ElMessage.error('密码长度需在6-20位')
-    return
-  }
+  validateUsername()
+  validateName()
+  validatePhone()
+  validatePassword()
+  if (errors.username || errors.name || errors.phone || errors.password) return
   submitting.value = true
   try {
-    await registerApi(form)
-    ElMessage.success('注册成功，请登录')
-    router.push('/login')
+    const data = await registerApi(form, { __skipErrorToast: true })
+    authStore.setAuth(data)
+    ElMessage.success('注册成功')
+    router.push('/home')
+  } catch (err) {
+    ElMessageBox.alert(err?.message || '注册失败，请稍后重试', '注册失败', {
+      type: 'error',
+      confirmButtonText: '知道了',
+      closeOnClickModal: false,
+      closeOnPressEscape: false,
+      showClose: false
+    })
   } finally {
     submitting.value = false
   }
@@ -195,6 +229,13 @@ const onRegister = async () => {
   color: var(--ink-2);
   position: relative;
   z-index: 1;
+}
+
+.field-error {
+  color: #f56c6c;
+  font-size: 12px;
+  margin: 4px 0 0 0;
+  line-height: 1.2;
 }
 
 .auth-footer a {

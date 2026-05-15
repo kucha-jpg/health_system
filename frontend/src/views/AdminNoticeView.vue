@@ -3,7 +3,6 @@
     <div class="page-header">
       <div>
         <h3 class="page-title">系统公告管理</h3>
-        <p class="page-subtitle">统一发布平台通知，支持按状态与关键词检索</p>
       </div>
       <div class="page-actions">
         <el-input v-model="query.keyword" placeholder="标题/内容关键字" clearable style="width:220px" />
@@ -67,7 +66,15 @@
     </div>
   </el-card>
 
-  <el-dialog v-model="visible" title="公告信息">
+  <el-dialog
+    v-model="visible"
+    title="公告信息"
+    center
+    align-center
+    :close-on-click-modal="false"
+    :close-on-press-escape="false"
+    :show-close="false"
+  >
     <el-form :model="form" label-width="90px">
       <el-form-item label="标题"><el-input v-model="form.title" /></el-form-item>
       <el-form-item label="投放对象">
@@ -99,14 +106,23 @@
     </template>
   </el-dialog>
 
-  <el-dialog v-model="previewVisible" title="公告预览" width="760px">
+  <el-dialog
+    v-model="previewVisible"
+    title="公告预览"
+    width="760px"
+    center
+    align-center
+    :close-on-click-modal="true"
+    :close-on-press-escape="false"
+    :show-close="false"
+  >
     <div class="notice-preview" v-html="previewNotice.content || '-'" />
   </el-dialog>
 </template>
 
 <script setup>
 import { onMounted, onUnmounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { createNoticeApi, deleteNoticeApi, listNoticesApi, updateNoticeApi } from '../api/modules'
 
 const notices = ref([])
@@ -217,6 +233,18 @@ const save = async () => {
     ElMessage.error('内容不能为空')
     return
   }
+  try {
+    await ElMessageBox.confirm(form.id ? '确认修改该公告？' : '确认发布该公告？', '保存确认', {
+      type: 'warning',
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      closeOnClickModal: false,
+      closeOnPressEscape: false,
+      showClose: false
+    })
+  } catch {
+    return
+  }
   if (form.id) {
     await updateNoticeApi(form)
   } else {
@@ -228,6 +256,18 @@ const save = async () => {
 }
 
 const remove = async (id) => {
+  try {
+    await ElMessageBox.confirm('确认删除该公告？', '删除确认', {
+      type: 'warning',
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      closeOnClickModal: false,
+      closeOnPressEscape: false,
+      showClose: false
+    })
+  } catch {
+    return
+  }
   await deleteNoticeApi(id)
   ElMessage.success('删除成功')
   await load()

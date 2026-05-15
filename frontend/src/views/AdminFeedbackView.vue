@@ -3,7 +3,6 @@
     <div class="page-header">
       <div>
         <h3 class="page-title">反馈消息管理</h3>
-        <p class="page-subtitle">汇总用户反馈、统一回复处理并支持批量状态流转</p>
       </div>
       <div class="page-actions">
         <el-button @click="refreshAll">刷新全部</el-button>
@@ -44,18 +43,18 @@
     <el-card>
     <template #header>
       <div class="toolbar">
-        <span>反馈消息</span>
-        <div style="display:flex; gap:8px; align-items:center; margin-left:auto;">
-          <el-input v-model="query.keyword" placeholder="用户名/内容关键字" clearable style="width:220px" />
-          <el-select v-model="query.roleType" placeholder="角色" clearable style="width:120px">
+        <span class="toolbar-title">反馈消息</span>
+        <div class="filter-toolbar" style="margin-left:auto; margin-bottom:0;">
+          <el-input v-model="query.keyword" class="w-180" placeholder="用户名/关键字" clearable />
+          <el-select v-model="query.roleType" class="w-130" placeholder="角色" clearable>
             <el-option label="患者" value="PATIENT" />
             <el-option label="医生" value="DOCTOR" />
           </el-select>
-          <el-select v-model="query.status" placeholder="状态" clearable style="width:120px">
+          <el-select v-model="query.status" class="w-120" placeholder="状态" clearable>
             <el-option label="未处理" :value="0" />
             <el-option label="已处理" :value="1" />
           </el-select>
-          <el-select v-model="query.replyStatus" placeholder="回复" clearable style="width:120px">
+          <el-select v-model="query.replyStatus" class="w-120" placeholder="回复" clearable>
             <el-option label="未回复" :value="0" />
             <el-option label="已回复" :value="1" />
           </el-select>
@@ -63,20 +62,22 @@
             v-model="query.range"
             type="datetimerange"
             range-separator="至"
-            start-placeholder="开始时间"
-            end-placeholder="结束时间"
+            start-placeholder="开始"
+            end-placeholder="结束"
             value-format="YYYY-MM-DD HH:mm:ss"
-            style="width:320px"
+            class="w-240"
           />
           <el-button @click="load">查询</el-button>
           <el-button @click="resetQuery">重置</el-button>
-          <el-button :disabled="rows.length === 0" @click="selectCurrentPending">全选本页未处理</el-button>
-          <el-button :disabled="selectedRows.length === 0" @click="clearSelection">清空选择</el-button>
-          <el-button type="success" plain :disabled="total === 0" @click="batchMarkByFilter(1)">筛选结果标记已处理</el-button>
-          <el-button type="warning" plain :disabled="total === 0" @click="batchMarkByFilter(0)">筛选结果标记未处理</el-button>
-          <el-button type="primary" plain @click="exportCsv">导出CSV</el-button>
-          <el-button type="success" :disabled="selectedRows.length === 0" @click="batchMark(1)">批量标记已处理</el-button>
-          <el-button type="warning" :disabled="selectedRows.length === 0" @click="batchMark(0)">批量标记未处理</el-button>
+        </div>
+        <div class="filter-toolbar" style="margin-top:6px; padding-top:6px; border-top:1px solid rgba(255,255,255,0.5);">
+          <el-button :disabled="rows.length === 0" size="small" @click="selectCurrentPending">全选本页未处理</el-button>
+          <el-button :disabled="selectedRows.length === 0" size="small" @click="clearSelection">清空选择</el-button>
+          <el-button type="success" plain size="small" :disabled="selectedRows.length === 0" @click="batchMark(1)">批量标记已处理</el-button>
+          <el-button type="warning" plain size="small" :disabled="selectedRows.length === 0" @click="batchMark(0)">批量标记未处理</el-button>
+          <el-button type="success" plain size="small" :disabled="total === 0" @click="batchMarkByFilter(1)">筛选结果标记已处理</el-button>
+          <el-button type="warning" plain size="small" :disabled="total === 0" @click="batchMarkByFilter(0)">筛选结果标记未处理</el-button>
+          <el-button type="primary" plain size="small" @click="exportCsv">导出CSV</el-button>
         </div>
       </div>
     </template>
@@ -136,7 +137,17 @@
       />
     </div>
 
-    <el-dialog v-model="replyVisible" title="回复反馈" width="520px">
+    <el-dialog
+      v-model="replyVisible"
+      title="回复反馈"
+      width="520px"
+      center
+      align-center
+      :lock-scroll="false"
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
+      :show-close="false"
+    >
       <el-form :model="replyForm" label-width="90px">
         <el-form-item label="反馈账号">
           <el-input v-model="replyForm.senderUsername" disabled />
@@ -160,7 +171,17 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="detailVisible" title="反馈详情" width="560px">
+    <el-dialog
+      v-model="detailVisible"
+      title="反馈详情"
+      width="560px"
+      center
+      align-center
+      :lock-scroll="false"
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
+      :show-close="false"
+    >
       <el-form :model="detailForm" label-width="90px">
         <el-form-item label="反馈账号">
           <el-input v-model="detailForm.senderUsername" disabled />
@@ -184,8 +205,7 @@
 import * as echarts from 'echarts'
 import { nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { batchUpdateFeedbackStatusApi, batchUpdateFeedbackStatusByFilterApi, getAdminFeedbackStatsApi, listAdminFeedbackPageApi, replyFeedbackApi, updateFeedbackStatusApi } from '../api/modules'
-import { authStore } from '../stores/auth'
+import { batchUpdateFeedbackStatusApi, batchUpdateFeedbackStatusByFilterApi, exportFeedbackApi, getAdminFeedbackStatsApi, listAdminFeedbackPageApi, replyFeedbackApi, updateFeedbackStatusApi } from '../api/modules'
 
 const tableRef = ref(null)
 const rows = ref([])
@@ -336,39 +356,30 @@ const refreshAll = async () => {
 }
 
 const exportCsv = async () => {
-  const params = new URLSearchParams()
-  if (query.keyword) params.append('keyword', query.keyword)
-  if (query.roleType) params.append('roleType', query.roleType)
-  if (query.status !== null && query.status !== undefined) params.append('status', String(query.status))
-  if (query.replyStatus !== null && query.replyStatus !== undefined) params.append('replyStatus', String(query.replyStatus))
+  const apiParams = {}
+  if (query.keyword) apiParams.keyword = query.keyword
+  if (query.roleType) apiParams.roleType = query.roleType
+  if (query.status !== null && query.status !== undefined) apiParams.status = String(query.status)
+  if (query.replyStatus !== null && query.replyStatus !== undefined) apiParams.replyStatus = String(query.replyStatus)
   if (query.range?.length === 2) {
-    params.append('startTime', query.range[0])
-    params.append('endTime', query.range[1])
+    apiParams.startTime = query.range[0]
+    apiParams.endTime = query.range[1]
   }
 
-  const url = `/api/admin/feedback/export${params.toString() ? `?${params.toString()}` : ''}`
-  const res = await fetch(url, {
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${authStore.token}`
-    }
-  })
-
-  if (!res.ok) {
+  try {
+    const blob = await exportFeedbackApi(apiParams)
+    const link = document.createElement('a')
+    const objectUrl = URL.createObjectURL(blob)
+    link.href = objectUrl
+    link.download = `feedback_export_${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(objectUrl)
+    ElMessage.success('导出成功')
+  } catch {
     ElMessage.error('导出失败')
-    return
   }
-
-  const blob = await res.blob()
-  const link = document.createElement('a')
-  const objectUrl = URL.createObjectURL(blob)
-  link.href = objectUrl
-  link.download = `feedback_export_${new Date().toISOString().slice(0, 10)}.csv`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(objectUrl)
-  ElMessage.success('导出成功')
 }
 
 const resetQuery = async () => {
@@ -378,6 +389,19 @@ const resetQuery = async () => {
 }
 
 const mark = async (id, status) => {
+  const actionText = status === 1 ? '已处理' : '未处理'
+  try {
+    await ElMessageBox.confirm(`确认将该反馈标记为${actionText}？`, '状态变更确认', {
+      type: 'warning',
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      closeOnClickModal: false,
+      closeOnPressEscape: false,
+      showClose: false
+    })
+  } catch {
+    return
+  }
   await updateFeedbackStatusApi(id, status)
   ElMessage.success('状态更新成功')
   await refreshAll()
@@ -394,7 +418,14 @@ const batchMark = async (status) => {
     await ElMessageBox.confirm(
       `确认将选中的 ${selectedRows.value.length} 条反馈标记为${actionText}吗？`,
       '批量操作确认',
-      { type: 'warning' }
+      {
+        type: 'warning',
+        confirmButtonText: '确认',
+        cancelButtonText: '取消',
+        closeOnClickModal: false,
+        closeOnPressEscape: false,
+        showClose: false
+      }
     )
   } catch {
     return
@@ -425,7 +456,14 @@ const batchMarkByFilter = async (targetStatus) => {
     await ElMessageBox.confirm(
       `确认将当前筛选结果共 ${total.value} 条反馈标记为${actionText}吗？此操作会跨分页生效。`,
       '跨页批量操作确认',
-      { type: 'warning' }
+      {
+        type: 'warning',
+        confirmButtonText: '确认',
+        cancelButtonText: '取消',
+        closeOnClickModal: false,
+        closeOnPressEscape: false,
+        showClose: false
+      }
     )
   } catch {
     return
@@ -483,6 +521,18 @@ const submitReply = async () => {
   const replyContent = (replyForm.replyContent || '').trim()
   if (!replyContent) {
     ElMessage.warning('回复内容不能为空')
+    return
+  }
+  try {
+    await ElMessageBox.confirm('确认保存该回复？', '保存确认', {
+      type: 'warning',
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      closeOnClickModal: false,
+      closeOnPressEscape: false,
+      showClose: false
+    })
+  } catch {
     return
   }
   await replyFeedbackApi({ id: replyForm.id, status: replyForm.status, replyContent })

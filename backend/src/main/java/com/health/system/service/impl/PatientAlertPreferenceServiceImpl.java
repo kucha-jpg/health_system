@@ -3,14 +3,13 @@ package com.health.system.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.health.system.common.BusinessException;
 import com.health.system.common.CacheNames;
+import com.health.system.config.CacheEvictionSupport;
 import com.health.system.dto.PatientAlertPreferenceDTO;
 import com.health.system.entity.PatientAlertPreference;
 import com.health.system.entity.User;
 import com.health.system.mapper.PatientAlertPreferenceMapper;
 import com.health.system.mapper.UserMapper;
 import com.health.system.service.PatientAlertPreferenceService;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -24,11 +23,14 @@ public class PatientAlertPreferenceServiceImpl implements PatientAlertPreference
 
     private final PatientAlertPreferenceMapper patientAlertPreferenceMapper;
     private final UserMapper userMapper;
+    private final CacheEvictionSupport cacheEvictionSupport;
 
     public PatientAlertPreferenceServiceImpl(PatientAlertPreferenceMapper patientAlertPreferenceMapper,
-                                             UserMapper userMapper) {
+                                             UserMapper userMapper,
+                                             CacheEvictionSupport cacheEvictionSupport) {
         this.patientAlertPreferenceMapper = patientAlertPreferenceMapper;
         this.userMapper = userMapper;
+        this.cacheEvictionSupport = cacheEvictionSupport;
     }
 
     @Override
@@ -41,12 +43,6 @@ public class PatientAlertPreferenceServiceImpl implements PatientAlertPreference
     }
 
     @Override
-    @Caching(evict = {
-            @CacheEvict(cacheNames = CacheNames.PATIENT_ALERT_LIST, allEntries = true),
-            @CacheEvict(cacheNames = CacheNames.DOCTOR_OPEN_ALERTS, allEntries = true),
-            @CacheEvict(cacheNames = CacheNames.DOCTOR_PATIENT_INSIGHT, allEntries = true),
-            @CacheEvict(cacheNames = CacheNames.PATIENT_REPORT_SUMMARY, allEntries = true)
-    })
     public void upsertMyPreference(String username, PatientAlertPreferenceDTO dto) {
         User user = resolvePatient(username);
         validate(dto);
@@ -64,13 +60,18 @@ public class PatientAlertPreferenceServiceImpl implements PatientAlertPreference
             record.setMediumRule(dto.getMediumRule());
             record.setEnabled(dto.getEnabled());
             patientAlertPreferenceMapper.insert(record);
-            return;
+        } else {
+            existing.setHighRule(dto.getHighRule());
+            existing.setMediumRule(dto.getMediumRule());
+            existing.setEnabled(dto.getEnabled());
+            patientAlertPreferenceMapper.updateById(existing);
         }
 
-        existing.setHighRule(dto.getHighRule());
-        existing.setMediumRule(dto.getMediumRule());
-        existing.setEnabled(dto.getEnabled());
-        patientAlertPreferenceMapper.updateById(existing);
+        String prefix = user.getUsername() + "::";
+        cacheEvictionSupport.evictByPrefix(CacheNames.PATIENT_ALERT_LIST, prefix);
+        cacheEvictionSupport.evictByPrefix(CacheNames.PATIENT_REPORT_SUMMARY, prefix);
+        cacheEvictionSupport.evictByPrefix(CacheNames.DOCTOR_PATIENT_INSIGHT, "");
+        cacheEvictionSupport.evictByPrefix(CacheNames.DOCTOR_OPEN_ALERTS, "");
     }
 
     private User resolvePatient(String username) {

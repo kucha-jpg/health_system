@@ -13,6 +13,9 @@ import java.util.List;
 @Component
 public class BloodPressureAlertEvaluator implements AlertEvaluator {
 
+    private static final int RECENT_DAYS = 7;
+    private static final int RECENT_LIMIT = 20;
+
     private final HealthDataMapper healthDataMapper;
 
     public BloodPressureAlertEvaluator(HealthDataMapper healthDataMapper) {
@@ -30,8 +33,7 @@ public class BloodPressureAlertEvaluator implements AlertEvaluator {
         if (values.length != 2) {
             return null;
         }
-        int systolic;
-        int diastolic;
+        int systolic, diastolic;
         try {
             systolic = Integer.parseInt(values[0]);
             diastolic = Integer.parseInt(values[1]);
@@ -48,19 +50,20 @@ public class BloodPressureAlertEvaluator implements AlertEvaluator {
             return null;
         }
 
+        List<HealthData> recentData = selectRecent(context.userId());
+
         if (highRisk) {
             BigDecimal sysRatio = RiskScoreSupport.ratio(systolic, high[0]);
             BigDecimal diaRatio = RiskScoreSupport.ratio(diastolic, high[1]);
             int score = RiskScoreSupport.severeScore(sysRatio, diaRatio);
             String reasonCode = "BP_HIGH_RULE";
             String reasonText = "血压超过高风险阈值";
-                List<HealthData> recentData = selectRecentByIndicatorType(context.userId(), 7);
-            if (isThreeDayPersistentHigh(recentData, high[0])) {
+            if (isPersistentHigh(recentData, high[0])) {
                 score = Math.min(100, score + 6);
                 reasonCode = "BP_PERSISTENT_HIGH";
                 reasonText = "连续3天收缩压高于高风险阈值";
             } else {
-                int predicted = linearPredictNextSystolic(recentData);
+                int predicted = RiskScoreSupport.linearPredictInt(recentData, Integer.MIN_VALUE);
                 if (predicted >= high[0]) {
                     score = Math.min(100, score + 3);
                     reasonCode = "BP_TREND_UP";
@@ -75,8 +78,7 @@ public class BloodPressureAlertEvaluator implements AlertEvaluator {
         int score = RiskScoreSupport.mediumScore(sysRatio, diaRatio);
         String reasonCode = "BP_MEDIUM_RULE";
         String reasonText = "血压达到中风险阈值";
-        List<HealthData> recentData = selectRecentByIndicatorType(context.userId(), 7);
-        int predicted = linearPredictNextSystolic(recentData);
+        int predicted = RiskScoreSupport.linearPredictInt(recentData, Integer.MIN_VALUE);
         if (predicted >= medium[0]) {
             score = Math.min(79, score + 4);
             reasonCode = "BP_TREND_UP";
@@ -85,7 +87,7 @@ public class BloodPressureAlertEvaluator implements AlertEvaluator {
         return new AlertDecision("MEDIUM", score, RiskScoreSupport.riskLevel(score), reasonCode, reasonText);
     }
 
-    private boolean isThreeDayPersistentHigh(List<HealthData> records, int threshold) {
+    private boolean isPersistentHigh(List<HealthData> records, int threshold) {
         if (records == null || records.isEmpty()) {
             return false;
         }
@@ -116,54 +118,12 @@ public class BloodPressureAlertEvaluator implements AlertEvaluator {
         return true;
     }
 
-    private int linearPredictNextSystolic(List<HealthData> records) {
-        if (records == null || records.size() < 2) {
-            return Integer.MIN_VALUE;
-        }
-        List<HealthData> sorted = records.stream()
-                .filter(item -> item.getReportTime() != null && item.getValue() != null)
-                .sorted((a, b) -> a.getReportTime().compareTo(b.getReportTime()))
-                .toList();
-        if (sorted.size() < 2) {
-            return Integer.MIN_VALUE;
-        }
-        double n = sorted.size();
-        double sumX = 0;
-        double sumY = 0;
-        double sumXY = 0;
-        double sumXX = 0;
-        for (int i = 0; i < sorted.size(); i++) {
-            String[] arr = sorted.get(i).getValue().split("/");
-            if (arr.length != 2) {
-                return Integer.MIN_VALUE;
-            }
-            int y;
-            try {
-                y = Integer.parseInt(arr[0]);
-            } catch (NumberFormatException ex) {
-                return Integer.MIN_VALUE;
-            }
-            double x = i + 1;
-            sumX += x;
-            sumY += y;
-            sumXY += x * y;
-            sumXX += x * x;
-        }
-        double denominator = n * sumXX - sumX * sumX;
-        if (denominator == 0) {
-            return Integer.MIN_VALUE;
-        }
-        double k = (n * sumXY - sumX * sumY) / denominator;
-        double b = (sumY - k * sumX) / n;
-        return (int) Math.round(k * (n + 1) + b);
-    }
-
-    private List<HealthData> selectRecentByIndicatorType(Long userId, int days) {
+    private List<HealthData> selectRecent(Long userId) {
         return healthDataMapper.selectList(new LambdaQueryWrapper<HealthData>()
                 .eq(HealthData::getUserId, userId)
                 .eq(HealthData::getIndicatorType, IndicatorTypes.BLOOD_PRESSURE)
-                .ge(HealthData::getReportTime, LocalDateTime.now().minusDays(days))
+                .ge(HealthData::getReportTime, LocalDateTime.now().minusDays(RECENT_DAYS))
                 .orderByDesc(HealthData::getReportTime)
-                .last("limit 20"));
+                .last("limit " + RECENT_LIMIT));
     }
 }

@@ -3,7 +3,6 @@
     <div class="page-header">
       <div>
         <h3 class="page-title">反馈通道</h3>
-        <p class="page-subtitle">提交与跟踪反馈处理</p>
       </div>
       <div class="page-actions">
         <el-button @click="reloadFromStart">刷新</el-button>
@@ -26,6 +25,7 @@
           end-placeholder="结束时间"
           value-format="YYYY-MM-DD HH:mm:ss"
         />
+        <el-button class="filter-btn" @click="fillRangeToNow">至当前</el-button>
         <el-button class="filter-btn" @click="reloadFromStart">筛选</el-button>
       </el-form-item>
       <el-form-item>
@@ -98,6 +98,15 @@ const load = async () => {
   const res = await listMyFeedbackPageApi(params)
   rows.value = res.records || []
   total.value = res.total || 0
+}
+
+const fillRangeToNow = () => {
+  const pad = (n) => String(n).padStart(2, '0')
+  const now = new Date()
+  const end = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`
+  const start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+  const begin = `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())} ${pad(start.getHours())}:${pad(start.getMinutes())}:${pad(start.getSeconds())}`
+  range.value = [begin, end]
 }
 
 const reloadFromStart = async () => {

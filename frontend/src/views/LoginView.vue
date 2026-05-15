@@ -10,8 +10,10 @@
             v-model="form.username"
             :placeholder="copy.usernamePlaceholder"
             size="large"
+            @blur="validateUsername"
             @keyup.enter="onLogin"
           />
+          <p v-if="errors.username" class="field-error">{{ errors.username }}</p>
         </el-form-item>
 
         <el-form-item>
@@ -21,8 +23,10 @@
             show-password
             size="large"
             :placeholder="copy.passwordPlaceholder"
+            @blur="validatePassword"
             @keyup.enter="onLogin"
           />
+          <p v-if="errors.password" class="field-error">{{ errors.password }}</p>
         </el-form-item>
 
         <el-button type="primary" class="auth-submit" size="large" :loading="submitting" @click="onLogin">
@@ -49,8 +53,18 @@ import { AUTH_UI_COPY } from '../constants/auth-ui'
 const router = useRouter()
 const route = useRoute()
 const form = reactive({ username: '', password: '' })
+const errors = reactive({ username: '', password: '' })
 const submitting = ref(false)
 const copy = AUTH_UI_COPY.login
+const validateUsername = () => {
+  if (!form.username) errors.username = '请输入账号'
+}
+const validatePassword = () => {
+  if (!form.password) errors.password = '请输入密码'
+}
+
+watch(() => form.username, () => { errors.username = '' })
+watch(() => form.password, () => { errors.password = '' })
 
 const showAuthNotice = async (notice) => {
   if (!notice) return
@@ -58,8 +72,9 @@ const showAuthNotice = async (notice) => {
     await ElMessageBox.alert(notice, '登录提示', {
       type: 'warning',
       confirmButtonText: '知道了',
-      closeOnClickModal: true,
-      closeOnPressEscape: true
+      closeOnClickModal: false,
+      closeOnPressEscape: false,
+      showClose: false
     })
   } catch (error) {
     // Ignore close errors to avoid blocking navigation.
@@ -67,17 +82,24 @@ const showAuthNotice = async (notice) => {
 }
 
 const onLogin = async () => {
-  if (!form.username || !form.password) {
-    ElMessage.warning('请输入账号和密码')
-    return
-  }
+  validateUsername()
+  validatePassword()
+  if (errors.username || errors.password) return
 
   submitting.value = true
   try {
-    const data = await loginApi(form)
+    const data = await loginApi(form, { __skipErrorToast: true })
     authStore.setAuth(data)
     ElMessage.success('登录成功')
     router.push('/home')
+  } catch (err) {
+    ElMessageBox.alert(err?.message || '登录失败，请检查账号和密码', '登录失败', {
+      type: 'error',
+      confirmButtonText: '知道了',
+      closeOnClickModal: false,
+      closeOnPressEscape: false,
+      showClose: false
+    })
   } finally {
     submitting.value = false
   }
@@ -225,6 +247,13 @@ watch(
   color: var(--ink-2);
   position: relative;
   z-index: 1;
+}
+
+.field-error {
+  color: #f56c6c;
+  font-size: 12px;
+  margin: 4px 0 0 0;
+  line-height: 1.2;
 }
 
 .auth-footer a {
