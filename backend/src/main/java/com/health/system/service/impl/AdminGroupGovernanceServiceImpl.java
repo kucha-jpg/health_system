@@ -64,6 +64,7 @@ public class AdminGroupGovernanceServiceImpl implements AdminGroupGovernanceServ
             dto.setGroupName(g.getGroupName());
             dto.setPatientCount(patientCountMap.getOrDefault(g.getId(), 0));
             dto.setGovernanceStatus(g.getGovernanceStatus());
+            dto.setReviewRemark(g.getReviewRemark());
             dto.setTargetDept(g.getTargetDept());
             dto.setLastActionTime(lastActionTimeMap.getOrDefault(g.getId(), null));
 
@@ -112,21 +113,45 @@ public class AdminGroupGovernanceServiceImpl implements AdminGroupGovernanceServ
     }
 
     @Override
-    public Map<String, Object> approve(Long id) {
+    public Map<String, Object> approve(Long id, String remark) {
         DoctorGroup group = requireGroup(id);
+        String current = group.getGovernanceStatus();
+        if (!"PENDING_REVIEW".equals(current) && !"CROSS_DEPT".equals(current)) {
+            throw BusinessException.badRequest("仅待审核或跨科室状态的群组可审核通过");
+        }
         group.setGovernanceStatus("ACTIVE");
         group.setTargetDept(null);
+        group.setReviewRemark(remark != null && !remark.isBlank() ? remark.trim() : null);
         doctorGroupMapper.updateById(group);
-        logAction(id, "approve", "审核通过");
+        logAction(id, "approve", "审核通过 -> ACTIVE" + (group.getReviewRemark() != null ? " remark=" + group.getReviewRemark() : ""));
         return simpleResult(id, "ACTIVE");
+    }
+
+    @Override
+    public Map<String, Object> reject(Long id, String reason) {
+        DoctorGroup group = requireGroup(id);
+        if (!"PENDING_REVIEW".equals(group.getGovernanceStatus())) {
+            throw BusinessException.badRequest("仅待审核状态的群组可驳回");
+        }
+        if (reason == null || reason.isBlank()) {
+            throw BusinessException.badRequest("驳回原因不能为空");
+        }
+        group.setGovernanceStatus("REJECTED");
+        group.setReviewRemark(reason.trim());
+        doctorGroupMapper.updateById(group);
+        logAction(id, "reject", "驳回 -> REJECTED reason=" + group.getReviewRemark());
+        return simpleResult(id, "REJECTED");
     }
 
     @Override
     public Map<String, Object> archive(Long id) {
         DoctorGroup group = requireGroup(id);
+        if ("ARCHIVED".equals(group.getGovernanceStatus())) {
+            throw BusinessException.badRequest("该群组已归档");
+        }
         group.setGovernanceStatus("ARCHIVED");
         doctorGroupMapper.updateById(group);
-        logAction(id, "archive", "归档");
+        logAction(id, "archive", "归档 -> ARCHIVED");
         return simpleResult(id, "ARCHIVED");
     }
 
@@ -152,7 +177,9 @@ public class AdminGroupGovernanceServiceImpl implements AdminGroupGovernanceServ
         int processed = 0;
         for (Long id : ids) {
             DoctorGroup group = doctorGroupMapper.selectById(id);
-            if (group == null || "ARCHIVED".equals(group.getGovernanceStatus())) continue;
+            if (group == null) continue;
+            String current = group.getGovernanceStatus();
+            if (!"PENDING_REVIEW".equals(current) && !"CROSS_DEPT".equals(current)) continue;
             group.setGovernanceStatus("ACTIVE");
             group.setTargetDept(null);
             doctorGroupMapper.updateById(group);

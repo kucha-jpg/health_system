@@ -9,7 +9,9 @@ public interface AdminGroupGovernanceService {
 
     Map<String, Object> stats();
 
-    Map<String, Object> approve(Long id);
+    Map<String, Object> approve(Long id, String remark);
+
+    Map<String, Object> reject(Long id, String reason);
 
     Map<String, Object> archive(Long id);
 

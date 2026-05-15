@@ -55,6 +55,7 @@ public class DoctorGroupServiceImpl implements DoctorGroupService {
         group.setDoctorId(doctor.getId());
         group.setGroupName(dto.getGroupName());
         group.setDescription(dto.getDescription());
+        group.setGovernanceStatus("PENDING_REVIEW");
         doctorGroupMapper.insert(group);
         evictGroupRelatedCaches();
     }
@@ -102,6 +103,9 @@ public class DoctorGroupServiceImpl implements DoctorGroupService {
         DoctorGroup group = doctorGroupMapper.selectById(groupId);
         if (group == null) {
             throw BusinessException.notFound("群组不存在");
+        }
+        if (!"ACTIVE".equals(group.getGovernanceStatus())) {
+            throw BusinessException.forbidden("群组尚未通过审核，暂不可添加成员");
         }
         if (!operator.getId().equals(group.getDoctorId())) {
             throw BusinessException.forbidden("仅群组创建者可维护协作医生");
@@ -167,7 +171,10 @@ public class DoctorGroupServiceImpl implements DoctorGroupService {
     @Override
     public void addPatientToGroup(String doctorUsername, Long groupId, Long patientUserId) {
         User doctor = doctorAccessSupport.requireDoctor(doctorUsername);
-        doctorAccessSupport.assertGroupAccessible(doctor.getId(), groupId);
+        DoctorGroup group = doctorAccessSupport.assertGroupAccessible(doctor.getId(), groupId);
+        if (!"ACTIVE".equals(group.getGovernanceStatus())) {
+            throw BusinessException.forbidden("群组尚未通过审核，暂不可添加成员");
+        }
         User patient = userMapper.selectById(patientUserId);
         if (patient == null || !"PATIENT".equals(patient.getRoleType())) {
             throw BusinessException.notFound("患者不存在");

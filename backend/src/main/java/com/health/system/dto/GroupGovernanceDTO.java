@@ -9,6 +9,7 @@ public class GroupGovernanceDTO {
     private String doctorName;
     private Integer patientCount;
     private String governanceStatus;
+    private String reviewRemark;
     private String targetDept;
     private String lastActionTime;
 }

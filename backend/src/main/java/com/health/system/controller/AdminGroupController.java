@@ -42,8 +42,14 @@ public class AdminGroupController {
     }
 
     @PatchMapping("/{id}/approve")
-    public ApiResponse<Map<String, Object>> approve(@PathVariable Long id) {
-        return ApiResponse.success(governanceService.approve(id));
+    public ApiResponse<Map<String, Object>> approve(@PathVariable Long id, @RequestBody(required = false) Map<String, String> body) {
+        String remark = body != null ? body.get("remark") : null;
+        return ApiResponse.success(governanceService.approve(id, remark));
+    }
+
+    @PatchMapping("/{id}/reject")
+    public ApiResponse<Map<String, Object>> reject(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        return ApiResponse.success(governanceService.reject(id, body.get("reason")));
     }
 
     @PatchMapping("/{id}/archive")

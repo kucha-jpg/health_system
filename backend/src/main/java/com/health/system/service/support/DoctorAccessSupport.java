@@ -43,13 +43,13 @@ public class DoctorAccessSupport {
         return doctor;
     }
 
-    public void assertGroupAccessible(Long doctorId, Long groupId) {
+    public DoctorGroup assertGroupAccessible(Long doctorId, Long groupId) {
         DoctorGroup group = doctorGroupMapper.selectById(groupId);
         if (group == null) {
             throw BusinessException.notFound("群组不存在");
         }
         if (doctorId.equals(group.getDoctorId())) {
-            return;
+            return group;
         }
         Long count = doctorGroupDoctorMemberMapper.selectCount(new LambdaQueryWrapper<DoctorGroupDoctorMember>()
                 .eq(DoctorGroupDoctorMember::getGroupId, groupId)
@@ -57,6 +57,7 @@ public class DoctorAccessSupport {
         if (count == null || count == 0) {
             throw BusinessException.forbidden("群组不存在或无权限");
         }
+        return group;
     }
 
     public void assertPatientAccessible(Long doctorId, Long patientUserId, String forbiddenMessage) {

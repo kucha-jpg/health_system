@@ -13,7 +13,8 @@ export const updateRolePermissionApi = (payload) => http.put('/admin/roles', pay
 
 export const listAdminGroupsApi = (params) => http.get('/admin/groups', { params })
 export const getAdminGroupStatsApi = () => http.get('/admin/groups/stats')
-export const approveGroupApi = (id) => http.patch(`/admin/groups/${id}/approve`)
+export const approveGroupApi = (id, remark) => http.patch(`/admin/groups/${id}/approve`, { remark })
+export const rejectGroupApi = (id, reason) => http.patch(`/admin/groups/${id}/reject`, { reason })
 export const archiveGroupApi = (id) => http.patch(`/admin/groups/${id}/archive`)
 export const crossDeptGroupApi = (id, payload) => http.patch(`/admin/groups/${id}/cross-dept`, payload)
 export const batchApproveGroupsApi = (payload) => http.post('/admin/groups/batch-approve', payload)
