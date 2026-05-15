@@ -68,10 +68,12 @@ public class PatientAlertPreferenceServiceImpl implements PatientAlertPreference
         }
 
         String prefix = user.getUsername() + "::";
-        cacheEvictionSupport.evictByPrefix(CacheNames.PATIENT_ALERT_LIST, prefix);
-        cacheEvictionSupport.evictByPrefix(CacheNames.PATIENT_REPORT_SUMMARY, prefix);
-        cacheEvictionSupport.evictByPrefix(CacheNames.DOCTOR_PATIENT_INSIGHT, "");
-        cacheEvictionSupport.evictByPrefix(CacheNames.DOCTOR_OPEN_ALERTS, "");
+        if (cacheEvictionSupport != null) {
+            cacheEvictionSupport.evictByPrefix(CacheNames.PATIENT_ALERT_LIST, prefix);
+            cacheEvictionSupport.evictByPrefix(CacheNames.PATIENT_REPORT_SUMMARY, prefix);
+            cacheEvictionSupport.evictByPrefix(CacheNames.DOCTOR_PATIENT_INSIGHT, "");
+            cacheEvictionSupport.evictByPrefix(CacheNames.DOCTOR_OPEN_ALERTS, "");
+        }
     }
 
     private User resolvePatient(String username) {

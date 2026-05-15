@@ -133,6 +133,7 @@ public class HealthDataServiceImpl implements HealthDataService {
     }
 
     private void evictPatientCaches(String username) {
+        if (cacheEvictionSupport == null) return;
         String prefix = username + "::";
         cacheEvictionSupport.evictByPrefix(CacheNames.PATIENT_HEALTH_DATA_LIST, prefix);
         cacheEvictionSupport.evictByPrefix(CacheNames.PATIENT_REPORT_SUMMARY, prefix);

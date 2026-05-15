@@ -191,10 +191,12 @@ public class HealthAlertServiceImpl implements HealthAlertService {
 
         User patient = userMapper.selectById(alert.getUserId());
         String patientPrefix = (patient != null ? patient.getUsername() : String.valueOf(alert.getUserId())) + "::";
-        cacheEvictionSupport.evictByPrefix(CacheNames.DOCTOR_OPEN_ALERTS, doctorUsername + "::");
-        cacheEvictionSupport.evictByPrefix(CacheNames.PATIENT_ALERT_LIST, patientPrefix);
-        cacheEvictionSupport.evictByPrefix(CacheNames.PATIENT_REPORT_SUMMARY, patientPrefix);
-        cacheEvictionSupport.evictByPrefix(CacheNames.ADMIN_MONITOR_OVERVIEW, "");
+        if (cacheEvictionSupport != null) {
+            cacheEvictionSupport.evictByPrefix(CacheNames.DOCTOR_OPEN_ALERTS, doctorUsername + "::");
+            cacheEvictionSupport.evictByPrefix(CacheNames.PATIENT_ALERT_LIST, patientPrefix);
+            cacheEvictionSupport.evictByPrefix(CacheNames.PATIENT_REPORT_SUMMARY, patientPrefix);
+            cacheEvictionSupport.evictByPrefix(CacheNames.ADMIN_MONITOR_OVERVIEW, "");
+        }
     }
 
     @Override

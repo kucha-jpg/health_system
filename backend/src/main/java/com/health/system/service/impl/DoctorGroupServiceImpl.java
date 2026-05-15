@@ -244,8 +244,7 @@ public class DoctorGroupServiceImpl implements DoctorGroupService {
     }
 
     private void evictGroupRelatedCaches() {
-        // Group membership changes affect all doctors' alert views and patient insights.
-        // Use clear() since the set of affected doctors is not known at this point.
+        if (cacheEvictionSupport == null) return;
         cacheEvictionSupport.evictByPrefix(CacheNames.DOCTOR_OPEN_ALERTS, "");
         cacheEvictionSupport.evictByPrefix(CacheNames.DOCTOR_PATIENT_INSIGHT, "");
     }
