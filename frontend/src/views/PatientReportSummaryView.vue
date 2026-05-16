@@ -9,57 +9,70 @@
           <el-radio-button value="week">周报</el-radio-button>
           <el-radio-button value="month">月报</el-radio-button>
         </el-radio-group>
-        <el-button @click="exportCsv">导出当前报表</el-button>
+        <el-button @click="exportCsv">导出报表</el-button>
         <el-button :loading="loading" @click="load">刷新</el-button>
       </div>
     </div>
 
-    <div class="filter-toolbar filter-toolbar-compact">
-      <el-select v-model="filters.indicatorType" class="w-140" clearable placeholder="指标筛选">
-        <el-option label="血压" value="血压" />
-        <el-option label="血糖" value="血糖" />
-        <el-option label="体重" value="体重" />
-        <el-option label="服药" value="服药" />
-      </el-select>
-      <el-input v-model="filters.keyword" class="w-180" clearable placeholder="备注关键词" />
-      <el-segmented v-model="riskChartType" :options="['line', 'bar']" />
-      <el-button @click="resetFilters">重置筛选</el-button>
-    </div>
-
     <el-row :gutter="10" class="summary-row">
-      <el-col :xs="24" :sm="8"><el-card shadow="never" class="summary-stat-card">统计范围：{{ summary.range || '-' }}</el-card></el-col>
-      <el-col :xs="24" :sm="8"><el-card shadow="never" class="summary-stat-card">当前筛选后最近数据：{{ filteredLatestData.length }} 条</el-card></el-col>
-      <el-col :xs="24" :sm="8"><el-card shadow="never" class="summary-stat-card">图表模式：{{ riskChartType }}</el-card></el-col>
+      <el-col :xs="12" :sm="6"><el-card shadow="never" class="summary-stat-card">📋 上报次数：{{ summary.reportCount || 0 }}</el-card></el-col>
+      <el-col :xs="12" :sm="6"><el-card shadow="never" class="summary-stat-card summary-stat-card--warn">⚠️ 预警次数：{{ summary.alertCount || 0 }}</el-card></el-col>
+      <el-col :xs="12" :sm="6"><el-card shadow="never" class="summary-stat-card">📅 统计范围：{{ range === 'week' ? '本周' : '本月' }}</el-card></el-col>
+      <el-col :xs="12" :sm="6"><el-card shadow="never" class="summary-stat-card">📊 指标种类：{{ indicatorTypeCount }}</el-card></el-col>
     </el-row>
 
-    <el-row :gutter="10" class="summary-row summary-row-spaced">
-      <el-col :xs="24" :sm="8"><el-card shadow="never" class="summary-stat-card">上报总数：{{ summary.reportCount || 0 }}</el-card></el-col>
-      <el-col :xs="24" :sm="8"><el-card shadow="never" class="summary-stat-card summary-stat-card--warn">预警总数：{{ summary.alertCount || 0 }}</el-card></el-col>
-      <el-col :xs="24" :sm="8"><el-card shadow="never" class="summary-stat-card">导出范围：当前筛选结果</el-card></el-col>
-    </el-row>
+    <!-- Chart 1: Daily Alert Count (replaces "risk trend") -->
+    <el-card class="section-card" shadow="never">
+      <template #header>
+        <div class="chart-title-row">
+          <span>📈 每日预警次数</span>
+          <span class="chart-subtitle">最近{{ range === 'week' ? '7天' : '30天' }}每天的预警数量</span>
+        </div>
+      </template>
+      <div ref="alertCountRef" class="chart-main"></div>
+    </el-card>
 
     <el-row :gutter="12" class="chart-row">
-      <el-col :xs="24" :lg="14">
-        <el-card>
-          <template #header>风险趋势（交互缩放）</template>
-          <div ref="riskTrendRef" class="chart-main"></div>
-        </el-card>
-      </el-col>
-      <el-col :xs="24" :lg="10">
-        <el-card>
-          <template #header>指标分布（饼图）</template>
+      <!-- Chart 2: Indicator Distribution (simplified pie) -->
+      <el-col :xs="24" :lg="12">
+        <el-card shadow="never">
+          <template #header>
+            <div class="chart-title-row">
+              <span>🥧 各指标上报占比</span>
+              <span class="chart-subtitle">不同指标的上报次数分布</span>
+            </div>
+          </template>
           <div ref="typePieRef" class="chart-side"></div>
         </el-card>
       </el-col>
+
+      <!-- Chart 3: Indicator Frequency (bar chart replacing radar) -->
+      <el-col :xs="24" :lg="12">
+        <el-card shadow="never">
+          <template #header>
+            <div class="chart-title-row">
+              <span>📊 各指标上报次数</span>
+              <span class="chart-subtitle">清晰对比各指标上报频率</span>
+            </div>
+          </template>
+          <div ref="typeBarRef" class="chart-side"></div>
+        </el-card>
+      </el-col>
     </el-row>
 
-    <el-card class="section-card" style="margin-bottom: 12px" shadow="never">
-      <template #header>指标分布（雷达图）</template>
-      <div ref="typeRadarRef" class="chart-main"></div>
-    </el-card>
-
-    <el-card>
-      <template #header>最近上报（自定义筛选）</template>
+    <!-- Data table -->
+    <el-card shadow="never">
+      <template #header>📝 最近上报记录</template>
+      <div class="filter-row">
+        <el-select v-model="filters.indicatorType" class="w-140" clearable placeholder="指标筛选" @change="onFilterChange">
+          <el-option label="血压" value="血压" />
+          <el-option label="血糖" value="血糖" />
+          <el-option label="体重" value="体重" />
+          <el-option label="服药" value="服药" />
+        </el-select>
+        <el-input v-model="filters.keyword" class="w-180" clearable placeholder="备注关键词" @input="onFilterChange" />
+        <el-button @click="resetFilters">重置筛选</el-button>
+      </div>
       <el-table :data="pagedLatestData" border v-loading="loading" empty-text="暂无匹配数据">
         <el-table-column prop="indicatorType" label="指标" width="100" />
         <el-table-column prop="value" label="数值" width="120" />
@@ -80,42 +93,39 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
 import echarts from '../utils/echarts'
 import { csvEscape, downloadCsv } from '../utils/csv'
 import { ElMessage } from 'element-plus'
 import { getPatientReportSummaryApi } from '../api/modules'
-import { CHART_PALETTE, CHART_SPLIT_LINE, RISK_COLORS } from '../constants/chart-theme'
-import { showFirstVisitGuide } from '../composables/useFirstVisitGuide'
+import { CHART_PALETTE } from '../constants/chart-theme'
 
 const summary = ref({})
 const range = ref('week')
 const loading = ref(false)
 const filters = reactive({ indicatorType: '', keyword: '' })
-const riskChartType = ref('line')
 const latestPageNo = ref(1)
 const latestPageSize = ref(10)
-const riskTrendRef = ref(null)
+const alertCountRef = ref(null)
 const typePieRef = ref(null)
-const typeRadarRef = ref(null)
-let riskTrendChart = null
+const typeBarRef = ref(null)
+let alertCountChart = null
 let typePieChart = null
-let typeRadarChart = null
+let typeBarChart = null
 
 const INDICATOR_LABEL_MAP = {
   BLOOD_PRESSURE: '血压',
   BLOOD_SUGAR: '血糖',
   WEIGHT: '体重',
-  MEDICATION: '服药',
-  HEART_RATE: '心率',
-  TEMPERATURE: '体温',
-  OXYGEN_SATURATION: '血氧'
+  MEDICATION: '服药'
 }
 
-const toIndicatorLabel = (value) => {
-  const key = String(value || '').trim()
-  return INDICATOR_LABEL_MAP[key] || key
-}
+const toLabel = (v) => INDICATOR_LABEL_MAP[String(v || '').trim()] || v
+
+const indicatorTypeCount = computed(() => {
+  const byType = summary.value?.byType || {}
+  return Object.keys(byType).length
+})
 
 const filteredLatestData = computed(() => {
   const list = summary.value?.latestData || []
@@ -123,8 +133,7 @@ const filteredLatestData = computed(() => {
     const indicatorOk = !filters.indicatorType || item.indicatorType === filters.indicatorType
     const keyword = (filters.keyword || '').trim().toLowerCase()
     const remark = String(item.remark || '').toLowerCase()
-    const keywordOk = !keyword || remark.includes(keyword)
-    return indicatorOk && keywordOk
+    return indicatorOk && (!keyword || remark.includes(keyword))
   })
 })
 
@@ -133,94 +142,94 @@ const pagedLatestData = computed(() => {
   return filteredLatestData.value.slice(start, start + latestPageSize.value)
 })
 
-const renderRiskChart = async () => {
+// Chart 1: Daily alert count (simple bar chart)
+const renderAlertCountChart = async () => {
   await nextTick()
-  if (!riskTrendRef.value) return
-  if (!riskTrendChart) {
-    riskTrendChart = echarts.init(riskTrendRef.value)
-  }
+  if (!alertCountRef.value) return
+  if (!alertCountChart) alertCountChart = echarts.init(alertCountRef.value)
 
   const rows = summary.value?.riskTrend || []
-  const xAxis = rows.map((item) => item.date)
-  const scoreSeries = rows.map((item) => item.avgRiskScore)
-  const countSeries = rows.map((item) => item.alertCount)
+  const xData = rows.map(r => {
+    const d = r.date
+    if (!d || d.length < 10) return d
+    return `${parseInt(d.slice(5, 7))}月${parseInt(d.slice(8, 10))}日`
+  })
+  const counts = rows.map(r => r.alertCount)
 
-  riskTrendChart.setOption({
-    color: [CHART_PALETTE[1], RISK_COLORS.MEDIUM],
-    tooltip: { trigger: 'axis' },
-    toolbox: {
-      feature: {
-        dataZoom: { yAxisIndex: 'none' },
-        restore: {},
-        saveAsImage: {}
-      }
+  alertCountChart.setOption({
+    tooltip: {
+      trigger: 'axis',
+      formatter: (params) => `${params[0].axisValue}<br/>预警次数：<b>${params[0].value}</b> 次`
     },
-    dataZoom: [{ type: 'inside' }, { type: 'slider' }],
-    legend: { data: ['平均风险分', '预警数'] },
-    xAxis: { type: 'category', data: xAxis },
-    yAxis: [
-      { type: 'value', name: '平均风险分', min: 0, max: 100, splitLine: CHART_SPLIT_LINE },
-      { type: 'value', name: '预警数', splitLine: CHART_SPLIT_LINE }
-    ],
-    series: [
-      {
-        name: '平均风险分',
-        type: riskChartType.value,
-        smooth: riskChartType.value === 'line',
-        data: scoreSeries,
-        itemStyle: { color: CHART_PALETTE[1] },
-        lineStyle: { width: 3 }
+    grid: { left: 45, right: 20, top: 28, bottom: 30 },
+    xAxis: { type: 'category', data: xData, axisLabel: { rotate: 0, fontSize: 11 } },
+    yAxis: { type: 'value', name: '次数', nameTextStyle: { fontSize: 11 }, minInterval: 1 },
+    series: [{
+      type: 'bar', data: counts, barMaxWidth: 36,
+      itemStyle: {
+        color: (params) => counts[params.dataIndex] > 0 ? '#e6a23c' : '#c0ccda',
+        borderRadius: [4, 4, 0, 0]
       },
-      {
-        name: '预警数',
-        type: 'bar',
-        yAxisIndex: 1,
-        data: countSeries,
-        barMaxWidth: 24,
-        itemStyle: { color: RISK_COLORS.MEDIUM }
-      }
-    ]
+      label: { show: true, position: 'top', distance: 4, formatter: (p) => p.value > 0 ? p.value : '' }
+    }]
   })
 }
 
-const renderTypeCharts = async () => {
+// Chart 2: Simplified pie chart
+const renderPieChart = async () => {
   await nextTick()
+  if (!typePieRef.value) return
+  if (!typePieChart) typePieChart = echarts.init(typePieRef.value)
+
   const byType = summary.value?.byType || {}
   const entries = Object.entries(byType)
-  const displayEntries = entries.map(([name, value]) => [toIndicatorLabel(name), value])
-  if (!typePieRef.value || !typeRadarRef.value) return
+  const pieData = entries.map(([name, value]) => ({ name: toLabel(name), value }))
 
-  if (!typePieChart) typePieChart = echarts.init(typePieRef.value)
-  if (!typeRadarChart) typeRadarChart = echarts.init(typeRadarRef.value)
-
-  const pieData = displayEntries.map(([name, value]) => ({ name, value }))
   typePieChart.setOption({
     color: CHART_PALETTE,
-    tooltip: { trigger: 'item' },
+    tooltip: { trigger: 'item', formatter: '{b}: {c} 次 ({d}%)' },
     legend: { bottom: 0 },
     series: [{
       type: 'pie',
-      radius: ['35%', '68%'],
-      center: ['50%', '45%'],
+      radius: ['38%', '65%'],
+      center: ['50%', '42%'],
       data: pieData,
-      label: { formatter: '{b}: {d}%' }
+      label: { formatter: '{b}\n{d}%', fontSize: 12 },
+      emphasis: { label: { fontSize: 16, fontWeight: 'bold' } }
     }]
   })
+}
 
-  const max = Math.max(...displayEntries.map(([, value]) => Number(value)), 1)
-  typeRadarChart.setOption({
+// Chart 3: Simple horizontal bar chart (replaces radar)
+const renderBarChart = async () => {
+  await nextTick()
+  if (!typeBarRef.value) return
+  if (!typeBarChart) typeBarChart = echarts.init(typeBarRef.value)
+
+  const byType = summary.value?.byType || {}
+  const entries = Object.entries(byType).map(([name, value]) => [toLabel(name), value])
+  entries.sort((a, b) => b[1] - a[1])
+  const names = entries.map(e => e[0])
+  const values = entries.map(e => e[1])
+
+  typeBarChart.setOption({
     color: [CHART_PALETTE[0]],
-    tooltip: {},
-    radar: {
-      radius: '65%',
-      indicator: displayEntries.map(([name]) => ({ name, max }))
-    },
+    tooltip: { trigger: 'axis', formatter: (params) => `${params[0].name}：<b>${params[0].value}</b> 次` },
+    grid: { left: 80, right: 40, top: 10, bottom: 20 },
+    xAxis: { type: 'value', name: '次数', minInterval: 1 },
+    yAxis: { type: 'category', data: names },
     series: [{
-      type: 'radar',
-      areaStyle: { opacity: 0.28 },
-      data: [{ value: displayEntries.map(([, value]) => value), name: '指标频次' }]
+      type: 'bar', data: values, barMaxWidth: 28,
+      itemStyle: { borderRadius: [0, 4, 4, 0] },
+      label: { show: true, position: 'right' }
     }]
   })
+}
+
+const renderAllCharts = async () => {
+  await renderAlertCountChart()
+  await renderPieChart()
+  await renderBarChart()
 }
 
 const load = async () => {
@@ -228,11 +237,14 @@ const load = async () => {
   try {
     summary.value = await getPatientReportSummaryApi({ range: range.value })
     latestPageNo.value = 1
-    await renderRiskChart()
-    await renderTypeCharts()
+    await renderAllCharts()
   } finally {
     loading.value = false
   }
+}
+
+const onFilterChange = () => {
+  latestPageNo.value = 1
 }
 
 const resetFilters = () => {
@@ -249,42 +261,33 @@ const exportCsv = () => {
 
   lines.push('报表名称,健康周报月报')
   lines.push(`导出时间,${now.toLocaleString()}`)
-  lines.push(`统计范围,${summary.value?.range || '-'}`)
+  lines.push(`统计范围,${range.value === 'week' ? '周报' : '月报'}`)
   lines.push(`上报总数,${summary.value?.reportCount || 0}`)
   lines.push(`预警总数,${summary.value?.alertCount || 0}`)
   lines.push('')
 
-  lines.push('指标分布')
+  lines.push('各指标上报次数')
   lines.push('指标,次数')
-  Object.entries(byType).forEach(([k, v]) => {
-    lines.push(`${csvEscape(k)},${csvEscape(v)}`)
-  })
+  Object.entries(byType).forEach(([k, v]) => lines.push(`${csvEscape(k)},${csvEscape(v)}`))
   lines.push('')
 
-  lines.push('风险趋势')
-  lines.push('日期,平均风险分,预警数')
-  riskTrend.forEach((row) => {
-    lines.push(`${csvEscape(row.date)},${csvEscape(row.avgRiskScore)},${csvEscape(row.alertCount)}`)
-  })
+  lines.push('每日预警情况')
+  lines.push('日期,预警次数,平均风险分')
+  riskTrend.forEach(row => lines.push(`${csvEscape(row.date)},${csvEscape(row.alertCount)},${csvEscape(row.avgRiskScore)}`))
   lines.push('')
 
-  lines.push('最近上报(当前筛选结果)')
+  lines.push('最近上报记录')
   lines.push('指标,数值,上报时间,备注')
-  filteredLatestData.value.forEach((row) => {
-    lines.push([
-      csvEscape(row.indicatorType),
-      csvEscape(row.value),
-      csvEscape(row.reportTime),
-      csvEscape(row.remark)
-    ].join(','))
+  filteredLatestData.value.forEach(row => {
+    lines.push([csvEscape(row.indicatorType), csvEscape(row.value), csvEscape(row.reportTime), csvEscape(row.remark)].join(','))
   })
 
-  const csvText = `\uFEFF${lines.join('\n')}`
+  const csvText = `﻿${lines.join('\n')}`
   const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `patient_report_${summary.value?.range || 'week'}_${Date.now()}.csv`
+  a.download = `health_report_${range.value}_${Date.now()}.csv`
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
@@ -292,46 +295,22 @@ const exportCsv = () => {
   ElMessage.success('报表导出成功')
 }
 
-watch(riskChartType, () => {
-  renderRiskChart()
-})
-
-watch(filteredLatestData, () => {
-  if ((latestPageNo.value - 1) * latestPageSize.value >= filteredLatestData.value.length) {
-    latestPageNo.value = 1
-  }
-})
-
 const handleResize = () => {
-  if (riskTrendChart) riskTrendChart.resize()
-  if (typePieChart) typePieChart.resize()
-  if (typeRadarChart) typeRadarChart.resize()
+  alertCountChart?.resize()
+  typePieChart?.resize()
+  typeBarChart?.resize()
 }
 
 onMounted(() => {
   load()
-  showFirstVisitGuide({
-    storageKey: 'guide_patient_report_summary_v1',
-    title: '周报/月报引导',
-    message: '可先切换周报或月报，再用图表类型切换观察风险变化；筛选备注关键词后导出的 CSV 将与当前视图保持一致。'
-  }).catch(() => {})
   window.addEventListener('resize', handleResize)
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
-  if (riskTrendChart) {
-    riskTrendChart.dispose()
-    riskTrendChart = null
-  }
-  if (typePieChart) {
-    typePieChart.dispose()
-    typePieChart = null
-  }
-  if (typeRadarChart) {
-    typeRadarChart.dispose()
-    typeRadarChart = null
-  }
+  alertCountChart?.dispose(); alertCountChart = null
+  typePieChart?.dispose(); typePieChart = null
+  typeBarChart?.dispose(); typeBarChart = null
 })
 </script>
 
@@ -340,8 +319,14 @@ onUnmounted(() => {
   margin: 12px 0;
 }
 
-.summary-row-spaced {
-  margin-top: 0;
+.summary-stat-card {
+  font-weight: 600;
+  color: #2f4952;
+  font-size: 14px;
+}
+
+.summary-stat-card--warn {
+  color: #8a4b28;
 }
 
 .chart-row {
@@ -350,7 +335,7 @@ onUnmounted(() => {
 
 .chart-main {
   width: 100%;
-  height: 320px;
+  height: 340px;
 }
 
 .chart-side {
@@ -358,12 +343,27 @@ onUnmounted(() => {
   height: 320px;
 }
 
-.summary-stat-card {
-  font-weight: 600;
-  color: #2f4952;
+.chart-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
 }
 
-.summary-stat-card--warn {
-  color: #8a4b28;
+.chart-subtitle {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--ink-2);
+}
+
+.section-card {
+  margin-bottom: 12px;
+}
+
+.filter-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+  align-items: center;
 }
 </style>

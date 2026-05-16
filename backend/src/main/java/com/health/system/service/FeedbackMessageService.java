@@ -14,7 +14,7 @@ public interface FeedbackMessageService {
 
     List<FeedbackMessage> listMine(String username);
 
-    Map<String, Object> listMinePaged(String username, LocalDateTime startTime, LocalDateTime endTime, int pageNo, int pageSize);
+    Map<String, Object> listMinePaged(String username, Integer status, LocalDateTime startTime, LocalDateTime endTime, int pageNo, int pageSize);
 
     List<FeedbackMessage> listAll(FeedbackQueryDTO query);
 

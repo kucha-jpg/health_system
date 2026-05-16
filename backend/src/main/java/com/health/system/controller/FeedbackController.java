@@ -41,11 +41,12 @@ public class FeedbackController {
 
     @GetMapping("/mine/page")
     public ApiResponse<Map<String, Object>> minePage(Authentication authentication,
+                                                     @RequestParam(required = false) Integer status,
                                                      @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startTime,
                                                      @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endTime,
                                                      @RequestParam(defaultValue = "1") Integer pageNo,
                                                      @RequestParam(defaultValue = "10") Integer pageSize) {
-        return ApiResponse.success(feedbackMessageService.listMinePaged(authentication.getName(), startTime, endTime, pageNo, pageSize));
+        return ApiResponse.success(feedbackMessageService.listMinePaged(authentication.getName(), status, startTime, endTime, pageNo, pageSize));
     }
 
     @GetMapping("/unread-count")

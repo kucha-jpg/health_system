@@ -61,7 +61,7 @@ public class FeedbackMessageServiceImpl implements FeedbackMessageService {
     }
 
     @Override
-    public Map<String, Object> listMinePaged(String username, LocalDateTime startTime, LocalDateTime endTime, int pageNo, int pageSize) {
+    public Map<String, Object> listMinePaged(String username, Integer status, LocalDateTime startTime, LocalDateTime endTime, int pageNo, int pageSize) {
         User user = requireNonAdminUser(username, "管理员账号无需查看该通道");
 
         int safePageNo = Math.min(Math.max(pageNo, 1), 1000);
@@ -70,6 +70,9 @@ public class FeedbackMessageServiceImpl implements FeedbackMessageService {
         LambdaQueryWrapper<FeedbackMessage> wrapper = new LambdaQueryWrapper<FeedbackMessage>()
                 .eq(FeedbackMessage::getSenderUserId, user.getId())
                 .orderByDesc(FeedbackMessage::getCreateTime);
+        if (status != null) {
+            wrapper.eq(FeedbackMessage::getStatus, status);
+        }
         applyDateRange(wrapper, startTime, endTime);
 
         Page<FeedbackMessage> page = feedbackMessageMapper.selectPage(new Page<>(safePageNo, safePageSize), wrapper);

@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { authStore } from '../stores/auth'
 
 /**
@@ -33,7 +33,14 @@ http.interceptors.response.use(
     const { code, msg, data } = res.data
     if (code !== 200) {
       if (!res.config?.__skipErrorToast) {
-        showError(msg || '请求失败')
+        if (code === 403) {
+          ElMessageBox.alert(msg || '无权限访问', '操作被拒绝', {
+            type: 'warning', confirmButtonText: '知道了',
+            closeOnClickModal: false, closeOnPressEscape: false, showClose: false
+          }).catch(() => {})
+        } else {
+          showError(msg || '请求失败')
+        }
       }
       return Promise.reject(new Error(msg))
     }

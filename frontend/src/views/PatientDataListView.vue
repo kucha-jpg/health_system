@@ -5,15 +5,76 @@
         <h3 class="page-title">历史上报数据</h3>
       </div>
       <div class="page-actions">
-        <el-button :loading="loading" @click="load">刷新</el-button>
+        <el-button :loading="loading" @click="loadAll">刷新</el-button>
         <el-button @click="resetFilter">重置筛选</el-button>
       </div>
     </div>
 
     <div class="soft-tip">
-      当前筛选：{{ query.indicator_type || '全部指标' }} / {{ query.timeRange || '全部时间' }}
+      以下展示您所有指标的历史趋势，可切换查看各指标变化情况。
     </div>
 
+    <!-- 5 charts grid -->
+    <div v-if="allData.length === 0 && !loading" class="chart-empty-banner">
+      <div class="empty-illustration"></div>
+      <div>暂无健康数据，请先上报</div>
+    </div>
+
+    <div v-else class="charts-grid">
+      <!-- Chart 1: Blood Pressure -->
+      <el-card class="chart-card" shadow="never">
+        <template #header>
+          <div class="chart-header">
+            <span class="chart-icon">💓</span>
+            <span>血压趋势</span>
+            <span class="chart-unit">(mmHg)</span>
+          </div>
+        </template>
+        <div v-if="bpData.length === 0" class="chart-empty">暂无血压数据</div>
+        <div v-else ref="bpRef" class="chart-box"></div>
+      </el-card>
+
+      <!-- Chart 2: Blood Sugar -->
+      <el-card class="chart-card" shadow="never">
+        <template #header>
+          <div class="chart-header">
+            <span class="chart-icon">🩸</span>
+            <span>血糖趋势</span>
+            <span class="chart-unit">(mmol/L)</span>
+          </div>
+        </template>
+        <div v-if="sugarData.length === 0" class="chart-empty">暂无血糖数据</div>
+        <div v-else ref="sugarRef" class="chart-box"></div>
+      </el-card>
+
+      <!-- Chart 3: Weight -->
+      <el-card class="chart-card" shadow="never">
+        <template #header>
+          <div class="chart-header">
+            <span class="chart-icon">⚖️</span>
+            <span>体重趋势</span>
+            <span class="chart-unit">(kg)</span>
+          </div>
+        </template>
+        <div v-if="weightData.length === 0" class="chart-empty">暂无体重数据</div>
+        <div v-else ref="weightRef" class="chart-box"></div>
+      </el-card>
+
+      <!-- Chart 4: Medication -->
+      <el-card class="chart-card" shadow="never">
+        <template #header>
+          <div class="chart-header">
+            <span class="chart-icon">💊</span>
+            <span>服药记录</span>
+          </div>
+        </template>
+        <div v-if="medData.length === 0" class="chart-empty">暂无服药记录</div>
+        <div v-else ref="medRef" class="chart-box"></div>
+      </el-card>
+
+    </div>
+
+    <!-- Table filters and data table (unchanged logic) -->
     <div class="filter-row">
       <el-select v-model="query.indicator_type" placeholder="指标类型" clearable style="width: 140px" @change="onFilterChanged">
         <el-option label="血压" value="血压" />
@@ -26,6 +87,7 @@
         <el-option label="最近一周" value="week" />
         <el-option label="最近一月" value="month" />
       </el-select>
+      <span class="table-hint">表格筛选：{{ query.indicator_type || '全部指标' }} / {{ query.timeRange || '全部时间' }}</span>
       <el-button link type="primary" @click="resetFilter">清空条件</el-button>
     </div>
 
@@ -34,12 +96,6 @@
       <el-col :xs="24" :sm="8"><el-card shadow="never">总记录数：{{ total }}</el-card></el-col>
       <el-col :xs="24" :sm="8"><el-card shadow="never">筛选指标：{{ query.indicator_type || '全部' }}</el-card></el-col>
     </el-row>
-
-    <el-card style="margin-bottom: 12px">
-      <template #header>指标趋势图</template>
-      <div v-if="list.length === 0" class="chart-empty">暂无可绘制数据，请先上报或调整筛选条件</div>
-      <div v-else ref="trendRef" class="trend-chart"></div>
-    </el-card>
 
     <el-table :data="list" border v-loading="loading" empty-text="暂无健康数据记录">
       <el-table-column prop="indicatorType" label="指标" width="100" />
@@ -89,34 +145,81 @@
 </template>
 
 <script setup>
-import { nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { deleteHealthDataApi, listHealthDataApi, updateHealthDataApi } from '../api/modules'
 
 const list = ref([])
+const allData = ref([])
 const loading = ref(false)
 const saving = ref(false)
 const visible = ref(false)
 const query = reactive({ indicator_type: '', timeRange: '', pageNo: 1, pageSize: 20 })
 const form = reactive({ id: null, indicatorType: '', value: '', reportTime: '', remark: '' })
-const trendRef = ref(null)
-let trendChart = null
 const total = ref(0)
 
+// Chart refs
+const bpRef = ref(null)
+const sugarRef = ref(null)
+const weightRef = ref(null)
+const medRef = ref(null)
+let bpChart = null, sugarChart = null, weightChart = null, medChart = null
+
+// Computed data subsets
+const bpData = computed(() => allData.value.filter(d => d.indicatorType === '血压'))
+const sugarData = computed(() => allData.value.filter(d => d.indicatorType === '血糖'))
+const weightData = computed(() => allData.value.filter(d => d.indicatorType === '体重'))
+const medData = computed(() => allData.value.filter(d => d.indicatorType === '服药'))
+
+const fmtDate = (d) => {
+  if (!d || d.length < 10) return d
+  return `${parseInt(d.slice(5, 7))}月${parseInt(d.slice(8, 10))}日`
+}
+
+const sortByTime = (arr) => [...arr].sort((a, b) => String(a.reportTime).localeCompare(String(b.reportTime)))
+
+const parseBp = (item) => {
+  const parts = String(item.value || '').split('/')
+  if (parts.length !== 2) return null
+  const s = Number(parts[0])
+  const d = Number(parts[1])
+  return Number.isFinite(s) && Number.isFinite(d) ? { systolic: s, diastolic: d } : null
+}
+
+const parseNum = (item) => {
+  const n = Number(item.value)
+  return Number.isFinite(n) ? n : null
+}
+
+// Load ALL data for charts
+const loadAllData = async () => {
+  try {
+    const res = await listHealthDataApi({ pageNo: 1, pageSize: 2000 })
+    allData.value = res?.list || []
+  } catch (e) {
+    allData.value = []
+  }
+}
+
+// Load filtered data for table
 const load = async () => {
   loading.value = true
-  if (trendChart) { trendChart.dispose(); trendChart = null }
   try {
     const res = await listHealthDataApi(query)
     list.value = res?.list || []
     total.value = res?.total || 0
-    await renderTrend()
   } catch (err) {
     ElMessage.error(err?.message || '加载健康数据失败，请稍后重试')
   } finally {
     loading.value = false
   }
+}
+
+const loadAll = async () => {
+  await Promise.all([loadAllData(), load()])
+  await nextTick()
+  renderAllCharts()
 }
 
 const onFilterChanged = () => {
@@ -131,100 +234,169 @@ const resetFilter = () => {
   load()
 }
 
-const parseNumericValue = (item, field) => {
-  if (!item) return null
-  const type = item.indicatorType
-  if (type === '血压') {
-    const arr = String(item.value || '').split('/')
-    if (arr.length !== 2) return null
-    const val = Number(field === 'diastolic' ? arr[1] : arr[0])
-    return Number.isFinite(val) ? val : null
-  }
-  const n = Number(item.value)
-  return Number.isFinite(n) ? n : null
+const renderAllCharts = () => {
+  renderBpChart()
+  renderSugarChart()
+  renderWeightChart()
+  renderMedChart()
 }
 
-const isBloodPressure = () => {
-  const selectedType = query.indicator_type
-  const source = list.value
-  return (selectedType || (source.length > 0 ? source[0].indicatorType : '')) === '血压'
-}
-
-const resolveThresholds = () => {
-  const selectedType = query.indicator_type
-  const source = list.value
-  const inferredType = source.length > 0 ? source[0].indicatorType : ''
-  const type = selectedType || inferredType
-  if (type === '血压') {
-    return [
-      { yAxis: 140, lineStyle: { color: '#e6a23c' }, label: { formatter: '收缩压偏高 140' } },
-      { yAxis: 180, lineStyle: { color: '#f56c6c' }, label: { formatter: '收缩压危急 180' } }
-    ]
-  }
-  if (type === '血糖') {
-    return [
-      { yAxis: 11.1, lineStyle: { color: '#e6a23c' }, label: { formatter: '偏高阈值 11.1' } },
-      { yAxis: 16.7, lineStyle: { color: '#f56c6c' }, label: { formatter: '危急阈值 16.7' } }
-    ]
-  }
-  if (type === '体重') {
-    return [{ yAxis: 200, lineStyle: { color: '#e6a23c' }, label: { formatter: '关注阈值 200' } }]
-  }
-  return []
-}
-
-const renderTrend = async () => {
+// ---- Blood Pressure Chart ----
+const renderBpChart = async () => {
   await nextTick()
-  if (list.value.length === 0) {
-    if (trendChart) {
-      trendChart.clear()
-    }
-    return
-  }
-  if (!trendRef.value) return
-  if (!trendChart) {
-    trendChart = echarts.init(trendRef.value)
-  }
+  if (!bpRef.value) return
+  if (!bpChart) bpChart = echarts.init(bpRef.value)
+  const sorted = sortByTime(bpData.value)
+  const xData = sorted.map(d => fmtDate(d.reportTime))
+  const systolic = sorted.map(d => parseBp(d)?.systolic ?? null)
+  const diastolic = sorted.map(d => parseBp(d)?.diastolic ?? null)
 
-  const sorted = [...list.value].sort((a, b) => String(a.reportTime).localeCompare(String(b.reportTime)))
-  const xAxis = sorted.map((item) => item.reportTime)
-  const thresholds = resolveThresholds()
-  const bp = isBloodPressure()
-
-  const series = bp
-    ? [
-        {
-          name: '收缩压',
-          type: 'line',
-          smooth: true,
-          data: sorted.map((item) => parseNumericValue(item, 'systolic')),
-          connectNulls: false,
-          markLine: thresholds.length > 0 ? { symbol: 'none', data: thresholds } : undefined
-        },
-        {
-          name: '舒张压',
-          type: 'line',
-          smooth: true,
-          data: sorted.map((item) => parseNumericValue(item, 'diastolic')),
-          connectNulls: false,
-          lineStyle: { type: 'dashed' }
-        }
-      ]
-    : [{
-        type: 'line',
-        smooth: true,
-        data: sorted.map((item) => parseNumericValue(item)),
-        connectNulls: false,
-        markLine: thresholds.length > 0 ? { symbol: 'none', data: thresholds } : undefined
-      }]
-
-  trendChart.clear()
-  trendChart.setOption({
+  bpChart.setOption({
     tooltip: { trigger: 'axis' },
-    legend: bp ? { data: ['收缩压', '舒张压'] } : undefined,
-    xAxis: { type: 'category', data: xAxis },
-    yAxis: { type: 'value' },
-    series
+    legend: { data: ['收缩压(高压)', '舒张压(低压)'], bottom: 0 },
+    grid: { left: 55, right: 50, top: 28, bottom: 60 },
+    xAxis: { type: 'category', data: xData, axisLabel: { rotate: 0, fontSize: 11 } },
+    yAxis: { type: 'value', name: 'mmHg', nameTextStyle: { fontSize: 11 }, min: 0 },
+    dataZoom: [{ type: 'inside' }, { type: 'slider', bottom: 8, height: 22 }],
+    series: [
+      {
+        name: '收缩压(高压)', type: 'line', smooth: true, data: systolic,
+        lineStyle: { width: 2, color: '#e74c3c' },
+        itemStyle: { color: '#e74c3c' },
+        markLine: {
+          silent: true, symbol: 'none',
+          label: { fontSize: 10 },
+          data: [
+            { yAxis: 140, lineStyle: { color: '#e6a23c', type: 'dashed' }, label: { formatter: '偏高140' } },
+            { yAxis: 180, lineStyle: { color: '#f56c6c', type: 'dashed' }, label: { formatter: '危险180' } }
+          ]
+        }
+      },
+      {
+        name: '舒张压(低压)', type: 'line', smooth: true, data: diastolic,
+        lineStyle: { width: 2, color: '#3498db' },
+        itemStyle: { color: '#3498db' },
+        markLine: {
+          silent: true, symbol: 'none',
+          label: { fontSize: 10 },
+          data: [
+            { yAxis: 90, lineStyle: { color: '#e6a23c', type: 'dashed' }, label: { formatter: '偏高90' } },
+            { yAxis: 110, lineStyle: { color: '#f56c6c', type: 'dashed' }, label: { formatter: '危险110' } }
+          ]
+        }
+      }
+    ]
+  })
+}
+
+// ---- Blood Sugar Chart ----
+const renderSugarChart = async () => {
+  await nextTick()
+  if (!sugarRef.value) return
+  if (!sugarChart) sugarChart = echarts.init(sugarRef.value)
+  const sorted = sortByTime(sugarData.value)
+  const xData = sorted.map(d => fmtDate(d.reportTime))
+  const values = sorted.map(d => parseNum(d))
+
+  sugarChart.setOption({
+    tooltip: { trigger: 'axis' },
+    grid: { left: 55, right: 65, top: 28, bottom: 60 },
+    xAxis: { type: 'category', data: xData, axisLabel: { rotate: 0, fontSize: 11 } },
+    yAxis: { type: 'value', name: 'mmol/L', nameTextStyle: { fontSize: 11 }, min: 0 },
+    dataZoom: [{ type: 'inside' }, { type: 'slider', bottom: 8, height: 22 }],
+    series: [{
+      name: '血糖值', type: 'line', smooth: true, data: values,
+      lineStyle: { width: 2, color: '#e67e22' },
+      itemStyle: { color: '#e67e22' },
+      areaStyle: { color: 'rgba(230, 126, 34, 0.08)' },
+      markLine: {
+        silent: true, symbol: 'none',
+        label: { fontSize: 10 },
+        data: [
+          { yAxis: 6.1, lineStyle: { color: '#e6a23c', type: 'dashed' }, label: { formatter: '正常上限6.1' } },
+          { yAxis: 11.1, lineStyle: { color: '#f56c6c', type: 'dashed' }, label: { formatter: '危险11.1' } }
+        ]
+      },
+      markArea: {
+        silent: true,
+        data: [
+          [{ yAxis: 0, itemStyle: { color: 'rgba(46, 204, 113, 0.06)' } }, { yAxis: 6.1 }],
+          [{ yAxis: 6.1, itemStyle: { color: 'rgba(230, 126, 34, 0.08)' } }, { yAxis: 11.1 }],
+          [{ yAxis: 11.1, itemStyle: { color: 'rgba(245, 108, 108, 0.1)' } }, { yAxis: 30 }]
+        ]
+      }
+    }]
+  })
+}
+
+// ---- Weight Chart ----
+const renderWeightChart = async () => {
+  await nextTick()
+  if (!weightRef.value) return
+  if (!weightChart) weightChart = echarts.init(weightRef.value)
+  const sorted = sortByTime(weightData.value)
+  const xData = sorted.map(d => fmtDate(d.reportTime))
+  const values = sorted.map(d => parseNum(d))
+
+  weightChart.setOption({
+    tooltip: { trigger: 'axis' },
+    grid: { left: 50, right: 20, top: 28, bottom: 60 },
+    xAxis: { type: 'category', data: xData, axisLabel: { rotate: 0, fontSize: 11 } },
+    yAxis: { type: 'value', name: 'kg', nameTextStyle: { fontSize: 11 }, min: 0 },
+    dataZoom: [{ type: 'inside' }, { type: 'slider', bottom: 8, height: 22 }],
+    series: [{
+      name: '体重', type: 'line', smooth: true, data: values,
+      lineStyle: { width: 2, color: '#2ecc71' },
+      itemStyle: { color: '#2ecc71' },
+      areaStyle: { color: 'rgba(46, 204, 113, 0.1)' }
+    }]
+  })
+}
+
+// ---- Medication Chart ----
+const renderMedChart = async () => {
+  await nextTick()
+  if (!medRef.value) return
+  if (!medChart) medChart = echarts.init(medRef.value)
+  const sorted = sortByTime(medData.value)
+  const xData = sorted.map(d => fmtDate(d.reportTime))
+
+  medChart.setOption({
+    tooltip: {
+      trigger: 'item',
+      formatter: (params) => {
+        const v = params.value
+        return `${params.name}<br/>${v === 1 ? '✅ 已服药' : '❌ 未服药'}`
+      }
+    },
+    grid: { left: 40, right: 20, top: 25, bottom: 60 },
+    xAxis: { type: 'category', data: xData, axisLabel: { rotate: 0, fontSize: 11 } },
+    yAxis: { type: 'value', min: -0.5, max: 1.5, show: false },
+    dataZoom: [{ type: 'inside' }, { type: 'slider', bottom: 8, height: 22 }],
+    series: [
+      {
+        name: '已服药',
+        type: 'scatter',
+        symbol: 'circle',
+        symbolSize: 16,
+        itemStyle: { color: '#2ecc71', borderColor: '#27ae60', borderWidth: 1 },
+        data: sorted.map((d, i) => {
+          const v = String(d.value || '')
+          return (v === '已服药' || v === '1') ? [xData[i], 0.8] : null
+        }).filter(Boolean)
+      },
+      {
+        name: '未服药',
+        type: 'scatter',
+        symbol: 'circle',
+        symbolSize: 16,
+        itemStyle: { color: '#e74c3c', borderColor: '#c0392b', borderWidth: 1, opacity: 0.7 },
+        data: sorted.map((d, i) => {
+          const v = String(d.value || '')
+          return (v !== '已服药' && v !== '1') ? [xData[i], 0.4] : null
+        }).filter(Boolean)
+      }
+    ]
   })
 }
 
@@ -252,7 +424,7 @@ const saveEdit = async () => {
     await updateHealthDataApi(form.id, form)
     ElMessage.success('更新成功')
     visible.value = false
-    await load()
+    await loadAll()
   } finally {
     saving.value = false
   }
@@ -269,75 +441,108 @@ const remove = async (id) => {
   })
   await deleteHealthDataApi(id)
   ElMessage.success('删除成功')
-  await load()
+  await loadAll()
 }
 
 const handleResize = () => {
-  if (trendChart) {
-    trendChart.resize()
-  }
+  bpChart?.resize()
+  sugarChart?.resize()
+  weightChart?.resize()
+  medChart?.resize()
 }
 
 onMounted(() => {
-  load()
+  loadAll()
   window.addEventListener('resize', handleResize)
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
-  if (trendChart) {
-    trendChart.dispose()
-    trendChart = null
-  }
+  bpChart?.dispose(); bpChart = null
+  sugarChart?.dispose(); sugarChart = null
+  weightChart?.dispose(); weightChart = null
+  medChart?.dispose(); medChart = null
 })
 </script>
 
 <style scoped>
-.toolbar {
+.charts-grid {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.chart-header {
+  display: flex;
   align-items: center;
-  gap: 12px;
-}
-
-.title {
-  font-size: 16px;
+  gap: 6px;
   font-weight: 600;
+  font-size: 14px;
 }
 
-.sub {
-  color: #909399;
+.chart-icon {
+  font-size: 16px;
+}
+
+.chart-unit {
   font-size: 12px;
+  color: var(--ink-2);
+  font-weight: 400;
 }
 
-.actions {
-  display: flex;
-  gap: 8px;
+.chart-desc {
+  font-size: 12px;
+  color: var(--ink-2);
+  font-weight: 400;
+  margin-left: 8px;
+}
+
+.chart-box {
+  width: 100%;
+  height: 400px;
+  min-height: 400px;
 }
 
 .chart-empty {
-  height: 140px;
+  min-height: 400px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #698188;
+  color: var(--ink-2);
   font-size: 13px;
 }
 
+.chart-card {
+  margin-bottom: 0;
+}
+
+.chart-empty-banner {
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--ink-2);
+  font-size: 14px;
+}
+
 .filter-row {
-  margin-bottom: 12px;
+  margin-bottom: 10px;
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.table-hint {
+  font-size: 12px;
+  color: var(--ink-2);
 }
 
 .summary-row {
   margin-bottom: 12px;
-}
-
-.trend-chart {
-  width: 100%;
-  height: 320px;
 }
 
 .pager {

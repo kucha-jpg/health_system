@@ -5,47 +5,51 @@
         <h3 class="page-title">反馈通道</h3>
       </div>
       <div class="page-actions">
+        <el-tag effect="plain" size="small">共 {{ total }} 条</el-tag>
         <el-button @click="reloadFromStart">刷新</el-button>
       </div>
     </div>
 
-    <div class="soft-tip">支持按时间范围筛选。</div>
+    <div class="soft-tip">提交反馈后，管理员将会尽快处理并回复。</div>
 
-    <el-form label-width="80px" class="feedback-form">
-      <el-form-item label="反馈内容">
-        <el-input v-model="content" type="textarea" :rows="4" maxlength="500" show-word-limit placeholder="请输入你遇到的问题、建议或改进想法" />
-      </el-form-item>
-      <el-form-item label="时间范围">
-        <el-date-picker
-          v-model="range"
-          class="w-360"
-          type="datetimerange"
-          range-separator="至"
-          start-placeholder="开始时间"
-          end-placeholder="结束时间"
-          value-format="YYYY-MM-DD HH:mm:ss"
-        />
-        <el-button class="filter-btn" @click="fillRangeToNow">至当前</el-button>
-        <el-button class="filter-btn" @click="reloadFromStart">筛选</el-button>
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" @click="submit">提交反馈</el-button>
-      </el-form-item>
-    </el-form>
+    <el-card class="submit-card" shadow="never">
+      <div class="submit-card-header">提交反馈</div>
+      <el-input
+        v-model="content"
+        type="textarea"
+        :rows="3"
+        maxlength="500"
+        show-word-limit
+        placeholder="请描述你遇到的问题、建议或改进想法"
+        class="submit-textarea"
+      />
+      <el-button type="primary" class="submit-btn" @click="submit">提交反馈</el-button>
+    </el-card>
+
+    <div class="filter-row">
+      <el-select v-model="statusFilter" class="w-130" clearable placeholder="处理状态" @change="reloadFromStart">
+        <el-option label="未处理" :value="0" />
+        <el-option label="已处理" :value="1" />
+      </el-select>
+      <span v-if="statusFilter !== '' && statusFilter !== null" class="filter-hint">
+        当前筛选：{{ statusFilter === 1 ? '已处理' : '未处理' }}
+      </span>
+    </div>
 
     <el-table :data="rows" border>
       <el-table-column prop="id" label="ID" width="80" />
-      <el-table-column prop="content" label="反馈内容" min-width="360" />
-      <el-table-column label="管理员回复" min-width="320">
+      <el-table-column prop="content" label="反馈内容" min-width="340" show-overflow-tooltip />
+      <el-table-column label="管理员回复" min-width="300" show-overflow-tooltip>
         <template #default="scope">
-          {{ scope.row.replyContent || '-' }}
+          <span v-if="scope.row.replyContent" class="reply-text">{{ scope.row.replyContent }}</span>
+          <span v-else class="no-reply">暂未回复</span>
         </template>
       </el-table-column>
       <el-table-column prop="repliedTime" label="回复时间" width="180" />
       <el-table-column prop="createTime" label="提交时间" width="180" />
-      <el-table-column label="状态" width="120">
+      <el-table-column label="状态" width="100" align="center">
         <template #default="scope">
-          <el-tag :type="scope.row.status === 1 ? 'success' : 'warning'">
+          <el-tag :type="scope.row.status === 1 ? 'success' : 'warning'" effect="plain">
             {{ scope.row.status === 1 ? '已处理' : '未处理' }}
           </el-tag>
         </template>
@@ -54,7 +58,7 @@
         <div class="empty-state">
           <div class="empty-illustration"></div>
           <div class="empty-title">暂无反馈记录</div>
-          <div class="empty-desc">可先提交一条反馈，管理员处理后会在此显示回复。</div>
+          <div class="empty-desc">提交一条反馈，管理员处理后会在此显示回复。</div>
         </div>
       </template>
     </el-table>
@@ -83,7 +87,7 @@ const rows = ref([])
 const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(10)
-const range = ref([])
+const statusFilter = ref(null)
 let timer = null
 
 const load = async () => {
@@ -91,22 +95,12 @@ const load = async () => {
     pageNo: pageNo.value,
     pageSize: pageSize.value
   }
-  if (range.value?.length === 2) {
-    params.startTime = range.value[0]
-    params.endTime = range.value[1]
+  if (statusFilter.value !== null && statusFilter.value !== '') {
+    params.status = statusFilter.value
   }
   const res = await listMyFeedbackPageApi(params)
   rows.value = res.records || []
   total.value = res.total || 0
-}
-
-const fillRangeToNow = () => {
-  const pad = (n) => String(n).padStart(2, '0')
-  const now = new Date()
-  const end = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`
-  const start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-  const begin = `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())} ${pad(start.getHours())}:${pad(start.getMinutes())}:${pad(start.getSeconds())}`
-  range.value = [begin, end]
 }
 
 const reloadFromStart = async () => {
@@ -144,18 +138,44 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.feedback-form {
-  max-width: 820px;
-  margin-bottom: 18px;
+.submit-card {
+  margin-bottom: 14px;
+  max-width: 600px;
 }
 
-.filter-btn {
-  margin-left: 8px;
+.submit-textarea {
+  max-width: 100%;
 }
 
-@media (max-width: 900px) {
-  .filter-btn {
-    margin-left: 0;
-  }
+.submit-card-header {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-1);
+  margin-bottom: 10px;
+}
+
+.submit-btn {
+  margin-top: 10px;
+}
+
+.reply-text {
+  color: var(--ink-1);
+}
+
+.no-reply {
+  color: var(--ink-2);
+  font-size: 12px;
+}
+
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.filter-hint {
+  font-size: 12px;
+  color: var(--ink-2);
 }
 </style>
