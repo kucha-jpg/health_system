@@ -35,6 +35,7 @@ public class AuthController {
 
     @GetMapping("/ping")
     public ApiResponse<Void> ping() {
+        // Connectivity health-check — used by session validation and container health probes
         return ApiResponse.success("ok", null);
     }
 }

@@ -116,7 +116,7 @@
     :close-on-press-escape="false"
     :show-close="false"
   >
-    <div class="notice-preview" v-html="previewNotice.content || '-'" />
+    <div class="notice-preview" v-html="sanitizeRichHtml(previewNotice.content) || '-'" />
   </el-dialog>
 </template>
 
@@ -124,6 +124,7 @@
 import { onMounted, onUnmounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { createNoticeApi, deleteNoticeApi, listNoticesApi, updateNoticeApi } from '../api/modules'
+import { sanitizeRichHtml } from '../utils/richHtml'
 
 const notices = ref([])
 const allNotices = ref([])
@@ -245,14 +246,18 @@ const save = async () => {
   } catch {
     return
   }
-  if (form.id) {
-    await updateNoticeApi(form)
-  } else {
-    await createNoticeApi(form)
+  try {
+    if (form.id) {
+      await updateNoticeApi(form)
+    } else {
+      await createNoticeApi(form)
+    }
+    ElMessage.success('保存成功')
+    visible.value = false
+    await load()
+  } catch (err) {
+    ElMessage.error(err?.message || '保存失败')
   }
-  ElMessage.success('保存成功')
-  visible.value = false
-  await load()
 }
 
 const remove = async (id) => {
@@ -268,9 +273,13 @@ const remove = async (id) => {
   } catch {
     return
   }
-  await deleteNoticeApi(id)
-  ElMessage.success('删除成功')
-  await load()
+  try {
+    await deleteNoticeApi(id)
+    ElMessage.success('删除成功')
+    await load()
+  } catch (err) {
+    ElMessage.error(err?.message || '删除失败')
+  }
 }
 
 onMounted(() => {

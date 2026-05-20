@@ -22,4 +22,6 @@ public interface AdminGroupGovernanceService {
     Map<String, Object> batchArchive(List<Long> ids);
 
     Map<String, Object> batchCrossDept(List<Long> ids, String targetDept);
+
+    Map<String, Object> deleteGroup(Long id);
 }

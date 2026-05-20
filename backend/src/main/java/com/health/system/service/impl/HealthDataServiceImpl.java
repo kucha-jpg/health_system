@@ -136,6 +136,7 @@ public class HealthDataServiceImpl implements HealthDataService {
         if (cacheEvictionSupport == null) return;
         String prefix = username + "::";
         cacheEvictionSupport.evictByPrefix(CacheNames.PATIENT_HEALTH_DATA_LIST, prefix);
+        cacheEvictionSupport.evictByPrefix(CacheNames.PATIENT_ALERT_LIST, prefix);
         cacheEvictionSupport.evictByPrefix(CacheNames.PATIENT_REPORT_SUMMARY, prefix);
         // Cross-user caches that can't be scoped to a single patient:
         // DOCTOR_PATIENT_INSIGHT keys are prefixed with doctorUsername, DOCTOR_OPEN_ALERTS likewise.

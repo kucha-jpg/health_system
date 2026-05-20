@@ -53,10 +53,14 @@ public class SystemNoticeServiceImpl implements SystemNoticeService {
         if (!includeOffline) {
             wrapper.eq(SystemNotice::getStatus, 1);
         }
+        if (StringUtils.hasText(safeTargetRole)) {
+            wrapper.and(w -> w.eq(SystemNotice::getTargetRole, safeTargetRole)
+                    .or().isNull(SystemNotice::getTargetRole)
+                    .or().eq(SystemNotice::getTargetRole, "ALL"));
+        }
 
         List<SystemNotice> notices = systemNoticeMapper.selectList(wrapper);
         return notices.stream()
-                .filter(item -> matchesTargetRoleFilter(item, safeTargetRole))
                 .filter(item -> matchesVisibleRole(item, safeVisibleRoleType, visibleUsername))
                 .toList();
     }

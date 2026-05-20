@@ -2,7 +2,9 @@ package com.health.system.controller;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -74,8 +76,13 @@ public class AdminGroupController {
 
     @PostMapping("/batch-cross-dept")
     public ApiResponse<Map<String, Object>> batchCrossDept(@RequestBody Map<String, Object> body) {
-        String targetDept = String.valueOf(body.getOrDefault("targetDept", ""));
+        String targetDept = Objects.toString(body.get("targetDept"), "");
         return ApiResponse.success(governanceService.batchCrossDept(parseIds(body), targetDept));
+    }
+
+    @DeleteMapping("/{id}")
+    public ApiResponse<Map<String, Object>> deleteGroup(@PathVariable Long id) {
+        return ApiResponse.success(governanceService.deleteGroup(id));
     }
 
     @SuppressWarnings("unchecked")

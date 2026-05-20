@@ -73,9 +73,12 @@
           {{ scope.row.lastActionTime || '-' }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" min-width="120" fixed="right">
+      <el-table-column label="操作" min-width="300" fixed="right">
         <template #default="scope">
-          <el-button link type="primary" @click="openDrawer(scope.row)">审核</el-button>
+          <el-button link type="primary" :disabled="scope.row.governanceStatus === 'ARCHIVED'" @click="approveGroup(scope.row)">审核通过</el-button>
+          <el-button link type="warning" :disabled="scope.row.governanceStatus === 'ARCHIVED'" @click="crossDeptGroup(scope.row)">跨科室</el-button>
+          <el-button link type="danger" :disabled="scope.row.governanceStatus === 'ARCHIVED'" @click="archiveGroup(scope.row)">归档</el-button>
+          <el-button link type="danger" @click="deleteGroup(scope.row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -92,38 +95,25 @@
       />
     </div>
   </el-card>
-
-  <GovernanceDrawer
-    v-model="drawerVisible"
-    :group="drawerGroup"
-    :loading="drawerLoading"
-    @approve="onDrawerApprove"
-    @reject="onDrawerReject"
-    @archive="onDrawerArchive"
-    @cross-dept="onDrawerCrossDept"
-  />
 </template>
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { downloadObjectsCsv } from '../utils/csv'
 import {
   approveGroupApi,
-  rejectGroupApi,
   archiveGroupApi,
   batchApproveGroupsApi,
   batchArchiveGroupsApi,
   batchCrossDeptGroupsApi,
   crossDeptGroupApi,
+  deleteGroupApi,
   getAdminGroupStatsApi,
   listAdminGroupsApi
 } from '../api/modules'
-import GovernanceDrawer from './components/GovernanceDrawer.vue'
 
 const loading = ref(false)
-const drawerVisible = ref(false)
-const drawerGroup = ref(null)
-const drawerLoading = ref(false)
 const groups = ref([])
 const selectedRows = ref([])
 const tableRef = ref(null)
@@ -148,7 +138,6 @@ const tableRows = computed(() => groups.value)
 const statusText = (status) => {
   const map = {
     PENDING_REVIEW: '待审核',
-    REJECTED: '已驳回',
     PENDING_ARCHIVE: '待归档',
     CROSS_DEPT: '跨科室中',
     ARCHIVED: '已归档',
@@ -159,7 +148,6 @@ const statusText = (status) => {
 
 const statusTagType = (status) => {
   if (status === 'PENDING_REVIEW') return 'warning'
-  if (status === 'REJECTED') return 'danger'
   if (status === 'PENDING_ARCHIVE') return 'info'
   if (status === 'CROSS_DEPT') return 'danger'
   if (status === 'ARCHIVED') return 'info'
@@ -219,65 +207,78 @@ const handlePageSizeChange = () => {
   load()
 }
 
-const openDrawer = (row) => {
-  drawerGroup.value = row
-  drawerVisible.value = true
+const approveGroup = async (row) => {
+  try {
+    await ElMessageBox.confirm(`确认审核通过群组「${row.groupName}」吗？`, '审核确认', {
+      type: 'warning',
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      closeOnClickModal: false,
+      closeOnPressEscape: false,
+      showClose: false
+    })
+  } catch { return }
+  await approveGroupApi(row.groupId)
+  ElMessage.success('审核通过')
+  await load()
 }
 
-const onDrawerApprove = async ({ group, remark }) => {
-  drawerLoading.value = true
+const archiveGroup = async (row) => {
   try {
-    await approveGroupApi(group.groupId, remark)
-    ElMessage.success(`群组「${group.groupName}」已审核通过`)
-    drawerVisible.value = false
+    await ElMessageBox.confirm(`确认归档群组「${row.groupName}」吗？归档后不再出现在可操作列表中。`, '归档确认', {
+      type: 'warning',
+      confirmButtonText: '确认归档',
+      cancelButtonText: '取消',
+      closeOnClickModal: false,
+      closeOnPressEscape: false,
+      showClose: false
+    })
+  } catch { return }
+  await archiveGroupApi(row.groupId)
+  ElMessage.success('已归档')
+  await load()
+}
+
+const deleteGroup = async (row) => {
+  try {
+    await ElMessageBox.confirm(`确认删除群组「${row.groupName}」吗？删除后数据不可恢复，请确认该群组下已无关联患者。`, '删除确认', {
+      type: 'error',
+      confirmButtonText: '确认删除',
+      cancelButtonText: '取消',
+      closeOnClickModal: false,
+      closeOnPressEscape: false,
+      showClose: false
+    })
+  } catch { return }
+  try {
+    await deleteGroupApi(row.groupId)
+    ElMessage.success('群组已删除')
     await load()
   } catch (err) {
-    ElMessage.error(err?.message || '审核操作失败')
-  } finally {
-    drawerLoading.value = false
+    ElMessage.error(err?.message || '删除失败')
   }
 }
 
-const onDrawerReject = async ({ group, reason }) => {
-  drawerLoading.value = true
+const crossDeptGroup = async (row) => {
+  let result
   try {
-    await rejectGroupApi(group.groupId, reason)
-    ElMessage.success(`群组「${group.groupName}」已驳回`)
-    drawerVisible.value = false
-    await load()
-  } catch (err) {
-    ElMessage.error(err?.message || '驳回操作失败')
-  } finally {
-    drawerLoading.value = false
+    result = await ElMessageBox.prompt('请输入目标科室名称', `跨科室 - ${row.groupName}`, {
+      inputPlaceholder: '例如：心内科二组',
+      confirmButtonText: '保存',
+      cancelButtonText: '取消',
+      closeOnClickModal: false,
+      closeOnPressEscape: false,
+      showClose: false
+    })
+  } catch { return }
+  const dept = String(result.value || '').trim()
+  if (!dept) {
+    ElMessage.warning('目标科室不能为空')
+    return
   }
-}
-
-const onDrawerArchive = async (group) => {
-  drawerLoading.value = true
-  try {
-    await archiveGroupApi(group.groupId)
-    ElMessage.success(`群组「${group.groupName}」已归档`)
-    drawerVisible.value = false
-    await load()
-  } catch (err) {
-    ElMessage.error(err?.message || '归档操作失败')
-  } finally {
-    drawerLoading.value = false
-  }
-}
-
-const onDrawerCrossDept = async ({ group, targetDept }) => {
-  drawerLoading.value = true
-  try {
-    await crossDeptGroupApi(group.groupId, { targetDept })
-    ElMessage.success(`群组「${group.groupName}」已发起跨科室（${targetDept}）`)
-    drawerVisible.value = false
-    await load()
-  } catch (err) {
-    ElMessage.error(err?.message || '跨科室操作失败')
-  } finally {
-    drawerLoading.value = false
-  }
+  await crossDeptGroupApi(row.groupId, { targetDept: dept })
+  ElMessage.success('跨科室流程已发起')
+  await load()
 }
 
 const confirmBatch = async (title, selected, executable) => {
@@ -297,31 +298,23 @@ const confirmBatch = async (title, selected, executable) => {
 }
 
 const batchApprove = async () => {
-  const executable = selectedRows.value.filter(r => r.governanceStatus === 'PENDING_REVIEW' || r.governanceStatus === 'CROSS_DEPT')
-  if (!executable.length) { ElMessage.warning('已选群组无可审核的（仅待审核或跨科室状态可操作）'); return }
+  const executable = selectedRows.value.filter(r => r.governanceStatus !== 'ARCHIVED')
+  if (!executable.length) { ElMessage.warning('已选群组均不可审核'); return }
   try { await confirmBatch('批量审核确认', selectedRows.value, executable) } catch { return }
-  try {
-    const res = await batchApproveGroupsApi({ ids: executable.map(r => r.groupId) })
-    ElMessage.success(`已审核通过 ${res?.processed || executable.length} 个群组，跳过 ${res?.skipped ?? 0} 个`)
-    clearSelected()
-    await load()
-  } catch (err) {
-    ElMessage.error(err?.message || '批量审核失败')
-  }
+  const res = await batchApproveGroupsApi({ ids: executable.map(r => r.groupId) })
+  ElMessage.success(`已审核通过 ${res?.processed || executable.length} 个群组`)
+  clearSelected()
+  await load()
 }
 
 const batchArchive = async () => {
   const executable = selectedRows.value.filter(r => r.governanceStatus !== 'ARCHIVED')
   if (!executable.length) { ElMessage.warning('已选群组均为已归档状态'); return }
   try { await confirmBatch('批量归档确认', selectedRows.value, executable) } catch { return }
-  try {
-    const res = await batchArchiveGroupsApi({ ids: executable.map(r => r.groupId) })
-    ElMessage.success(`已归档 ${res?.processed || executable.length} 个群组，跳过 ${res?.skipped ?? 0} 个`)
-    clearSelected()
-    await load()
-  } catch (err) {
-    ElMessage.error(err?.message || '批量归档失败')
-  }
+  const res = await batchArchiveGroupsApi({ ids: executable.map(r => r.groupId) })
+  ElMessage.success(`已归档 ${res?.processed || executable.length} 个群组`)
+  clearSelected()
+  await load()
 }
 
 const batchCrossDept = async () => {
@@ -341,22 +334,10 @@ const batchCrossDept = async () => {
   } catch { return }
   const dept = String(result.value || '').trim()
   if (!dept) { ElMessage.warning('目标科室不能为空'); return }
-  try {
-    const res = await batchCrossDeptGroupsApi({ ids: executable.map(r => r.groupId), targetDept: dept })
-    ElMessage.success(`已发起 ${res?.processed || executable.length} 个群组跨科室流程，跳过 ${res?.skipped ?? 0} 个`)
-    clearSelected()
-    await load()
-  } catch (err) {
-    ElMessage.error(err?.message || '批量跨科室失败')
-  }
-}
-
-const escapeCsv = (value) => {
-  const text = String(value ?? '')
-  if (text.includes('"') || text.includes(',') || text.includes('\n')) {
-    return `"${text.replace(/"/g, '""')}"`
-  }
-  return text
+  const res = await batchCrossDeptGroupsApi({ ids: executable.map(r => r.groupId), targetDept: dept })
+  ElMessage.success(`已发起 ${res?.processed || executable.length} 个群组跨科室流程`)
+  clearSelected()
+  await load()
 }
 
 const exportCsv = () => {
@@ -364,22 +345,24 @@ const exportCsv = () => {
     ElMessage.info('当前没有可导出的治理数据')
     return
   }
-  const header = ['群组名称', '负责医生', '患者数', '目标科室', '治理状态', '最近操作']
-  const lines = tableRows.value.map(row => [
-    row.groupName, row.doctorName, row.patientCount,
-    row.targetDept || '-', statusText(row.governanceStatus), row.lastActionTime || '-'
-  ].map(escapeCsv).join(','))
-  const csv = [header.join(','), ...lines].join('\n')
-  const blob = new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
+  const columns = [
+    { key: 'groupName', label: '群组名称' },
+    { key: 'doctorName', label: '负责医生' },
+    { key: 'patientCount', label: '患者数' },
+    { key: 'targetDept', label: '目标科室' },
+    { key: 'governanceStatus', label: '治理状态' },
+    { key: 'lastActionTime', label: '最近操作' }
+  ]
+  const exportRows = tableRows.value.map(row => ({
+    groupName: row.groupName,
+    doctorName: row.doctorName,
+    patientCount: row.patientCount,
+    targetDept: row.targetDept || '-',
+    governanceStatus: statusText(row.governanceStatus),
+    lastActionTime: row.lastActionTime || '-'
+  }))
   const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
-  link.download = `群组治理导出-${stamp}.csv`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
+  downloadObjectsCsv(exportRows, columns, `群组治理导出-${stamp}.csv`)
   ElMessage.success(`已导出 ${tableRows.value.length} 条记录`)
 }
 

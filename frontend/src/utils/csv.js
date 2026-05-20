@@ -18,3 +18,9 @@ export const downloadCsv = (lines, filename) => {
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
 }
+
+export const downloadObjectsCsv = (objects, columns, filename) => {
+  const header = columns.map(c => csvEscape(c.label)).join(',')
+  const rows = objects.map(obj => columns.map(c => csvEscape(obj[c.key] ?? '')).join(','))
+  downloadCsv([header, ...rows], filename)
+}

@@ -2,7 +2,7 @@
   <el-card class="page-shell role-home-v2 fade-in-page">
     <div class="page-header">
       <div>
-        <h3 class="page-title">工作首页</h3>
+        <h3 class="page-title">{{ role === 'ADMIN' ? '工作首页' : '首页' }}</h3>
       </div>
       <div class="page-actions">
         <el-button :loading="noticeLoading" @click="loadNotices">刷新公告</el-button>

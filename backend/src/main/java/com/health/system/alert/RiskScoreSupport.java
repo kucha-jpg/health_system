@@ -92,6 +92,8 @@ public final class RiskScoreSupport {
         return max;
     }
 
+    // NOTE: linearPredictDecimal and linearPredictInt share the same linear regression logic.
+    // If updating the algorithm, keep both methods in sync.
     public static BigDecimal linearPredictDecimal(List<HealthData> records) {
         if (records == null || records.size() < 2) {
             return null;

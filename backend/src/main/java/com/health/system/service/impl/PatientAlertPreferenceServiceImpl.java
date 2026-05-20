@@ -1,6 +1,7 @@
 package com.health.system.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.health.system.alert.IndicatorTypes;
 import com.health.system.common.BusinessException;
 import com.health.system.common.CacheNames;
 import com.health.system.config.CacheEvictionSupport;
@@ -98,7 +99,7 @@ public class PatientAlertPreferenceServiceImpl implements PatientAlertPreference
         String mediumRule = dto.getMediumRule();
 
         switch (indicatorType) {
-            case "血压" -> {
+            case IndicatorTypes.BLOOD_PRESSURE -> {
                 if (!StringUtils.hasText(highRule) || !isPressureRule(highRule)) {
                     throw BusinessException.badRequest("血压高风险阈值格式必须为xx/xx");
                 }
@@ -106,7 +107,7 @@ public class PatientAlertPreferenceServiceImpl implements PatientAlertPreference
                     throw BusinessException.badRequest("血压中风险阈值格式必须为xx/xx");
                 }
             }
-            case "血糖", "体重" -> {
+            case IndicatorTypes.BLOOD_SUGAR, IndicatorTypes.WEIGHT -> {
                 if (!StringUtils.hasText(highRule) || !isPositiveNumber(highRule)) {
                     throw BusinessException.badRequest("高风险阈值必须为正数");
                 }

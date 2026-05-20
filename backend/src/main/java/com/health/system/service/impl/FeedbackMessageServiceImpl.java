@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.health.system.common.BusinessException;
 import com.health.system.common.CacheNames;
@@ -61,7 +62,7 @@ public class FeedbackMessageServiceImpl implements FeedbackMessageService {
     }
 
     @Override
-    public Map<String, Object> listMinePaged(String username, LocalDateTime startTime, LocalDateTime endTime, int pageNo, int pageSize) {
+    public Map<String, Object> listMinePaged(String username, Integer status, LocalDateTime startTime, LocalDateTime endTime, int pageNo, int pageSize) {
         User user = requireNonAdminUser(username, "管理员账号无需查看该通道");
 
         int safePageNo = Math.min(Math.max(pageNo, 1), 1000);
@@ -70,6 +71,9 @@ public class FeedbackMessageServiceImpl implements FeedbackMessageService {
         LambdaQueryWrapper<FeedbackMessage> wrapper = new LambdaQueryWrapper<FeedbackMessage>()
                 .eq(FeedbackMessage::getSenderUserId, user.getId())
                 .orderByDesc(FeedbackMessage::getCreateTime);
+        if (status != null) {
+            wrapper.eq(FeedbackMessage::getStatus, status);
+        }
         applyDateRange(wrapper, startTime, endTime);
 
         Page<FeedbackMessage> page = feedbackMessageMapper.selectPage(new Page<>(safePageNo, safePageSize), wrapper);
@@ -186,16 +190,18 @@ public class FeedbackMessageServiceImpl implements FeedbackMessageService {
         }
 
         List<FeedbackMessage> unreadList = feedbackMessageMapper.selectList(new LambdaQueryWrapper<FeedbackMessage>()
+                .select(FeedbackMessage::getId)
                 .eq(FeedbackMessage::getSenderUserId, user.getId())
                 .eq(FeedbackMessage::getReplyRead, 0)
                 .eq(FeedbackMessage::getStatus, 1)
                 .isNotNull(FeedbackMessage::getReplyContent));
 
-        LocalDateTime now = LocalDateTime.now();
-        for (FeedbackMessage item : unreadList) {
-            item.setReplyRead(1);
-            item.setReplyReadTime(now);
-            feedbackMessageMapper.updateById(item);
+        if (!unreadList.isEmpty()) {
+            List<Long> unreadIds = unreadList.stream().map(FeedbackMessage::getId).toList();
+            feedbackMessageMapper.update(null, new LambdaUpdateWrapper<FeedbackMessage>()
+                    .in(FeedbackMessage::getId, unreadIds)
+                    .set(FeedbackMessage::getReplyRead, 1)
+                    .set(FeedbackMessage::getReplyReadTime, LocalDateTime.now()));
         }
     }
 

@@ -14,12 +14,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.health.system.common.ApiResponse;
+import com.health.system.dto.ComprehensiveScoreResult;
 import com.health.system.dto.DoctorGroupAddDoctorDTO;
 import com.health.system.dto.AlertHandleDTO;
 import com.health.system.dto.DoctorGroupAddPatientDTO;
 import com.health.system.dto.DoctorGroupDTO;
 import com.health.system.entity.DoctorGroup;
 import com.health.system.entity.User;
+import com.health.system.service.ComprehensiveScoreService;
 import com.health.system.service.DoctorGroupService;
 import com.health.system.service.DoctorPatientInsightService;
 import com.health.system.service.HealthAlertService;
@@ -33,13 +35,16 @@ public class DoctorController {
     private final HealthAlertService healthAlertService;
     private final DoctorGroupService doctorGroupService;
     private final DoctorPatientInsightService doctorPatientInsightService;
+    private final ComprehensiveScoreService comprehensiveScoreService;
 
     public DoctorController(HealthAlertService healthAlertService,
                             DoctorGroupService doctorGroupService,
-                            DoctorPatientInsightService doctorPatientInsightService) {
+                            DoctorPatientInsightService doctorPatientInsightService,
+                            ComprehensiveScoreService comprehensiveScoreService) {
         this.healthAlertService = healthAlertService;
         this.doctorGroupService = doctorGroupService;
         this.doctorPatientInsightService = doctorPatientInsightService;
+        this.comprehensiveScoreService = comprehensiveScoreService;
     }
 
     @GetMapping("/alerts")
@@ -119,5 +124,12 @@ public class DoctorController {
         return ApiResponse.success(
                 doctorPatientInsightService.patientInsight(authentication.getName(), patientUserId, indicatorType, timeRange)
         );
+    }
+
+    @GetMapping("/patients/{patientUserId}/comprehensive-score")
+    public ApiResponse<ComprehensiveScoreResult> getPatientComprehensiveScore(
+            Authentication authentication, @PathVariable Long patientUserId) {
+        return ApiResponse.success(
+                comprehensiveScoreService.calculateForPatient(authentication.getName(), patientUserId));
     }
 }

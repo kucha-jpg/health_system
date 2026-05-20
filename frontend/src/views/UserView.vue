@@ -47,10 +47,11 @@
           <el-tag :type="scope.row.status === 1 ? 'success' : 'danger'">{{ scope.row.status === 1 ? '启用' : '禁用' }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="220">
+      <el-table-column label="操作" width="280">
         <template #default="scope">
           <el-button link type="primary" @click="openDialog(scope.row)">编辑</el-button>
           <el-button link type="warning" @click="toggleStatus(scope.row)">{{ scope.row.status === 1 ? '禁用' : '启用' }}</el-button>
+          <el-button link type="danger" @click="deleteUser(scope.row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -103,7 +104,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { addUserApi, getUsersApi, updateUserApi, updateUserStatusApi } from '../api/modules'
+import { addUserApi, deleteUserApi, getUsersApi, updateUserApi, updateUserStatusApi } from '../api/modules'
 
 const users = ref([])
 const visible = ref(false)
@@ -222,6 +223,28 @@ const toggleStatus = async (row) => {
   await updateUserStatusApi(row.id, nextStatus)
   ElMessage.success(`账号已${actionText}`)
   await load()
+}
+
+const deleteUser = async (row) => {
+  try {
+    await ElMessageBox.confirm(`确认删除账号「${row.username}」吗？删除后数据不可恢复。`, '删除确认', {
+      type: 'error',
+      confirmButtonText: '确认删除',
+      cancelButtonText: '取消',
+      closeOnClickModal: false,
+      closeOnPressEscape: false,
+      showClose: false
+    })
+  } catch {
+    return
+  }
+  try {
+    await deleteUserApi(row.id)
+    ElMessage.success('账号已删除')
+    await load()
+  } catch (err) {
+    ElMessage.error(err?.message || '删除失败')
+  }
 }
 
 onMounted(() => {

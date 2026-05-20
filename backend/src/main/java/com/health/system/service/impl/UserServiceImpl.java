@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 
 @Service
 public class UserServiceImpl implements UserService {
@@ -101,8 +102,14 @@ public class UserServiceImpl implements UserService {
         }
         user.setName(dto.getName());
         user.setPhone(dto.getPhone());
+        boolean roleChanged = !Objects.equals(user.getRoleType(), dto.getRoleType());
         user.setRoleType(dto.getRoleType());
         user.setStatus(dto.getStatus());
+        if (roleChanged) {
+            Long currentVersionObj = user.getLoginVersion();
+            long currentVersion = currentVersionObj == null ? 0L : currentVersionObj;
+            user.setLoginVersion(currentVersion + 1L);
+        }
         userMapper.updateById(user);
 
         Role role = roleMapper.selectOne(new LambdaQueryWrapper<Role>().eq(Role::getRoleName, dto.getRoleType()));
@@ -129,5 +136,17 @@ public class UserServiceImpl implements UserService {
             user.setLoginVersion(currentVersion + 1L);
         }
         userMapper.updateById(user);
+    }
+
+    @Override
+    public void deleteUser(Long id) {
+        User user = userMapper.selectById(id);
+        if (user == null) {
+            throw BusinessException.notFound("用户不存在");
+        }
+        if ("ADMIN".equals(user.getRoleType())) {
+            throw BusinessException.badRequest("不允许删除管理员账号");
+        }
+        userMapper.deleteById(id);
     }
 }

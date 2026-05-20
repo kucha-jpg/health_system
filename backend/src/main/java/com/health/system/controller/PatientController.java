@@ -1,10 +1,12 @@
 package com.health.system.controller;
 
 import com.health.system.common.ApiResponse;
+import com.health.system.dto.ComprehensiveScoreResult;
 import com.health.system.dto.HealthDataDTO;
 import com.health.system.dto.PatientAlertPreferenceDTO;
 import com.health.system.dto.PatientArchiveDTO;
 import com.health.system.entity.PatientArchive;
+import com.health.system.service.ComprehensiveScoreService;
 import com.health.system.service.HealthAlertService;
 import com.health.system.service.HealthDataService;
 import com.health.system.service.PatientAlertPreferenceService;
@@ -25,17 +27,20 @@ public class PatientController {
     private final HealthAlertService healthAlertService;
     private final PatientReportService patientReportService;
     private final PatientAlertPreferenceService patientAlertPreferenceService;
+    private final ComprehensiveScoreService comprehensiveScoreService;
 
     public PatientController(PatientArchiveService patientArchiveService,
                              HealthDataService healthDataService,
                              HealthAlertService healthAlertService,
                              PatientReportService patientReportService,
-                             PatientAlertPreferenceService patientAlertPreferenceService) {
+                             PatientAlertPreferenceService patientAlertPreferenceService,
+                             ComprehensiveScoreService comprehensiveScoreService) {
         this.patientArchiveService = patientArchiveService;
         this.healthDataService = healthDataService;
         this.healthAlertService = healthAlertService;
         this.patientReportService = patientReportService;
         this.patientAlertPreferenceService = patientAlertPreferenceService;
+        this.comprehensiveScoreService = comprehensiveScoreService;
     }
 
     @GetMapping("/home")
@@ -132,5 +137,10 @@ public class PatientController {
                                                  Authentication authentication) {
         patientAlertPreferenceService.upsertMyPreference(authentication.getName(), dto);
         return ApiResponse.success("保存成功", null);
+    }
+
+    @GetMapping("/comprehensive-score")
+    public ApiResponse<ComprehensiveScoreResult> getComprehensiveScore(Authentication authentication) {
+        return ApiResponse.success(comprehensiveScoreService.calculate(authentication.getName()));
     }
 }

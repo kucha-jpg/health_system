@@ -43,6 +43,15 @@ public class BloodPressureAlertEvaluator implements AlertEvaluator {
         int[] high = RiskScoreSupport.parsePressure(context.highRule(), 140, 90);
         int[] medium = RiskScoreSupport.parsePressure(context.mediumRule(), 130, 85);
 
+        // Guangzhou seasonal adjustment: hot-humid climate (May-Oct) causes vasodilation.
+        // Thresholds are relaxed by 5 mmHg during this period to reduce false positives.
+        if (SeasonalAdjustmentSupport.isGuangzhouHotSeason()) {
+            high[0] = SeasonalAdjustmentSupport.adjustedSystolicThreshold(high[0]);
+            high[1] = SeasonalAdjustmentSupport.adjustedDiastolicThreshold(high[1]);
+            medium[0] = SeasonalAdjustmentSupport.adjustedSystolicThreshold(medium[0]);
+            medium[1] = SeasonalAdjustmentSupport.adjustedDiastolicThreshold(medium[1]);
+        }
+
         boolean highRisk = systolic >= high[0] || diastolic >= high[1];
         boolean mediumRisk = systolic >= medium[0] || diastolic >= medium[1];
 
@@ -79,7 +88,7 @@ public class BloodPressureAlertEvaluator implements AlertEvaluator {
         String reasonCode = "BP_MEDIUM_RULE";
         String reasonText = "血压达到中风险阈值";
         int predicted = RiskScoreSupport.linearPredictInt(recentData, Integer.MIN_VALUE);
-        if (predicted >= medium[0]) {
+        if (predicted >= high[0]) {
             score = Math.min(79, score + 4);
             reasonCode = "BP_TREND_UP";
             reasonText = "血压趋势预测接近高风险阈值";

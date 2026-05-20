@@ -101,10 +101,14 @@ const submit = async () => {
   if (!form.reportTime) {
     form.reportTime = nowString()
   }
-  await reportHealthDataApi(form)
-  ElMessage.success('上报成功')
-  form.value = ''
-  form.remark = ''
+  try {
+    await reportHealthDataApi(form)
+    ElMessage.success('上报成功')
+    form.value = ''
+    form.remark = ''
+  } catch (err) {
+    ElMessage.error(err?.message || '上报失败')
+  }
 }
 </script>
 

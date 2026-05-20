@@ -92,7 +92,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { authStore } from '../stores/auth'
@@ -116,6 +116,7 @@ const searchPatient = () => {
   router.push(`/doctor/patients/${id}`)
 }
 let sessionTimer = null
+let bodyLockTimer = null
 let feedbackTimer = null
 const pendingFeedbackCount = ref(0)
 const unreadFeedbackCount = ref(0)
@@ -196,6 +197,13 @@ const applyTheme = (theme) => {
   window.localStorage.setItem('hs_theme', nextTheme)
 }
 
+function cleanupBodyLock() {
+  if (document.body.style.paddingRight && !document.querySelector('.el-overlay')) {
+    document.body.style.overflow = ''
+    document.body.style.paddingRight = ''
+  }
+}
+
 onMounted(() => {
   document.body.setAttribute('data-role', role || 'PATIENT')
   const savedTheme = window.localStorage.getItem('hs_theme')
@@ -203,21 +211,25 @@ onMounted(() => {
   checkSession()
   loadPendingFeedbackCount()
   loadUnreadFeedbackCount()
-  sessionTimer = window.setInterval(async () => {
-    await checkSession()
-  }, 10000)
+  sessionTimer = window.setInterval(checkSession, 10000)
+  bodyLockTimer = window.setInterval(cleanupBodyLock, 500)
   feedbackTimer = window.setInterval(async () => {
     await loadPendingFeedbackCount()
     await loadUnreadFeedbackCount()
   }, 10000)
   document.addEventListener('visibilitychange', handleVisibilityChange)
   window.addEventListener('feedback:read', handleFeedbackRead)
+  router.afterEach(() => { nextTick(cleanupBodyLock) })
 })
 
 onUnmounted(() => {
   if (sessionTimer) {
     window.clearInterval(sessionTimer)
     sessionTimer = null
+  }
+  if (bodyLockTimer) {
+    window.clearInterval(bodyLockTimer)
+    bodyLockTimer = null
   }
   if (feedbackTimer) {
     window.clearInterval(feedbackTimer)

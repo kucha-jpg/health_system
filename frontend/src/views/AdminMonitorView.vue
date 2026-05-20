@@ -22,36 +22,29 @@
       <el-col :xs="24" :sm="8"><el-card shadow="never" class="summary-stat-card summary-stat-card--warn">未处理预警：{{ overview.openAlerts || 0 }}</el-card></el-col>
     </el-row>
 
+    <!-- Full-width 14-day trend -->
+    <el-card class="section-card" shadow="never" v-loading="loading">
+      <template #header>近14天上报趋势</template>
+      <div ref="dailyTrendRef" class="chart-main chart-main--tall"></div>
+    </el-card>
+
+    <!-- Pie + Bar side by side -->
     <el-row :gutter="12" class="chart-row" v-loading="loading">
-      <el-col :xs="24" :lg="14">
+      <el-col :xs="24" :lg="12">
         <el-card class="section-card" shadow="never">
-          <template #header>近14天上报趋势（时间维度）</template>
-          <div ref="dailyTrendRef" class="chart-main"></div>
-        </el-card>
-      </el-col>
-      <el-col :xs="24" :lg="10">
-        <el-card class="section-card" shadow="never">
-          <template #header>指标分布（饼图）</template>
+          <template #header>指标分布</template>
           <div ref="indicatorPieRef" class="chart-main"></div>
         </el-card>
       </el-col>
-    </el-row>
-
-    <el-row :gutter="12" class="chart-row" v-loading="loading">
       <el-col :xs="24" :lg="12">
         <el-card class="section-card" shadow="never">
-          <template #header>群组患者规模（群组维度）</template>
-          <div ref="groupBarRef" class="chart-main"></div>
-        </el-card>
-      </el-col>
-      <el-col :xs="24" :lg="12">
-        <el-card class="section-card" shadow="never">
-          <template #header>活跃患者 Top（用户维度）</template>
+          <template #header>活跃患者 Top</template>
           <div ref="userBarRef" class="chart-main"></div>
         </el-card>
       </el-col>
     </el-row>
 
+    <!-- Data table -->
     <el-card class="section-card" shadow="never">
       <template #header>最近上报数据</template>
       <el-table :data="pagedLatestHealthData" border v-loading="loading" empty-text="暂无数据">
@@ -86,13 +79,11 @@ const overview = ref({})
 const loading = ref(false)
 const dailyTrendRef = ref(null)
 const indicatorPieRef = ref(null)
-const groupBarRef = ref(null)
 const userBarRef = ref(null)
 const latestPageNo = ref(1)
 const latestPageSize = ref(10)
 let dailyTrendChart = null
 let indicatorPieChart = null
-let groupBarChart = null
 let userBarChart = null
 
 const latestHealthData = computed(() => overview.value?.latestHealthData || [])
@@ -111,8 +102,13 @@ const renderCharts = async () => {
     dailyTrendChart.setOption({
       color: [CHART_PALETTE[1]],
       tooltip: { trigger: 'axis' },
-      xAxis: { type: 'category', data: trend.map((item) => item.date) },
-      yAxis: { type: 'value', name: '上报数', splitLine: CHART_SPLIT_LINE },
+      grid: { left: 55, right: 30, top: 28, bottom: 30 },
+      xAxis: { type: 'category', data: trend.map((item) => {
+        const d = item.date
+        if (!d || d.length < 10) return d
+        return `${parseInt(d.slice(5, 7))}月${parseInt(d.slice(8, 10))}日`
+      }) },
+      yAxis: { type: 'value', name: '上报数', nameTextStyle: { fontSize: 11 }, splitLine: CHART_SPLIT_LINE },
       series: [{ type: 'line', smooth: true, areaStyle: { opacity: 0.2 }, data: trend.map((item) => item.count) }]
     })
   }
@@ -128,21 +124,9 @@ const renderCharts = async () => {
       series: [{
         type: 'pie',
         radius: ['35%', '68%'],
+        center: ['50%', '45%'],
         data: source.map((item) => ({ name: toIndicatorLabel(item.indicatorType), value: item.count }))
       }]
-    })
-  }
-
-  if (groupBarRef.value) {
-    if (!groupBarChart) groupBarChart = echarts.init(groupBarRef.value)
-    groupBarChart.clear()
-    const source = overview.value?.groupStats || []
-    groupBarChart.setOption({
-      color: [CHART_PALETTE[0]],
-      tooltip: { trigger: 'axis' },
-      xAxis: { type: 'category', data: source.map((item) => item.groupName) },
-      yAxis: { type: 'value', name: '患者数', splitLine: CHART_SPLIT_LINE },
-      series: [{ type: 'bar', barMaxWidth: 34, data: source.map((item) => item.patientCount) }]
     })
   }
 
@@ -153,9 +137,10 @@ const renderCharts = async () => {
     userBarChart.setOption({
       color: [CHART_PALETTE[2]],
       tooltip: { trigger: 'axis' },
+      grid: { left: 60, right: 20, top: 28, bottom: 30 },
       xAxis: { type: 'category', data: source.map((item) => item.name || item.username) },
-      yAxis: { type: 'value', name: '上报次数', splitLine: CHART_SPLIT_LINE },
-      series: [{ type: 'bar', barMaxWidth: 34, data: source.map((item) => item.count) }]
+      yAxis: { type: 'value', name: '上报次数', nameTextStyle: { fontSize: 11 }, splitLine: CHART_SPLIT_LINE, minInterval: 1 },
+      series: [{ type: 'bar', barMaxWidth: 34, data: source.map((item) => item.count), itemStyle: { borderRadius: [4, 4, 0, 0] } }]
     })
   }
 }
@@ -196,36 +181,19 @@ const exportCsv = () => {
   })
   lines.push('')
 
-  lines.push('群组规模')
-  lines.push('群组ID,群组名称,患者数')
-  ;(overview.value?.groupStats || []).forEach((row) => {
-    lines.push(`${csvEscape(row.groupId)},${csvEscape(row.groupName)},${csvEscape(row.patientCount)}`)
-  })
-  lines.push('')
-
   lines.push('活跃患者Top')
   lines.push('用户ID,用户名,姓名,上报次数')
   ;(overview.value?.activeUserStats || []).forEach((row) => {
     lines.push(`${csvEscape(row.userId)},${csvEscape(row.username)},${csvEscape(row.name)},${csvEscape(row.count)}`)
   })
 
-  const csvText = `\uFEFF${lines.join('\n')}`
-  const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `admin_monitor_${Date.now()}.csv`
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
+  downloadCsv(lines, `admin_monitor_${Date.now()}.csv`)
   ElMessage.success('监控报表导出成功')
 }
 
 const handleResize = () => {
   if (dailyTrendChart) dailyTrendChart.resize()
   if (indicatorPieChart) indicatorPieChart.resize()
-  if (groupBarChart) groupBarChart.resize()
   if (userBarChart) userBarChart.resize()
 }
 
@@ -234,29 +202,33 @@ onMounted(() => {
   showFirstVisitGuide({
     storageKey: 'guide_admin_monitor_v1',
     title: '监控总览引导',
-    message: '建议先看近14天趋势，再结合指标分布和群组规模定位异常区域，最后通过活跃患者Top快速锁定重点对象。'
+    message: '近14天趋势反映整体上报活跃度，指标分布展示各指标占比，活跃患者Top帮助快速锁定重点关注对象。'
   }).catch(() => {})
   window.addEventListener('resize', handleResize)
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
-  if (dailyTrendChart) dailyTrendChart.dispose()
-  if (indicatorPieChart) indicatorPieChart.dispose()
-  if (groupBarChart) groupBarChart.dispose()
-  if (userBarChart) userBarChart.dispose()
+  if (dailyTrendChart) { dailyTrendChart.dispose(); dailyTrendChart = null }
+  if (indicatorPieChart) { indicatorPieChart.dispose(); indicatorPieChart = null }
+  if (userBarChart) { userBarChart.dispose(); userBarChart = null }
 })
 </script>
 
 <style scoped>
 .summary-row,
 .chart-row {
+  margin-top: 16px;
   margin-bottom: 12px;
 }
 
 .chart-main {
   width: 100%;
   height: 300px;
+}
+
+.chart-main--tall {
+  height: 360px;
 }
 
 .summary-stat-card {
@@ -266,5 +238,9 @@ onUnmounted(() => {
 
 .summary-stat-card--warn {
   color: #8a4b28;
+}
+
+.section-card {
+  margin-bottom: 0;
 }
 </style>
