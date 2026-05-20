@@ -52,7 +52,7 @@ public class AuthServiceImpl implements AuthService {
     public Map<String, Object> login(LoginRequest request) {
         String username = request.getUsername();
         User user = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, request.getUsername()));
-        if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+        if (user == null || user.getPassword() == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             safeSaveOperationLog(username, "ANONYMOUS", "POST", "/api/auth/login", false, "LOGIN_FAILED_BAD_CREDENTIALS");
             throw BusinessException.unauthorized("用户名或密码错误");
         }
@@ -61,18 +61,25 @@ public class AuthServiceImpl implements AuthService {
             throw BusinessException.forbidden("该账号已被禁用");
         }
 
-        long prevVersion = user.getLoginVersion() == null ? 0L : user.getLoginVersion();
-        long nextVersion = prevVersion + 1;
+        long nextVersion;
         try {
             userMapper.update(null, new LambdaUpdateWrapper<User>()
                     .eq(User::getId, user.getId())
                     .setSql("login_version = COALESCE(login_version, 0) + 1"));
         } catch (Exception ex) {
             log.warn("DB version increment failed for user {}, using local fallback", username);
+            long prevVersion = user.getLoginVersion() == null ? 0L : user.getLoginVersion();
+            nextVersion = prevVersion + 1;
             userMapper.update(null, new LambdaUpdateWrapper<User>()
                     .eq(User::getId, user.getId())
                     .set(User::getLoginVersion, nextVersion));
         }
+        User refreshed = userMapper.selectById(user.getId());
+        if (refreshed == null) {
+            safeSaveOperationLog(username, user.getRoleType(), "POST", "/api/auth/login", false, "LOGIN_FAILED_ACCOUNT_DELETED");
+            throw BusinessException.unauthorized("账号不存在");
+        }
+        nextVersion = refreshed.getLoginVersion() == null ? 1L : refreshed.getLoginVersion();
 
         String token = jwtUtils.generateToken(user.getUsername(), user.getRoleType(), user.getId(), nextVersion);
         Map<String, Object> userInfo = new HashMap<>();

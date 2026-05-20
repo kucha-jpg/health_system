@@ -24,16 +24,9 @@ public class CacheEvictionSupport {
         Cache cache = cacheManager.getCache(cacheName);
         if (cache == null) return;
 
-        try {
-            if (cache.getNativeCache() instanceof java.util.Map<?, ?> map) {
-                map.keySet().removeIf(key -> key instanceof String str && str.startsWith(keyPrefix));
-                log.debug("Evicted {} entries from cache {} by prefix {}", map.size(), cacheName, keyPrefix);
-                return;
-            }
-        } catch (Exception ex) {
-            log.warn("Failed to evict cache {} by prefix, falling back to clear all: {}", cacheName, ex.getMessage());
-        }
-
+        // Redis-backed caches don't expose a java.util.Map native cache,
+        // so prefix-based eviction isn't feasible without a Lua script.
+        // For safety and correctness, clear the entire named cache region.
         cache.clear();
     }
 }

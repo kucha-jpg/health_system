@@ -20,6 +20,7 @@
 - `POST /api/admin/user`：管理员新增患者/医生账号
 - `PUT /api/admin/user`：管理员编辑账号
 - `PATCH /api/admin/user/{id}/status?status=0|1`：管理员禁用/启用账号
+- `DELETE /api/admin/user/{id}`：管理员删除账号
 
 ## 患者档案与上报接口
 
@@ -188,7 +189,7 @@ nginx -t && nginx -s reload
   - 说明：`FlywayMigrationIntegrationTest` 使用 Testcontainers，在无 Docker 环境时会自动跳过（`@Testcontainers(disabledWithoutDocker = true)`）
 - 接口测试脚本：`scripts/api_test.sh`
 - 错误码门禁脚本：`scripts/api_assert.ps1`、`scripts/api_assert.sh`（仅执行 400/401/403/404/409 断言）
-- 前端手工测试步骤与核心场景：`docs/testing_cases.md`
+- 前端手工测试步骤与核心场景：参考 SCRIPTS 目录下的接口测试脚本
 
 说明（Windows）：执行 `*.sh` 脚本需要 WSL 或 Git Bash 环境；若仅有 PowerShell，请使用 `*.ps1` 脚本。
 
@@ -324,4 +325,4 @@ IMAGE_PREFIX=docker.m.daocloud.io/library/ docker compose up -d --build
 - 前端：`http://localhost`
 - 后端：`http://localhost:9090`
 
-推荐按 `docs/testing_cases.md` 执行分角色验收步骤。
+推荐按角色分别登录（管理员/医生/患者）进行功能验收，账号密码见 SQL 种子脚本。

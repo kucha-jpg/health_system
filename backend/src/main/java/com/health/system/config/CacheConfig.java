@@ -14,33 +14,32 @@ import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSeriali
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 
 @Configuration
-@EnableCaching
 public class CacheConfig {
 
     @Bean
     public RedisCacheManagerBuilderCustomizer redisCacheManagerBuilderCustomizer(ObjectMapper objectMapper) {
-    ObjectMapper cacheObjectMapper = objectMapper.copy();
-    cacheObjectMapper.registerModule(new JavaTimeModule());
-    cacheObjectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        ObjectMapper cacheObjectMapper = objectMapper.copy();
+        cacheObjectMapper.registerModule(new JavaTimeModule());
+        cacheObjectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
-    BasicPolymorphicTypeValidator typeValidator = BasicPolymorphicTypeValidator.builder()
-        .allowIfSubType("com.health.system.")
-        .allowIfSubType("java.lang.")
-        .allowIfSubType("java.util.")
-        .allowIfSubType("java.time.")
-        .allowIfSubType("java.math.")
-        .build();
+        BasicPolymorphicTypeValidator typeValidator = BasicPolymorphicTypeValidator.builder()
+            .allowIfSubType("com.health.system.")
+            .allowIfSubType("java.lang.")
+            .allowIfSubType("java.util.")
+            .allowIfSubType("java.time.")
+            .allowIfSubType("java.math.")
+            .build();
 
-    cacheObjectMapper.activateDefaultTyping(
-        typeValidator,
-        ObjectMapper.DefaultTyping.NON_FINAL,
-        JsonTypeInfo.As.PROPERTY
-    );
+        cacheObjectMapper.activateDefaultTyping(
+            typeValidator,
+            ObjectMapper.DefaultTyping.NON_FINAL,
+            JsonTypeInfo.As.PROPERTY
+        );
 
         RedisSerializationContext.SerializationPair<Object> jsonPair =
-        RedisSerializationContext.SerializationPair.fromSerializer(
-            new GenericJackson2JsonRedisSerializer(cacheObjectMapper)
-        );
+            RedisSerializationContext.SerializationPair.fromSerializer(
+                new GenericJackson2JsonRedisSerializer(cacheObjectMapper)
+            );
 
         return (builder) -> builder.cacheDefaults(
                 RedisCacheConfiguration.defaultCacheConfig()

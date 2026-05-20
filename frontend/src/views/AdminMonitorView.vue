@@ -187,16 +187,7 @@ const exportCsv = () => {
     lines.push(`${csvEscape(row.userId)},${csvEscape(row.username)},${csvEscape(row.name)},${csvEscape(row.count)}`)
   })
 
-  const csvText = `﻿${lines.join('\n')}`
-  const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `admin_monitor_${Date.now()}.csv`
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
+  downloadCsv(lines, `admin_monitor_${Date.now()}.csv`)
   ElMessage.success('监控报表导出成功')
 }
 

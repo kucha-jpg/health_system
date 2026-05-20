@@ -1,5 +1,7 @@
 package com.health.system.common;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -19,6 +21,8 @@ import java.util.Base64;
 
 @Component
 public class SensitiveDataCipher {
+
+    private static final Logger log = LoggerFactory.getLogger(SensitiveDataCipher.class);
 
     private static final String PREFIX = "ENC:";
     private static final int IV_LENGTH = 12;
@@ -74,6 +78,7 @@ public class SensitiveDataCipher {
         } catch (IllegalArgumentException | NoSuchAlgorithmException | NoSuchPaddingException |
                  InvalidKeyException | InvalidAlgorithmParameterException |
                  IllegalBlockSizeException | BadPaddingException ex) {
+            log.warn("Failed to decrypt: {}", ex.getMessage());
             return cipherText;
         }
     }

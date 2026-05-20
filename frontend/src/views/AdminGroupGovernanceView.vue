@@ -73,11 +73,12 @@
           {{ scope.row.lastActionTime || '-' }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" min-width="250" fixed="right">
+      <el-table-column label="操作" min-width="300" fixed="right">
         <template #default="scope">
           <el-button link type="primary" :disabled="scope.row.governanceStatus === 'ARCHIVED'" @click="approveGroup(scope.row)">审核通过</el-button>
           <el-button link type="warning" :disabled="scope.row.governanceStatus === 'ARCHIVED'" @click="crossDeptGroup(scope.row)">跨科室</el-button>
           <el-button link type="danger" :disabled="scope.row.governanceStatus === 'ARCHIVED'" @click="archiveGroup(scope.row)">归档</el-button>
+          <el-button link type="danger" @click="deleteGroup(scope.row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -99,6 +100,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { downloadObjectsCsv } from '../utils/csv'
 import {
   approveGroupApi,
   archiveGroupApi,
@@ -106,6 +108,7 @@ import {
   batchArchiveGroupsApi,
   batchCrossDeptGroupsApi,
   crossDeptGroupApi,
+  deleteGroupApi,
   getAdminGroupStatsApi,
   listAdminGroupsApi
 } from '../api/modules'
@@ -236,6 +239,26 @@ const archiveGroup = async (row) => {
   await load()
 }
 
+const deleteGroup = async (row) => {
+  try {
+    await ElMessageBox.confirm(`确认删除群组「${row.groupName}」吗？删除后数据不可恢复，请确认该群组下已无关联患者。`, '删除确认', {
+      type: 'error',
+      confirmButtonText: '确认删除',
+      cancelButtonText: '取消',
+      closeOnClickModal: false,
+      closeOnPressEscape: false,
+      showClose: false
+    })
+  } catch { return }
+  try {
+    await deleteGroupApi(row.groupId)
+    ElMessage.success('群组已删除')
+    await load()
+  } catch (err) {
+    ElMessage.error(err?.message || '删除失败')
+  }
+}
+
 const crossDeptGroup = async (row) => {
   let result
   try {
@@ -317,35 +340,29 @@ const batchCrossDept = async () => {
   await load()
 }
 
-const escapeCsv = (value) => {
-  const text = String(value ?? '')
-  if (text.includes('"') || text.includes(',') || text.includes('\n')) {
-    return `"${text.replace(/"/g, '""')}"`
-  }
-  return text
-}
-
 const exportCsv = () => {
   if (!tableRows.value.length) {
     ElMessage.info('当前没有可导出的治理数据')
     return
   }
-  const header = ['群组名称', '负责医生', '患者数', '目标科室', '治理状态', '最近操作']
-  const lines = tableRows.value.map(row => [
-    row.groupName, row.doctorName, row.patientCount,
-    row.targetDept || '-', statusText(row.governanceStatus), row.lastActionTime || '-'
-  ].map(escapeCsv).join(','))
-  const csv = [header.join(','), ...lines].join('\n')
-  const blob = new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
+  const columns = [
+    { key: 'groupName', label: '群组名称' },
+    { key: 'doctorName', label: '负责医生' },
+    { key: 'patientCount', label: '患者数' },
+    { key: 'targetDept', label: '目标科室' },
+    { key: 'governanceStatus', label: '治理状态' },
+    { key: 'lastActionTime', label: '最近操作' }
+  ]
+  const exportRows = tableRows.value.map(row => ({
+    groupName: row.groupName,
+    doctorName: row.doctorName,
+    patientCount: row.patientCount,
+    targetDept: row.targetDept || '-',
+    governanceStatus: statusText(row.governanceStatus),
+    lastActionTime: row.lastActionTime || '-'
+  }))
   const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
-  link.download = `群组治理导出-${stamp}.csv`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
+  downloadObjectsCsv(exportRows, columns, `群组治理导出-${stamp}.csv`)
   ElMessage.success(`已导出 ${tableRows.value.length} 条记录`)
 }
 

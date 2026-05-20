@@ -2,7 +2,9 @@ package com.health.system.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.health.system.common.BusinessException;
+import com.health.system.common.CacheNames;
 import com.health.system.common.SensitiveDataCipher;
+import com.health.system.config.CacheEvictionSupport;
 import com.health.system.dto.PatientArchiveDTO;
 import com.health.system.entity.PatientArchive;
 import com.health.system.entity.User;
@@ -17,13 +19,16 @@ public class PatientArchiveServiceImpl implements PatientArchiveService {
     private final PatientArchiveMapper patientArchiveMapper;
     private final UserMapper userMapper;
     private final SensitiveDataCipher sensitiveDataCipher;
+    private final CacheEvictionSupport cacheEvictionSupport;
 
     public PatientArchiveServiceImpl(PatientArchiveMapper patientArchiveMapper,
                                      UserMapper userMapper,
-                                     SensitiveDataCipher sensitiveDataCipher) {
+                                     SensitiveDataCipher sensitiveDataCipher,
+                                     CacheEvictionSupport cacheEvictionSupport) {
         this.patientArchiveMapper = patientArchiveMapper;
         this.userMapper = userMapper;
         this.sensitiveDataCipher = sensitiveDataCipher;
+        this.cacheEvictionSupport = cacheEvictionSupport;
     }
 
     @Override
@@ -54,6 +59,7 @@ public class PatientArchiveServiceImpl implements PatientArchiveService {
             archive.setUpdateTime(null);
             patientArchiveMapper.updateById(archive);
         }
+        cacheEvictionSupport.evictByPrefix(CacheNames.DOCTOR_PATIENT_INSIGHT, "");
     }
 
     @Override

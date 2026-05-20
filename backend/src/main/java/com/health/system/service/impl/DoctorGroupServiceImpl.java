@@ -2,9 +2,11 @@ package com.health.system.service.impl;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.springframework.stereotype.Service;
 
@@ -154,11 +156,21 @@ public class DoctorGroupServiceImpl implements DoctorGroupService {
         List<DoctorGroupDoctorMember> members = doctorGroupDoctorMemberMapper.selectList(
                 new LambdaQueryWrapper<DoctorGroupDoctorMember>().eq(DoctorGroupDoctorMember::getGroupId, groupId)
         );
-        for (DoctorGroupDoctorMember item : members) {
-            User doctor = userMapper.selectById(item.getDoctorUserId());
-            if (doctor != null && "DOCTOR".equals(doctor.getRoleType())
-                    && result.stream().noneMatch(u -> u.getId().equals(doctor.getId()))) {
-                result.add(doctor);
+        if (!members.isEmpty()) {
+            Set<Long> seenIds = new HashSet<>();
+            seenIds.add(group.getDoctorId());
+            List<Long> doctorIds = members.stream()
+                    .map(DoctorGroupDoctorMember::getDoctorUserId)
+                    .filter(id -> !seenIds.contains(id))
+                    .distinct()
+                    .toList();
+            if (!doctorIds.isEmpty()) {
+                List<User> doctors = userMapper.selectBatchIds(doctorIds);
+                for (User doctor : doctors) {
+                    if (doctor != null && "DOCTOR".equals(doctor.getRoleType())) {
+                        result.add(doctor);
+                    }
+                }
             }
         }
         return result;
@@ -233,9 +245,16 @@ public class DoctorGroupServiceImpl implements DoctorGroupService {
         doctorAccessSupport.assertGroupAccessible(doctor.getId(), groupId);
         List<DoctorGroupMember> members = doctorGroupMemberMapper.selectList(new LambdaQueryWrapper<DoctorGroupMember>()
                 .eq(DoctorGroupMember::getGroupId, groupId));
+        if (members.isEmpty()) {
+            return List.of();
+        }
+        List<Long> patientIds = members.stream()
+                .map(DoctorGroupMember::getPatientUserId)
+                .distinct()
+                .toList();
+        List<User> allUsers = userMapper.selectBatchIds(patientIds);
         List<User> patients = new ArrayList<>();
-        for (DoctorGroupMember member : members) {
-            User user = userMapper.selectById(member.getPatientUserId());
+        for (User user : allUsers) {
             if (user != null && "PATIENT".equals(user.getRoleType())) {
                 patients.add(user);
             }

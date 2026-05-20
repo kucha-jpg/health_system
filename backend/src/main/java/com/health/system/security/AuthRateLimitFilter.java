@@ -105,13 +105,8 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     }
 
     private String resolveClientIp(HttpServletRequest request) {
-        String xff = request.getHeader("X-Forwarded-For");
-        if (xff != null && !xff.isBlank()) {
-            String[] parts = xff.split(",");
-            if (parts.length > 0 && !parts[0].isBlank()) {
-                return parts[0].trim();
-            }
-        }
+        // Prefer X-Real-IP set by the trusted Nginx reverse proxy.
+        // X-Forwarded-For can be client-spoofed, so skip it.
         String realIp = request.getHeader("X-Real-IP");
         if (realIp != null && !realIp.isBlank()) {
             return realIp.trim();

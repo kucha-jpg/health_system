@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.health.system.common.BusinessException;
 import com.health.system.common.CacheNames;
@@ -189,16 +190,18 @@ public class FeedbackMessageServiceImpl implements FeedbackMessageService {
         }
 
         List<FeedbackMessage> unreadList = feedbackMessageMapper.selectList(new LambdaQueryWrapper<FeedbackMessage>()
+                .select(FeedbackMessage::getId)
                 .eq(FeedbackMessage::getSenderUserId, user.getId())
                 .eq(FeedbackMessage::getReplyRead, 0)
                 .eq(FeedbackMessage::getStatus, 1)
                 .isNotNull(FeedbackMessage::getReplyContent));
 
-        LocalDateTime now = LocalDateTime.now();
-        for (FeedbackMessage item : unreadList) {
-            item.setReplyRead(1);
-            item.setReplyReadTime(now);
-            feedbackMessageMapper.updateById(item);
+        if (!unreadList.isEmpty()) {
+            List<Long> unreadIds = unreadList.stream().map(FeedbackMessage::getId).toList();
+            feedbackMessageMapper.update(null, new LambdaUpdateWrapper<FeedbackMessage>()
+                    .in(FeedbackMessage::getId, unreadIds)
+                    .set(FeedbackMessage::getReplyRead, 1)
+                    .set(FeedbackMessage::getReplyReadTime, LocalDateTime.now()));
         }
     }
 

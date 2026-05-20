@@ -61,17 +61,25 @@ const load = async () => {
 }
 
 const save = async () => {
-  await ElMessageBox.confirm('确认保存档案？', '保存确认', {
-    type: 'warning',
-    confirmButtonText: '确认',
-    cancelButtonText: '取消',
-    closeOnClickModal: false,
-    closeOnPressEscape: false,
-    showClose: false
-  })
-  await saveArchiveApi(form)
-  await load()
-  ElMessage.success('保存成功')
+  try {
+    await ElMessageBox.confirm('确认保存档案？', '保存确认', {
+      type: 'warning',
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      closeOnClickModal: false,
+      closeOnPressEscape: false,
+      showClose: false
+    })
+  } catch {
+    return
+  }
+  try {
+    await saveArchiveApi(form)
+    await load()
+    ElMessage.success('保存成功')
+  } catch (err) {
+    ElMessage.error(err?.message || '保存失败')
+  }
 }
 
 onMounted(load)

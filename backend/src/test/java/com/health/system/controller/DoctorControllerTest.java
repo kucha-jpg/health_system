@@ -16,6 +16,7 @@ import org.springframework.security.core.Authentication;
 
 import com.health.system.common.ApiResponse;
 import com.health.system.entity.HealthAlert;
+import com.health.system.service.ComprehensiveScoreService;
 import com.health.system.service.DoctorGroupService;
 import com.health.system.service.DoctorPatientInsightService;
 import com.health.system.service.HealthAlertService;
@@ -30,7 +31,8 @@ class DoctorControllerTest {
     void openAlerts_shouldPassRiskFilterParamsToService() {
         DoctorGroupService doctorGroupService = mock(DoctorGroupService.class);
         DoctorPatientInsightService doctorPatientInsightService = mock(DoctorPatientInsightService.class);
-        DoctorController doctorController = new DoctorController(healthAlertService, doctorGroupService, doctorPatientInsightService);
+        ComprehensiveScoreService comprehensiveScoreService = mock(ComprehensiveScoreService.class);
+        DoctorController doctorController = new DoctorController(healthAlertService, doctorGroupService, doctorPatientInsightService, comprehensiveScoreService);
         Authentication authentication = mock(Authentication.class);
         when(authentication.getName()).thenReturn("doc-a");
 

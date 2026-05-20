@@ -12,4 +12,6 @@ public interface UserService {
     void updateUser(UserDTO dto);
 
     void updateStatus(Long id, Integer status);
+
+    void deleteUser(Long id);
 }

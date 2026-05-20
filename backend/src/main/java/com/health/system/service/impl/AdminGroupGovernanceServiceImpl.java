@@ -203,6 +203,17 @@ public class AdminGroupGovernanceServiceImpl implements AdminGroupGovernanceServ
         return result;
     }
 
+    @Override
+    public Map<String, Object> deleteGroup(Long id) {
+        DoctorGroup group = requireGroup(id);
+        doctorGroupMapper.deleteById(id);
+        logAction(id, "delete", "删除群组：" + group.getGroupName());
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("groupId", id);
+        result.put("deleted", true);
+        return result;
+    }
+
     private DoctorGroup requireGroup(Long id) {
         DoctorGroup group = doctorGroupMapper.selectById(id);
         if (group == null) {

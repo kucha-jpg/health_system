@@ -16,6 +16,9 @@ public class HealthAlert extends BaseEntity {
     private String indicatorType;
     private String value;
     private Integer riskScore;
+    // Both `level` and `riskLevel` store the same value (see custom setters below).
+    // This dual-field pattern ensures compatibility with both old code using `level`
+    // and new code using `riskLevel` during migration.
     private String level;
     private String riskLevel;
     private String reasonCode;

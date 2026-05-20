@@ -268,7 +268,7 @@ const renderChart = async () => {
   trendChart.setOption({
     color: [CHART_PALETTE[1]],
     tooltip: { trigger: 'axis' },
-    toolbox: { feature: { saveAsImage: {}, restore: {} } },
+    toolbox: { feature: { saveAsImage: {} } },
     grid: { left: 70, right: 25, top: 28, bottom: 80 },
     xAxis: { type: 'category', data: xAxis, axisLabel: { rotate: 0, fontSize: 11 } },
     yAxis: { type: 'value', name: query.indicatorType === '血压' ? '收缩压(mmHg)' : '数值', nameTextStyle: { fontSize: 11 }, splitLine: CHART_SPLIT_LINE },
@@ -343,6 +343,9 @@ const load = async () => {
   } catch (err) {
     insight.value = {}
     errorMessage.value = err?.response?.data?.msg || err?.message || '加载患者数据失败'
+    if (trendChart) { trendChart.dispose(); trendChart = null }
+    if (alertPieChart) { alertPieChart.dispose(); alertPieChart = null }
+    if (indicatorBarChart) { indicatorBarChart.dispose(); indicatorBarChart = null }
   } finally {
     loading.value = false
   }

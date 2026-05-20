@@ -41,12 +41,13 @@
       <el-tag effect="light">{{ roleLabel(current?.targetRole) }}</el-tag>
       <span>{{ current?.createTime || '-' }}</span>
     </div>
-    <div class="notice-dialog-content" v-html="current?.content || '-'" />
+    <div class="notice-dialog-content" v-html="sanitizeRichHtml(current?.content) || '-'" />
   </el-dialog>
 </template>
 
 <script setup>
 import { ref } from 'vue'
+import { sanitizeRichHtml } from '../../utils/richHtml'
 
 defineProps({
   list: { type: Array, default: () => [] },

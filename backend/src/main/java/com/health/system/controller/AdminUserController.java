@@ -44,4 +44,10 @@ public class AdminUserController {
         userService.updateStatus(id, status);
         return ApiResponse.success("状态更新成功", null);
     }
+
+    @DeleteMapping("/{id}")
+    public ApiResponse<Void> deleteUser(@PathVariable Long id) {
+        userService.deleteUser(id);
+        return ApiResponse.success("删除成功", null);
+    }
 }

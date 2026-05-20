@@ -431,17 +431,25 @@ const saveEdit = async () => {
 }
 
 const remove = async (id) => {
-  await ElMessageBox.confirm('确认删除该条健康数据吗？', '删除确认', {
-    type: 'warning',
-    confirmButtonText: '确认',
-    cancelButtonText: '取消',
-    closeOnClickModal: false,
-    closeOnPressEscape: false,
-    showClose: false
-  })
-  await deleteHealthDataApi(id)
-  ElMessage.success('删除成功')
-  await loadAll()
+  try {
+    await ElMessageBox.confirm('确认删除该条健康数据吗？', '删除确认', {
+      type: 'warning',
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      closeOnClickModal: false,
+      closeOnPressEscape: false,
+      showClose: false
+    })
+  } catch {
+    return
+  }
+  try {
+    await deleteHealthDataApi(id)
+    ElMessage.success('删除成功')
+    await loadAll()
+  } catch (err) {
+    ElMessage.error(err?.message || '删除失败')
+  }
 }
 
 const handleResize = () => {
