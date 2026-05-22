@@ -5,6 +5,9 @@ import com.health.system.dto.LoginRequest;
 import com.health.system.dto.RegisterRequest;
 import com.health.system.service.AuthService;
 import jakarta.validation.Valid;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -33,9 +36,13 @@ public class AuthController {
         return ApiResponse.success("注册成功", authService.register(request));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/ping")
     public ApiResponse<Void> ping() {
-        // Connectivity health-check — used by session validation and container health probes
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            return ApiResponse.fail(401, "未认证");
+        }
         return ApiResponse.success("ok", null);
     }
 }

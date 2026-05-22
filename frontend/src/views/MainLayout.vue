@@ -94,7 +94,7 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { showWarning, showConfirm } from '../utils/message'
 import { authStore } from '../stores/auth'
 import { getPendingFeedbackCountApi, getUnreadFeedbackCountApi, validateSessionApi } from '../api/modules'
 import { themeOptions } from '../constants/layout'
@@ -109,7 +109,7 @@ const patientSearchId = ref('')
 const searchPatient = () => {
   const id = String(patientSearchId.value || '').trim()
   if (!id) {
-    ElMessage.warning('请输入患者ID')
+    showWarning('请输入患者ID')
     return
   }
   patientSearchId.value = ''
@@ -145,14 +145,7 @@ const handleVisibilityChange = () => {
 
 const logout = async () => {
   try {
-    await ElMessageBox.confirm('确认退出当前登录吗？', '退出确认', {
-      confirmButtonText: '确认退出',
-      cancelButtonText: '取消',
-      type: 'warning',
-      closeOnClickModal: false,
-      closeOnPressEscape: false,
-      showClose: false
-    })
+    await showConfirm('确认退出当前登录吗？', '退出确认')
     authStore.clear()
     router.push('/login')
   } catch (e) {

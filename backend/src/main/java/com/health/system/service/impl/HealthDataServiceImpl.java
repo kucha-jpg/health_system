@@ -7,6 +7,7 @@ import java.util.Map;
 
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -46,6 +47,7 @@ public class HealthDataServiceImpl implements HealthDataService {
     }
 
     @Override
+    @Transactional
     public void create(String username, HealthDataDTO dto) {
         Long userId = getCurrentUserId(username);
         validateData(dto.getIndicatorType(), dto.getValue());
@@ -53,7 +55,7 @@ public class HealthDataServiceImpl implements HealthDataService {
         HealthData data = new HealthData();
         data.setUserId(userId);
         data.setIndicatorType(dto.getIndicatorType());
-        data.setValue(dto.getValue());
+        data.setValue(dto.getValue().trim());
         data.setReportTime(dto.getReportTime() == null ? LocalDateTime.now() : dto.getReportTime());
         data.setRemark(dto.getRemark());
         healthDataMapper.insert(data);
@@ -85,10 +87,10 @@ public class HealthDataServiceImpl implements HealthDataService {
                 start = LocalDateTime.now().minusWeeks(1);
             } else if ("month".equalsIgnoreCase(timeRange)) {
                 start = LocalDateTime.now().minusMonths(1);
+            } else {
+                throw BusinessException.badRequest("不支持的时间范围");
             }
-            if (start != null) {
-                wrapper.ge(HealthData::getReportTime, start);
-            }
+            wrapper.ge(HealthData::getReportTime, start);
         }
 
         Page<HealthData> page = healthDataMapper.selectPage(new Page<>(safePageNo, safePageSize), wrapper);
@@ -101,6 +103,7 @@ public class HealthDataServiceImpl implements HealthDataService {
     }
 
     @Override
+    @Transactional
     public void update(String username, Long id, HealthDataDTO dto) {
         Long userId = getCurrentUserId(username);
         HealthData old = healthDataMapper.selectById(id);
@@ -109,7 +112,7 @@ public class HealthDataServiceImpl implements HealthDataService {
         }
         validateData(dto.getIndicatorType(), dto.getValue());
         old.setIndicatorType(dto.getIndicatorType());
-        old.setValue(dto.getValue());
+        old.setValue(dto.getValue().trim());
         old.setReportTime(dto.getReportTime() == null ? old.getReportTime() : dto.getReportTime());
         old.setRemark(dto.getRemark());
         healthDataMapper.updateById(old);
@@ -120,6 +123,7 @@ public class HealthDataServiceImpl implements HealthDataService {
     }
 
     @Override
+    @Transactional
     public void delete(String username, Long id) {
         Long userId = getCurrentUserId(username);
         HealthData old = healthDataMapper.selectById(id);
@@ -146,6 +150,9 @@ public class HealthDataServiceImpl implements HealthDataService {
     }
 
     private void validateData(String indicatorType, String value) {
+        if (value != null) {
+            value = value.trim();
+        }
         if (!StringUtils.hasText(indicatorType) || !StringUtils.hasText(value)) {
             throw BusinessException.badRequest("指标类型和值不能为空");
         }

@@ -34,7 +34,7 @@
             range-separator="至"
             start-placeholder="开始时间"
             end-placeholder="结束时间"
-            value-format="YYYY-MM-DD HH:mm:ss"
+            value-format="yyyy-MM-dd HH:mm:ss"
           />
           <el-button @click="search">查询</el-button>
           <el-button @click="resetQuery">重置</el-button>
@@ -59,7 +59,7 @@
           <el-button type="warning" plain @click="filterCrossPageBatch">跨页批量</el-button>
     </div>
 
-    <el-table :data="logs" border>
+    <el-table :data="logs" border v-loading="loading">
       <el-table-column prop="createTime" label="时间" width="180" />
       <el-table-column prop="username" label="用户" width="140" />
       <el-table-column prop="roleType" label="角色" width="120" />
@@ -123,9 +123,10 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { showSuccess, showError, showWarning, showConfirm } from '../utils/message'
 import { listOperationLogsPageApi, exportOperationLogsApi } from '../api/modules'
 
+const loading = ref(false)
 const logs = ref([])
 const total = ref(0)
 const pageNo = ref(1)
@@ -162,21 +163,28 @@ const recent7DaysRange = () => {
 }
 
 const load = async () => {
-  const params = {
-    pageNo: pageNo.value,
-    pageSize: pageSize.value,
-    keyword: query.value.keyword,
-    roleType: query.value.roleType,
-    success: query.value.success
-  }
-  if (query.value.range?.length === 2) {
-    params.startTime = query.value.range[0]
-    params.endTime = query.value.range[1]
-  }
+  loading.value = true
+  try {
+    const params = {
+      pageNo: pageNo.value,
+      pageSize: pageSize.value,
+      keyword: query.value.keyword,
+      roleType: query.value.roleType,
+      success: query.value.success
+    }
+    if (query.value.range?.length === 2) {
+      params.startTime = query.value.range[0]
+      params.endTime = query.value.range[1]
+    }
 
-  const res = await listOperationLogsPageApi(params)
-  logs.value = res.records || []
-  total.value = res.total || 0
+    const res = await listOperationLogsPageApi(params)
+    logs.value = res.records || []
+    total.value = res.total || 0
+  } catch (err) {
+    showError(err?.message || '加载日志失败，请稍后重试')
+  } finally {
+    loading.value = false
+  }
 }
 
 const search = async () => {
@@ -293,17 +301,9 @@ const onThresholdChange = () => {
 const exportLogs = async () => {
   if (exportLimit.value > 1000) {
     try {
-      await ElMessageBox.confirm(
+      await showConfirm(
         `当前导出条数为 ${exportLimit.value}，可能耗时较长，是否继续？`,
-        '导出确认',
-        {
-          type: 'warning',
-          confirmButtonText: '确认',
-          cancelButtonText: '取消',
-          closeOnClickModal: false,
-          closeOnPressEscape: false,
-          showClose: false
-        }
+        '导出确认'
       )
     } catch {
       return
@@ -332,12 +332,12 @@ const exportLogs = async () => {
     document.body.removeChild(link)
     URL.revokeObjectURL(objectUrl)
     if (effectiveLimit < requestedLimit) {
-      ElMessage.warning(`导出成功，已按上限裁剪：请求 ${requestedLimit} 条，实际 ${effectiveLimit} 条`)
+      showWarning(`导出成功，已按上限裁剪：请求 ${requestedLimit} 条，实际 ${effectiveLimit} 条`)
     } else {
-      ElMessage.success(`导出成功：${effectiveLimit} 条`)
+      showSuccess(`导出成功：${effectiveLimit} 条`)
     }
   } catch {
-    ElMessage.error('导出失败')
+    showError('导出失败')
   }
 }
 

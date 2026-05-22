@@ -38,7 +38,7 @@
 <script setup>
 import { reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessageBox } from 'element-plus'
 import { registerApi } from '../api/modules'
 import { authStore } from '../stores/auth'
 import { AUTH_UI_COPY } from '../constants/auth-ui'
@@ -86,7 +86,6 @@ const onRegister = async () => {
   try {
     const data = await registerApi(form, { __skipErrorToast: true })
     authStore.setAuth(data)
-    ElMessage.success('注册成功')
     router.push('/home')
   } catch (err) {
     ElMessageBox.alert(err?.message || '注册失败，请稍后重试', '注册失败', {

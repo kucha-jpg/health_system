@@ -48,6 +48,12 @@ public class DoctorAccessSupport {
         if (group == null) {
             throw BusinessException.notFound("群组不存在");
         }
+        if ("ARCHIVED".equals(group.getGovernanceStatus())) {
+            throw BusinessException.forbidden("该群组已被管理员归档，无法操作");
+        }
+        if ("PENDING_REVIEW".equals(group.getGovernanceStatus())) {
+            throw BusinessException.forbidden("该群组正在审核中，审核通过后方可使用");
+        }
         if (doctorId.equals(group.getDoctorId())) {
             return;
         }

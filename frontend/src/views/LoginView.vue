@@ -45,7 +45,7 @@
 <script setup>
 import { onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessageBox } from 'element-plus'
 import { loginApi } from '../api/modules'
 import { authStore } from '../stores/auth'
 import { AUTH_UI_COPY } from '../constants/auth-ui'
@@ -90,7 +90,6 @@ const onLogin = async () => {
   try {
     const data = await loginApi(form, { __skipErrorToast: true })
     authStore.setAuth(data)
-    ElMessage.success('登录成功')
     router.push('/home')
   } catch (err) {
     ElMessageBox.alert(err?.message || '登录失败，请检查账号和密码', '登录失败', {

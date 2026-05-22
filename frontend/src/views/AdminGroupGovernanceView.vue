@@ -75,8 +75,8 @@
       </el-table-column>
       <el-table-column label="操作" min-width="300" fixed="right">
         <template #default="scope">
-          <el-button link type="primary" :disabled="scope.row.governanceStatus === 'ARCHIVED'" @click="approveGroup(scope.row)">审核通过</el-button>
-          <el-button link type="warning" :disabled="scope.row.governanceStatus === 'ARCHIVED'" @click="crossDeptGroup(scope.row)">跨科室</el-button>
+          <el-button link type="primary" :disabled="scope.row.governanceStatus !== 'PENDING_REVIEW'" @click="approveGroup(scope.row)">审核通过</el-button>
+          <el-button link type="warning" :disabled="scope.row.governanceStatus === 'PENDING_REVIEW' || scope.row.governanceStatus === 'ARCHIVED'" @click="crossDeptGroup(scope.row)">跨科室</el-button>
           <el-button link type="danger" :disabled="scope.row.governanceStatus === 'ARCHIVED'" @click="archiveGroup(scope.row)">归档</el-button>
           <el-button link type="danger" @click="deleteGroup(scope.row)">删除</el-button>
         </template>
@@ -94,12 +94,32 @@
         @size-change="handlePageSizeChange"
       />
     </div>
+    <el-dialog
+      v-model="crossDeptVisible"
+      :title="crossDeptTitle"
+      width="460px"
+      center
+      align-center
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
+      :show-close="false"
+    >
+      <el-form :model="crossDeptForm" label-width="90px">
+        <el-form-item label="医生ID">
+          <el-input v-model="crossDeptForm.doctorId" placeholder="请输入目标科室医生的用户ID" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="crossDeptVisible = false">取消</el-button>
+        <el-button type="primary" :loading="crossDeptSaving" @click="submitCrossDept">保存</el-button>
+      </template>
+    </el-dialog>
   </el-card>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { computed, onMounted, reactive, ref } from 'vue'
+import { showSuccess, showError, showWarning, showConfirm } from '../utils/message'
 import { downloadObjectsCsv } from '../utils/csv'
 import {
   approveGroupApi,
@@ -134,6 +154,14 @@ const summary = ref({
 })
 
 const tableRows = computed(() => groups.value)
+
+// Cross-dept dialog state
+const crossDeptVisible = ref(false)
+const crossDeptSaving = ref(false)
+const crossDeptMode = ref('single')
+const crossDeptGroupIds = ref([])
+const crossDeptTitle = ref('')
+const crossDeptForm = reactive({ doctorId: '' })
 
 const statusText = (status) => {
   const map = {
@@ -181,7 +209,7 @@ const load = async () => {
       }
     }
   } catch (err) {
-    ElMessage.error(err?.message || '加载群组治理数据失败')
+    showError(err?.message || '加载群组治理数据失败')
   } finally {
     loading.value = false
   }
@@ -209,140 +237,114 @@ const handlePageSizeChange = () => {
 
 const approveGroup = async (row) => {
   try {
-    await ElMessageBox.confirm(`确认审核通过群组「${row.groupName}」吗？`, '审核确认', {
-      type: 'warning',
-      confirmButtonText: '确认',
-      cancelButtonText: '取消',
-      closeOnClickModal: false,
-      closeOnPressEscape: false,
-      showClose: false
-    })
+    await showConfirm(`确认审核通过群组「${row.groupName}」吗？`, '审核确认')
   } catch { return }
   await approveGroupApi(row.groupId)
-  ElMessage.success('审核通过')
   await load()
 }
 
 const archiveGroup = async (row) => {
   try {
-    await ElMessageBox.confirm(`确认归档群组「${row.groupName}」吗？归档后不再出现在可操作列表中。`, '归档确认', {
-      type: 'warning',
-      confirmButtonText: '确认归档',
-      cancelButtonText: '取消',
-      closeOnClickModal: false,
-      closeOnPressEscape: false,
-      showClose: false
-    })
+    await showConfirm(`确认归档群组「${row.groupName}」吗？归档后不再出现在可操作列表中。`, '归档确认')
   } catch { return }
   await archiveGroupApi(row.groupId)
-  ElMessage.success('已归档')
   await load()
 }
 
 const deleteGroup = async (row) => {
   try {
-    await ElMessageBox.confirm(`确认删除群组「${row.groupName}」吗？删除后数据不可恢复，请确认该群组下已无关联患者。`, '删除确认', {
-      type: 'error',
-      confirmButtonText: '确认删除',
-      cancelButtonText: '取消',
-      closeOnClickModal: false,
-      closeOnPressEscape: false,
-      showClose: false
-    })
+    await showConfirm(`确认删除群组「${row.groupName}」吗？删除后数据不可恢复，请确认该群组下已无关联患者。`, '删除确认')
   } catch { return }
   try {
     await deleteGroupApi(row.groupId)
-    ElMessage.success('群组已删除')
     await load()
   } catch (err) {
-    ElMessage.error(err?.message || '删除失败')
+    showError(err?.message || '删除失败')
+  }
+}
+
+const openCrossDeptDialog = (row) => {
+  crossDeptMode.value = 'single'
+  crossDeptGroupIds.value = [row.groupId]
+  crossDeptTitle.value = `跨科室 - ${row.groupName}`
+  crossDeptForm.doctorId = ''
+  crossDeptVisible.value = true
+}
+
+const submitCrossDept = async () => {
+  const doctorId = Number(crossDeptForm.doctorId)
+  if (!Number.isInteger(doctorId) || doctorId <= 0) {
+    showWarning('请输入有效的医生ID')
+    return
+  }
+  crossDeptSaving.value = true
+  try {
+    if (crossDeptMode.value === 'single') {
+      await crossDeptGroupApi(crossDeptGroupIds.value[0], {
+        targetDept: '',
+        doctorIds: [doctorId]
+      })
+    } else {
+      await batchCrossDeptGroupsApi({
+        ids: crossDeptGroupIds.value,
+        targetDept: '',
+        doctorIds: [doctorId]
+      })
+    }
+    crossDeptVisible.value = false
+    clearSelected()
+    await load()
+  } catch {
+    // http interceptor already shows the error
+  } finally {
+    crossDeptSaving.value = false
   }
 }
 
 const crossDeptGroup = async (row) => {
-  let result
-  try {
-    result = await ElMessageBox.prompt('请输入目标科室名称', `跨科室 - ${row.groupName}`, {
-      inputPlaceholder: '例如：心内科二组',
-      confirmButtonText: '保存',
-      cancelButtonText: '取消',
-      closeOnClickModal: false,
-      closeOnPressEscape: false,
-      showClose: false
-    })
-  } catch { return }
-  const dept = String(result.value || '').trim()
-  if (!dept) {
-    ElMessage.warning('目标科室不能为空')
-    return
-  }
-  await crossDeptGroupApi(row.groupId, { targetDept: dept })
-  ElMessage.success('跨科室流程已发起')
-  await load()
+  await openCrossDeptDialog(row)
 }
 
 const confirmBatch = async (title, selected, executable) => {
   const skipped = selected.length - executable.length
-  await ElMessageBox.confirm(
+  await showConfirm(
     `选中 ${selected.length} 个群组，可处理 ${executable.length} 个${skipped > 0 ? `，跳过 ${skipped} 个已归档` : ''}。确认继续？`,
-    title,
-    {
-      type: 'warning',
-      confirmButtonText: '确认',
-      cancelButtonText: '取消',
-      closeOnClickModal: false,
-      closeOnPressEscape: false,
-      showClose: false
-    }
+    title
   )
 }
 
 const batchApprove = async () => {
   const executable = selectedRows.value.filter(r => r.governanceStatus !== 'ARCHIVED')
-  if (!executable.length) { ElMessage.warning('已选群组均不可审核'); return }
+  if (!executable.length) { showWarning('已选群组均不可审核'); return }
   try { await confirmBatch('批量审核确认', selectedRows.value, executable) } catch { return }
   const res = await batchApproveGroupsApi({ ids: executable.map(r => r.groupId) })
-  ElMessage.success(`已审核通过 ${res?.processed || executable.length} 个群组`)
   clearSelected()
   await load()
 }
 
 const batchArchive = async () => {
   const executable = selectedRows.value.filter(r => r.governanceStatus !== 'ARCHIVED')
-  if (!executable.length) { ElMessage.warning('已选群组均为已归档状态'); return }
+  if (!executable.length) { showWarning('已选群组均为已归档状态'); return }
   try { await confirmBatch('批量归档确认', selectedRows.value, executable) } catch { return }
   const res = await batchArchiveGroupsApi({ ids: executable.map(r => r.groupId) })
-  ElMessage.success(`已归档 ${res?.processed || executable.length} 个群组`)
   clearSelected()
   await load()
 }
 
 const batchCrossDept = async () => {
   const executable = selectedRows.value.filter(r => r.governanceStatus !== 'ARCHIVED')
-  if (!executable.length) { ElMessage.warning('已选群组均不可跨科室'); return }
+  if (!executable.length) { showWarning('已选群组均不可跨科室'); return }
   try { await confirmBatch('批量跨科室确认', selectedRows.value, executable) } catch { return }
-  let result
-  try {
-    result = await ElMessageBox.prompt('请输入目标科室名称', `批量跨科室（${executable.length} 个群组）`, {
-      inputPlaceholder: '例如：内分泌联合组',
-      confirmButtonText: '保存',
-      cancelButtonText: '取消',
-      closeOnClickModal: false,
-      closeOnPressEscape: false,
-      showClose: false
-    })
-  } catch { return }
-  const dept = String(result.value || '').trim()
-  if (!dept) { ElMessage.warning('目标科室不能为空'); return }
-  const res = await batchCrossDeptGroupsApi({ ids: executable.map(r => r.groupId), targetDept: dept })
-  ElMessage.success(`已发起 ${res?.processed || executable.length} 个群组跨科室流程`)
-  clearSelected()
-  await load()
+  crossDeptMode.value = 'batch'
+  crossDeptGroupIds.value = executable.map(r => r.groupId)
+  crossDeptTitle.value = `批量跨科室（${executable.length} 个群组）`
+  crossDeptForm.doctorId = ''
+  crossDeptVisible.value = true
 }
 
 const exportCsv = () => {
   if (!tableRows.value.length) {
-    ElMessage.info('当前没有可导出的治理数据')
+    showWarning('当前没有可导出的治理数据')
     return
   }
   const columns = [
@@ -363,7 +365,7 @@ const exportCsv = () => {
   }))
   const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
   downloadObjectsCsv(exportRows, columns, `群组治理导出-${stamp}.csv`)
-  ElMessage.success(`已导出 ${tableRows.value.length} 条记录`)
+  showSuccess(`已导出 ${tableRows.value.length} 条记录`)
 }
 
 onMounted(load)

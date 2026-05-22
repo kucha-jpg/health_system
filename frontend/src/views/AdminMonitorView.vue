@@ -70,7 +70,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import echarts from '../utils/echarts'
 import { csvEscape, downloadCsv } from '../utils/csv'
-import { ElMessage } from 'element-plus'
+import { showSuccess, showError } from '../utils/message'
 import { getMonitorOverviewApi } from '../api/modules'
 import { CHART_PALETTE, CHART_SPLIT_LINE, toIndicatorLabel } from '../constants/chart-theme'
 import { showFirstVisitGuide } from '../composables/useFirstVisitGuide'
@@ -152,6 +152,8 @@ const load = async () => {
     overview.value = res || {}
     latestPageNo.value = 1
     await renderCharts()
+  } catch (err) {
+    showError(err?.message || '加载监控数据失败，请稍后重试')
   } finally {
     loading.value = false
   }
@@ -188,7 +190,7 @@ const exportCsv = () => {
   })
 
   downloadCsv(lines, `admin_monitor_${Date.now()}.csv`)
-  ElMessage.success('监控报表导出成功')
+  showSuccess('监控报表导出成功')
 }
 
 const handleResize = () => {

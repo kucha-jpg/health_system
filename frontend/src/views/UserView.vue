@@ -103,7 +103,7 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { showError, showWarning, showConfirm } from '../utils/message'
 import { addUserApi, deleteUserApi, getUsersApi, updateUserApi, updateUserStatusApi } from '../api/modules'
 
 const users = ref([])
@@ -143,7 +143,7 @@ const load = async () => {
       pageSize.value = Number(data.pageSize)
     }
   } catch (err) {
-    ElMessage.error(err?.message || '账号列表加载失败，请稍后重试')
+    showError(err?.message || '账号列表加载失败，请稍后重试')
   } finally {
     loading.value = false
   }
@@ -176,18 +176,11 @@ const openDialog = (row) => {
 
 const save = async () => {
   if (!String(form.username || '').trim() || !String(form.name || '').trim() || !String(form.phone || '').trim()) {
-    ElMessage.warning('请完整填写用户名、姓名和手机号')
+    showWarning('请完整填写用户名、姓名和手机号')
     return
   }
   try {
-    await ElMessageBox.confirm(form.id ? '确认修改该账号？' : '确认创建该账号？', '保存确认', {
-      type: 'warning',
-      confirmButtonText: '确认',
-      cancelButtonText: '取消',
-      closeOnClickModal: false,
-      closeOnPressEscape: false,
-      showClose: false
-    })
+    await showConfirm(form.id ? '确认修改该账号？' : '确认创建该账号？', '保存确认')
   } catch {
     return
   }
@@ -195,15 +188,13 @@ const save = async () => {
   try {
     if (form.id) {
       await updateUserApi(form)
-      ElMessage.success('账号更新成功')
     } else {
       await addUserApi(form)
-      ElMessage.success('账号创建成功')
     }
     visible.value = false
     await load()
   } catch (err) {
-    ElMessage.error(err?.message || '保存失败，请稍后重试')
+    showError(err?.message || '保存失败，请稍后重试')
   } finally {
     saving.value = false
   }
@@ -212,38 +203,22 @@ const save = async () => {
 const toggleStatus = async (row) => {
   const nextStatus = row.status === 1 ? 0 : 1
   const actionText = nextStatus === 1 ? '启用' : '禁用'
-  await ElMessageBox.confirm(`确认${actionText}账号 ${row.username} 吗？`, '状态变更确认', {
-    type: 'warning',
-    confirmButtonText: '确认',
-    cancelButtonText: '取消',
-    closeOnClickModal: false,
-    closeOnPressEscape: false,
-    showClose: false
-  })
+  await showConfirm(`确认${actionText}账号 ${row.username} 吗？`, '状态变更确认')
   await updateUserStatusApi(row.id, nextStatus)
-  ElMessage.success(`账号已${actionText}`)
   await load()
 }
 
 const deleteUser = async (row) => {
   try {
-    await ElMessageBox.confirm(`确认删除账号「${row.username}」吗？删除后数据不可恢复。`, '删除确认', {
-      type: 'error',
-      confirmButtonText: '确认删除',
-      cancelButtonText: '取消',
-      closeOnClickModal: false,
-      closeOnPressEscape: false,
-      showClose: false
-    })
+    await showConfirm(`确认删除账号「${row.username}」吗？删除后数据不可恢复。`, '删除确认')
   } catch {
     return
   }
   try {
     await deleteUserApi(row.id)
-    ElMessage.success('账号已删除')
     await load()
   } catch (err) {
-    ElMessage.error(err?.message || '删除失败')
+    showError(err?.message || '删除失败')
   }
 }
 

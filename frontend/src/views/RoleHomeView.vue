@@ -30,6 +30,7 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { showError } from '../utils/message'
 import { authStore } from '../stores/auth'
 import {
   getAdminFeedbackStatsApi, getDoctorAlertsApi, getDoctorGroupsApi,
@@ -135,6 +136,8 @@ const loadAdminSummary = async () => {
     adminSummary.feedback.totalCount = Number(feedback?.totalCount) || 0
     adminSummary.feedback.pendingCount = Number(feedback?.pendingCount) || 0
     adminSummary.feedback.todayNewCount = Number(feedback?.todayNewCount) || 0
+  } catch (err) {
+    showError(err?.message || '加载管理概览失败，请稍后重试')
   } finally { loading.value = false }
 }
 
@@ -162,6 +165,8 @@ const loadRoleSummary = async () => {
       patientSummary.openAlerts = Number(openAlertPage?.total) || 0
       patientSummary.unreadFeedback = Number(unreadFeedback) || 0
     }
+  } catch (err) {
+    showError(err?.message || '加载首页数据失败，请稍后重试')
   } finally { roleLoading.value = false }
 }
 

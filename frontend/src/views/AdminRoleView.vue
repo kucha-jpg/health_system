@@ -33,27 +33,41 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessageBox } from 'element-plus'
+import { showError } from '../utils/message'
 import { listRolesApi, updateRolePermissionApi } from '../api/modules'
 
 const roles = ref([])
 
 const load = async () => {
-  roles.value = await listRolesApi()
+  try {
+    roles.value = await listRolesApi()
+  } catch (err) {
+    showError(err?.message || '加载角色数据失败，请稍后重试')
+  }
 }
 
 const edit = async (row) => {
-  const { value } = await ElMessageBox.prompt('请输入新的权限字符串', `编辑 ${row.roleName}`, {
-    inputValue: row.permission,
-    confirmButtonText: '保存',
-    cancelButtonText: '取消',
-    closeOnClickModal: false,
-    closeOnPressEscape: false,
-    showClose: false
-  })
-  await updateRolePermissionApi({ id: row.id, permission: value })
-  ElMessage.success('更新成功')
-  await load()
+  let value
+  try {
+    const result = await ElMessageBox.prompt('请输入新的权限字符串', `编辑 ${row.roleName}`, {
+      inputValue: row.permission,
+      confirmButtonText: '保存',
+      cancelButtonText: '取消',
+      closeOnClickModal: false,
+      closeOnPressEscape: false,
+      showClose: false
+    })
+    value = result.value
+  } catch {
+    return
+  }
+  try {
+    await updateRolePermissionApi({ id: row.id, permission: value })
+    await load()
+  } catch (err) {
+    showError(err?.message || '更新权限失败，请稍后重试')
+  }
 }
 
 onMounted(load)

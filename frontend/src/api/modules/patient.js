@@ -12,4 +12,4 @@ export const getPatientAlertsApi = (params) => http.get('/patient/alerts', { par
 export const getPatientReportSummaryApi = (params) => http.get('/patient/reports/summary', { params })
 export const listPatientAlertPreferencesApi = () => http.get('/patient/alert-preferences')
 export const updatePatientAlertPreferenceApi = (payload) => http.put('/patient/alert-preferences', payload)
-export const getPatientComprehensiveScoreApi = () => http.get('/patient/comprehensive-score')
+export const getPatientComprehensiveScoreApi = (range = 'week') => http.get('/patient/comprehensive-score', { params: { range } })

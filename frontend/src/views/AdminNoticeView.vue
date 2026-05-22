@@ -122,7 +122,7 @@
 
 <script setup>
 import { onMounted, onUnmounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { showError, showConfirm } from '../utils/message'
 import { createNoticeApi, deleteNoticeApi, listNoticesApi, updateNoticeApi } from '../api/modules'
 import { sanitizeRichHtml } from '../utils/richHtml'
 
@@ -227,22 +227,15 @@ const roleLabel = (targetRole) => {
 
 const save = async () => {
   if (!form.title?.trim()) {
-    ElMessage.error('标题不能为空')
+    showError('标题不能为空')
     return
   }
   if (!form.content?.trim()) {
-    ElMessage.error('内容不能为空')
+    showError('内容不能为空')
     return
   }
   try {
-    await ElMessageBox.confirm(form.id ? '确认修改该公告？' : '确认发布该公告？', '保存确认', {
-      type: 'warning',
-      confirmButtonText: '确认',
-      cancelButtonText: '取消',
-      closeOnClickModal: false,
-      closeOnPressEscape: false,
-      showClose: false
-    })
+    await showConfirm(form.id ? '确认修改该公告？' : '确认发布该公告？', '保存确认')
   } catch {
     return
   }
@@ -252,33 +245,24 @@ const save = async () => {
     } else {
       await createNoticeApi(form)
     }
-    ElMessage.success('保存成功')
     visible.value = false
     await load()
   } catch (err) {
-    ElMessage.error(err?.message || '保存失败')
+    showError(err?.message || '保存失败')
   }
 }
 
 const remove = async (id) => {
   try {
-    await ElMessageBox.confirm('确认删除该公告？', '删除确认', {
-      type: 'warning',
-      confirmButtonText: '确认',
-      cancelButtonText: '取消',
-      closeOnClickModal: false,
-      closeOnPressEscape: false,
-      showClose: false
-    })
+    await showConfirm('确认删除该公告？', '删除确认')
   } catch {
     return
   }
   try {
     await deleteNoticeApi(id)
-    ElMessage.success('删除成功')
     await load()
   } catch (err) {
-    ElMessage.error(err?.message || '删除失败')
+    showError(err?.message || '删除失败')
   }
 }
 

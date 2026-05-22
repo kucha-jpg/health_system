@@ -63,7 +63,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { showError, showWarning } from '../utils/message'
 import { listPatientAlertPreferencesApi, updatePatientAlertPreferenceApi } from '../api/modules'
 
 const router = useRouter()
@@ -188,7 +188,7 @@ const load = async () => {
     prefMap.value = nextMap
     fillFormByIndicator()
   } catch (err) {
-    ElMessage.error(err?.message || '加载个性化阈值失败，请稍后重试')
+    showError(err?.message || '加载个性化阈值失败，请稍后重试')
   } finally {
     loading.value = false
   }
@@ -196,12 +196,12 @@ const load = async () => {
 
 const saveCurrent = async () => {
   if (!isEditing.value) {
-    ElMessage.warning('请先进入编辑模式')
+    showWarning('请先进入编辑模式')
     return
   }
   const msg = validate()
   if (msg) {
-    ElMessage.warning(msg)
+    showWarning(msg)
     return
   }
 
@@ -216,10 +216,9 @@ const saveCurrent = async () => {
   try {
     await updatePatientAlertPreferenceApi(payload)
     prefMap.value[form.indicatorType] = { ...payload }
-    ElMessage.success('个性化阈值保存成功')
     isEditing.value = false
   } catch (err) {
-    ElMessage.error(err?.message || '保存失败，请稍后重试')
+    showError(err?.message || '保存失败，请稍后重试')
   } finally {
     saving.value = false
   }

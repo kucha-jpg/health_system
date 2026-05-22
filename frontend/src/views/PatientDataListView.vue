@@ -77,10 +77,12 @@
     <!-- Table filters and data table (unchanged logic) -->
     <div class="filter-row">
       <el-select v-model="query.indicator_type" placeholder="指标类型" clearable style="width: 140px" @change="onFilterChanged">
-        <el-option label="血压" value="血压" />
-        <el-option label="血糖" value="血糖" />
-        <el-option label="体重" value="体重" />
-        <el-option label="服药" value="服药" />
+        <el-option
+          v-for="item in indicatorTypeOptions"
+          :key="item.indicatorType"
+          :label="item.displayName || item.indicatorType"
+          :value="item.indicatorType"
+        />
       </el-select>
       <el-select v-model="query.timeRange" placeholder="时间范围" clearable style="width: 140px" @change="onFilterChanged">
         <el-option label="最近一天" value="day" />
@@ -147,9 +149,17 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
 import * as echarts from 'echarts'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { showError, showConfirm } from '../utils/message'
 import { deleteHealthDataApi, listHealthDataApi, updateHealthDataApi } from '../api/modules'
 
+const DEFAULT_INDICATOR_TYPES = [
+  { indicatorType: '血压', displayName: '血压' },
+  { indicatorType: '血糖', displayName: '血糖' },
+  { indicatorType: '体重', displayName: '体重' },
+  { indicatorType: '服药', displayName: '服药' }
+]
+
+const indicatorTypeOptions = ref([...DEFAULT_INDICATOR_TYPES])
 const list = ref([])
 const allData = ref([])
 const loading = ref(false)
@@ -210,7 +220,7 @@ const load = async () => {
     list.value = res?.list || []
     total.value = res?.total || 0
   } catch (err) {
-    ElMessage.error(err?.message || '加载健康数据失败，请稍后重试')
+    showError(err?.message || '加载健康数据失败，请稍后重试')
   } finally {
     loading.value = false
   }
@@ -411,20 +421,18 @@ const openEdit = (row) => {
 }
 
 const saveEdit = async () => {
-  await ElMessageBox.confirm('确认修改该条健康数据？', '修改确认', {
-    type: 'warning',
-    confirmButtonText: '确认',
-    cancelButtonText: '取消',
-    closeOnClickModal: false,
-    closeOnPressEscape: false,
-    showClose: false
-  })
+  try {
+    await showConfirm('确认修改该条健康数据？', '修改确认')
+  } catch {
+    return
+  }
   saving.value = true
   try {
     await updateHealthDataApi(form.id, form)
-    ElMessage.success('更新成功')
     visible.value = false
     await loadAll()
+  } catch (err) {
+    showError(err?.message || '更新失败')
   } finally {
     saving.value = false
   }
@@ -432,23 +440,15 @@ const saveEdit = async () => {
 
 const remove = async (id) => {
   try {
-    await ElMessageBox.confirm('确认删除该条健康数据吗？', '删除确认', {
-      type: 'warning',
-      confirmButtonText: '确认',
-      cancelButtonText: '取消',
-      closeOnClickModal: false,
-      closeOnPressEscape: false,
-      showClose: false
-    })
+    await showConfirm('确认删除该条健康数据吗？', '删除确认')
   } catch {
     return
   }
   try {
     await deleteHealthDataApi(id)
-    ElMessage.success('删除成功')
     await loadAll()
   } catch (err) {
-    ElMessage.error(err?.message || '删除失败')
+    showError(err?.message || '删除失败')
   }
 }
 

@@ -8,8 +8,8 @@
 
     <div v-if="errorMessage" class="error-state">
       <div class="error-state-icon">!</div>
-      <div class="error-state-title">{{ errorMessage }}</div>
-      <div class="error-state-desc">该患者不在您的管辖范围内，或患者不存在</div>
+      <div class="error-state-title">数据加载失败</div>
+      <div class="error-state-desc">{{ errorMessage }}</div>
       <el-button type="primary" @click="router.push('/doctor/groups')">返回群组管理</el-button>
     </div>
 
@@ -41,10 +41,12 @@
       <div class="insight-toolbar">
         <div class="toolbar-left">
           <el-select v-model="query.indicatorType" class="w-130" clearable placeholder="指标类型" @change="load">
-            <el-option label="血压" value="血压" />
-            <el-option label="血糖" value="血糖" />
-            <el-option label="体重" value="体重" />
-            <el-option label="服药" value="服药" />
+            <el-option
+              v-for="item in indicatorTypeOptions"
+              :key="item.indicatorType"
+              :label="item.displayName || item.indicatorType"
+              :value="item.indicatorType"
+            />
           </el-select>
           <el-select v-model="query.timeRange" class="w-130" placeholder="时间范围" @change="load">
             <el-option label="最近一天" value="day" />
@@ -94,14 +96,19 @@
             <template #header>
               <div class="table-header-row">
                 <span class="section-title">📋 健康数据明细</span>
-                <el-input
-                  v-model="dataKeyword"
-                  class="table-filter-input"
-                  size="small"
-                  clearable
-                  placeholder="搜索备注..."
-                  @input="onDataFilterChange"
-                />
+                <div class="table-header-actions">
+                  <el-button link size="small" @click="dataSortAsc = !dataSortAsc">
+                    {{ dataSortAsc ? '↑ 正序' : '↓ 倒序' }}
+                  </el-button>
+                  <el-input
+                    v-model="dataKeyword"
+                    class="table-filter-input"
+                    size="small"
+                    clearable
+                    placeholder="搜索备注..."
+                    @input="onDataFilterChange"
+                  />
+                </div>
               </div>
             </template>
             <el-table :data="pagedTrendData" border size="small" empty-text="暂无匹配明细">
@@ -190,15 +197,24 @@ import PatientArchiveCard from './components/PatientArchiveCard.vue'
 
 const route = useRoute()
 const router = useRouter()
+const DEFAULT_INDICATOR_TYPES = [
+  { indicatorType: '血压', displayName: '血压' },
+  { indicatorType: '血糖', displayName: '血糖' },
+  { indicatorType: '体重', displayName: '体重' },
+  { indicatorType: '服药', displayName: '服药' }
+]
+
+const indicatorTypeOptions = ref([...DEFAULT_INDICATOR_TYPES])
 const insight = ref({})
 const loading = ref(false)
 const errorMessage = ref('')
-const query = reactive({ indicatorType: '', timeRange: 'month' })
+const query = reactive({ indicatorType: '血压', timeRange: 'month' })
 const trendChartType = ref('line')
 
 // Independent table filters
 const dataKeyword = ref('')
 const alertStatusFilter = ref('')
+const dataSortAsc = ref(false)
 const dataPageNo = ref(1)
 const dataPageSize = ref(10)
 const alertPageNo = ref(1)
@@ -214,8 +230,15 @@ let indicatorBarChart = null
 const filteredTrendData = computed(() => {
   const keyword = dataKeyword.value.trim().toLowerCase()
   const source = insight.value?.trendData || []
-  if (!keyword) return source
-  return source.filter(item => String(item.remark || '').toLowerCase().includes(keyword))
+  const filtered = keyword
+    ? source.filter(item => String(item.remark || '').toLowerCase().includes(keyword))
+    : [...source]
+  filtered.sort((a, b) => {
+    const ta = String(a.reportTime || '')
+    const tb = String(b.reportTime || '')
+    return dataSortAsc.value ? ta.localeCompare(tb) : tb.localeCompare(ta)
+  })
+  return filtered
 })
 
 const filteredAlerts = computed(() => {
@@ -387,13 +410,17 @@ watch(() => route.params.patientUserId, () => {
   if (route.params.patientUserId) load()
 })
 
+let insightTimer = null
+
 onMounted(() => {
   load()
   window.addEventListener('resize', handleResize)
+  insightTimer = setInterval(load, 30000)
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
+  if (insightTimer) { clearInterval(insightTimer); insightTimer = null }
   trendChart?.dispose(); trendChart = null
   alertPieChart?.dispose(); alertPieChart = null
   indicatorBarChart?.dispose(); indicatorBarChart = null
@@ -490,6 +517,12 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   gap: 10px;
+}
+
+.table-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .table-filter-input {

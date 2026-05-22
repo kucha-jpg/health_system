@@ -38,7 +38,7 @@
 
 <script setup>
 import { computed, onMounted, reactive } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { showError, showConfirm } from '../utils/message'
 import { getArchiveApi, saveArchiveApi } from '../api/modules'
 
 const form = reactive({ name: '', age: null, medicalHistory: '', medicationHistory: '', allergyHistory: '' })
@@ -56,29 +56,25 @@ const filledCount = computed(() => {
 const completeness = computed(() => Math.round((filledCount.value / 5) * 100))
 
 const load = async () => {
-  const data = await getArchiveApi()
-  if (data) Object.assign(form, data)
+  try {
+    const data = await getArchiveApi()
+    if (data) Object.assign(form, data)
+  } catch (err) {
+    showError(err?.message || '加载健康档案失败，请稍后重试')
+  }
 }
 
 const save = async () => {
   try {
-    await ElMessageBox.confirm('确认保存档案？', '保存确认', {
-      type: 'warning',
-      confirmButtonText: '确认',
-      cancelButtonText: '取消',
-      closeOnClickModal: false,
-      closeOnPressEscape: false,
-      showClose: false
-    })
+    await showConfirm('确认保存档案？', '保存确认')
   } catch {
     return
   }
   try {
     await saveArchiveApi(form)
     await load()
-    ElMessage.success('保存成功')
   } catch (err) {
-    ElMessage.error(err?.message || '保存失败')
+    showError(err?.message || '保存失败')
   }
 }
 

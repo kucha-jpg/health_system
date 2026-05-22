@@ -140,7 +140,8 @@ public class PatientController {
     }
 
     @GetMapping("/comprehensive-score")
-    public ApiResponse<ComprehensiveScoreResult> getComprehensiveScore(Authentication authentication) {
-        return ApiResponse.success(comprehensiveScoreService.calculate(authentication.getName()));
+    public ApiResponse<ComprehensiveScoreResult> getComprehensiveScore(Authentication authentication,
+                                                                       @RequestParam(defaultValue = "week") String range) {
+        return ApiResponse.success(comprehensiveScoreService.calculate(authentication.getName(), range));
     }
 }

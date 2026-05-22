@@ -54,8 +54,13 @@ public class AdminGroupController {
     }
 
     @PatchMapping("/{id}/cross-dept")
-    public ApiResponse<Map<String, Object>> crossDept(@PathVariable Long id, @RequestBody Map<String, String> body) {
-        return ApiResponse.success(governanceService.crossDept(id, body.get("targetDept")));
+    public ApiResponse<Map<String, Object>> crossDept(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        String targetDept = Objects.toString(body.get("targetDept"), "");
+        @SuppressWarnings("unchecked")
+        List<Long> doctorIds = body.get("doctorIds") instanceof List<?> list
+                ? list.stream().map(obj -> obj instanceof Number ? ((Number) obj).longValue() : Long.parseLong(String.valueOf(obj))).toList()
+                : List.of();
+        return ApiResponse.success(governanceService.crossDept(id, targetDept, doctorIds));
     }
 
     @PostMapping("/batch-approve")
@@ -71,7 +76,11 @@ public class AdminGroupController {
     @PostMapping("/batch-cross-dept")
     public ApiResponse<Map<String, Object>> batchCrossDept(@RequestBody Map<String, Object> body) {
         String targetDept = Objects.toString(body.get("targetDept"), "");
-        return ApiResponse.success(governanceService.batchCrossDept(parseIds(body), targetDept));
+        @SuppressWarnings("unchecked")
+        List<Long> doctorIds = body.get("doctorIds") instanceof List<?> list
+                ? list.stream().map(obj -> obj instanceof Number ? ((Number) obj).longValue() : Long.parseLong(String.valueOf(obj))).toList()
+                : List.of();
+        return ApiResponse.success(governanceService.batchCrossDept(parseIds(body), targetDept, doctorIds));
     }
 
     @DeleteMapping("/{id}")

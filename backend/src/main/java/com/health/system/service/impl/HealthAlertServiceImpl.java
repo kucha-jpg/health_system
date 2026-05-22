@@ -10,6 +10,8 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import jakarta.validation.constraints.Size;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.health.system.alert.AlertDecision;
@@ -72,22 +74,6 @@ public class HealthAlertServiceImpl implements HealthAlertService {
     public void evaluateAndCreateAlert(Long userId, Long healthDataId, String indicatorType, String value) {
         AlertDecision decision = alertEvaluationEngine.evaluate(userId, indicatorType, value);
         if (decision == null) {
-            return;
-        }
-        HealthAlert existing = healthAlertMapper.selectOne(new LambdaQueryWrapper<HealthAlert>()
-                .eq(HealthAlert::getUserId, userId)
-                .eq(HealthAlert::getIndicatorType, indicatorType)
-                .eq(HealthAlert::getReasonCode, decision.reasonCode())
-                .eq(HealthAlert::getStatus, "OPEN")
-                .orderByDesc(HealthAlert::getCreateTime)
-                .last("limit 1"));
-        if (existing != null) {
-            existing.setHealthDataId(healthDataId);
-            existing.setValue(value);
-            existing.setRiskScore(decision.riskScore());
-            existing.setRiskLevel(decision.riskLevel());
-            existing.setReasonText(decision.reasonText());
-            healthAlertMapper.updateById(existing);
             return;
         }
         HealthAlert alert = new HealthAlert();
@@ -173,7 +159,7 @@ public class HealthAlertServiceImpl implements HealthAlertService {
     }
 
     @Override
-    public void handleAlert(String doctorUsername, Long id, String handleRemark) {
+    public void handleAlert(String doctorUsername, Long id, @Size(max = 2000) String handleRemark) {
         User doctor = doctorAccessSupport.requireDoctor(doctorUsername);
         HealthAlert alert = healthAlertMapper.selectById(id);
         if (alert == null) {
@@ -182,6 +168,9 @@ public class HealthAlertServiceImpl implements HealthAlertService {
         doctorAccessSupport.assertPatientAccessible(doctor.getId(), alert.getUserId(), "预警不在您的可处理范围内");
         if (!"OPEN".equals(alert.getStatus())) {
             throw BusinessException.conflict("预警已处理");
+        }
+        if (handleRemark != null && handleRemark.length() > 2000) {
+            throw BusinessException.badRequest("处理备注长度不能超过2000");
         }
         alert.setStatus("CLOSED");
         alert.setHandledBy(doctor.getId());

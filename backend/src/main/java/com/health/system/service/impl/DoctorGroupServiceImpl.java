@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.health.system.common.BusinessException;
@@ -57,6 +58,7 @@ public class DoctorGroupServiceImpl implements DoctorGroupService {
         group.setDoctorId(doctor.getId());
         group.setGroupName(dto.getGroupName());
         group.setDescription(dto.getDescription());
+        group.setGovernanceStatus("PENDING_REVIEW");
         doctorGroupMapper.insert(group);
         evictGroupRelatedCaches();
     }
@@ -99,11 +101,18 @@ public class DoctorGroupServiceImpl implements DoctorGroupService {
     }
 
     @Override
+    @Transactional
     public void addDoctorToGroup(String doctorUsername, Long groupId, Long doctorUserId) {
         User operator = doctorAccessSupport.requireDoctor(doctorUsername);
         DoctorGroup group = doctorGroupMapper.selectById(groupId);
         if (group == null) {
             throw BusinessException.notFound("群组不存在");
+        }
+        if ("ARCHIVED".equals(group.getGovernanceStatus())) {
+            throw BusinessException.forbidden("该群组已被管理员归档，无法操作");
+        }
+        if ("PENDING_REVIEW".equals(group.getGovernanceStatus())) {
+            throw BusinessException.forbidden("该群组正在审核中，审核通过后方可使用");
         }
         if (!operator.getId().equals(group.getDoctorId())) {
             throw BusinessException.forbidden("仅群组创建者可维护协作医生");
@@ -177,6 +186,7 @@ public class DoctorGroupServiceImpl implements DoctorGroupService {
     }
 
     @Override
+    @Transactional
     public void addPatientToGroup(String doctorUsername, Long groupId, Long patientUserId) {
         User doctor = doctorAccessSupport.requireDoctor(doctorUsername);
         doctorAccessSupport.assertGroupAccessible(doctor.getId(), groupId);

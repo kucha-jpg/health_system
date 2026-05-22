@@ -6,13 +6,19 @@ import com.health.system.common.RequestActor;
 import com.health.system.common.SecurityActorUtils;
 import com.health.system.dto.GroupGovernanceDTO;
 import com.health.system.entity.DoctorGroup;
+import com.health.system.entity.DoctorGroupDoctorMember;
 import com.health.system.entity.DoctorGroupMember;
 import com.health.system.entity.OperationLog;
 import com.health.system.entity.User;
+import com.health.system.mapper.DoctorGroupDoctorMemberMapper;
 import com.health.system.mapper.DoctorGroupMapper;
 import com.health.system.mapper.DoctorGroupMemberMapper;
 import com.health.system.mapper.OperationLogMapper;
 import com.health.system.mapper.UserMapper;
+import com.health.system.entity.FeedbackMessage;
+import com.health.system.mapper.FeedbackMessageMapper;
+import com.health.system.common.CacheNames;
+import com.health.system.config.CacheEvictionSupport;
 import com.health.system.service.AdminGroupGovernanceService;
 import com.health.system.service.OperationLogService;
 import org.springframework.stereotype.Service;
@@ -27,20 +33,29 @@ public class AdminGroupGovernanceServiceImpl implements AdminGroupGovernanceServ
 
     private final DoctorGroupMapper doctorGroupMapper;
     private final DoctorGroupMemberMapper doctorGroupMemberMapper;
+    private final DoctorGroupDoctorMemberMapper doctorGroupDoctorMemberMapper;
     private final UserMapper userMapper;
     private final OperationLogMapper operationLogMapper;
     private final OperationLogService operationLogService;
+    private final FeedbackMessageMapper feedbackMessageMapper;
+    private final CacheEvictionSupport cacheEvictionSupport;
 
     public AdminGroupGovernanceServiceImpl(DoctorGroupMapper doctorGroupMapper,
                                            DoctorGroupMemberMapper doctorGroupMemberMapper,
+                                           DoctorGroupDoctorMemberMapper doctorGroupDoctorMemberMapper,
                                            UserMapper userMapper,
                                            OperationLogMapper operationLogMapper,
-                                           OperationLogService operationLogService) {
+                                           OperationLogService operationLogService,
+                                           FeedbackMessageMapper feedbackMessageMapper,
+                                           CacheEvictionSupport cacheEvictionSupport) {
         this.doctorGroupMapper = doctorGroupMapper;
         this.doctorGroupMemberMapper = doctorGroupMemberMapper;
+        this.doctorGroupDoctorMemberMapper = doctorGroupDoctorMemberMapper;
         this.userMapper = userMapper;
         this.operationLogMapper = operationLogMapper;
         this.operationLogService = operationLogService;
+        this.feedbackMessageMapper = feedbackMessageMapper;
+        this.cacheEvictionSupport = cacheEvictionSupport;
     }
 
     @Override
@@ -118,6 +133,8 @@ public class AdminGroupGovernanceServiceImpl implements AdminGroupGovernanceServ
         group.setTargetDept(null);
         doctorGroupMapper.updateById(group);
         logAction(id, "approve", "审核通过");
+        notifyDoctor(group.getDoctorId(), group.getGroupName(), "审核通过");
+        evictDoctorCaches();
         return simpleResult(id, "ACTIVE");
     }
 
@@ -127,24 +144,44 @@ public class AdminGroupGovernanceServiceImpl implements AdminGroupGovernanceServ
         group.setGovernanceStatus("ARCHIVED");
         doctorGroupMapper.updateById(group);
         logAction(id, "archive", "归档");
+        evictDoctorCaches();
         return simpleResult(id, "ARCHIVED");
     }
 
     @Override
-    public Map<String, Object> crossDept(Long id, String targetDept) {
+    public Map<String, Object> crossDept(Long id, String targetDept, List<Long> doctorIds) {
         DoctorGroup group = requireGroup(id);
-        if (targetDept == null || targetDept.isBlank()) {
-            throw BusinessException.badRequest("目标科室不能为空");
-        }
         group.setGovernanceStatus("CROSS_DEPT");
-        group.setTargetDept(targetDept);
+        if (targetDept != null && !targetDept.isBlank()) {
+            group.setTargetDept(targetDept);
+        }
         doctorGroupMapper.updateById(group);
-        logAction(id, "cross-dept", "跨科室处理，目标科室：" + targetDept);
+        logAction(id, "cross-dept", "跨科室处理" + (targetDept != null && !targetDept.isBlank() ? "，目标科室：" + targetDept : ""));
+
+        if (doctorIds != null) {
+            for (Long doctorId : doctorIds) {
+                addCollaboratorIfAbsent(id, doctorId);
+            }
+        }
+
+        evictDoctorCaches();
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("groupId", id);
         result.put("governanceStatus", "CROSS_DEPT");
-        result.put("targetDept", targetDept);
         return result;
+    }
+
+    private void addCollaboratorIfAbsent(Long groupId, Long doctorUserId) {
+        User doctor = userMapper.selectById(doctorUserId);
+        if (doctor == null || !"DOCTOR".equals(doctor.getRoleType())) return;
+        DoctorGroupDoctorMember exists = doctorGroupDoctorMemberMapper.selectOne(new LambdaQueryWrapper<DoctorGroupDoctorMember>()
+                .eq(DoctorGroupDoctorMember::getGroupId, groupId)
+                .eq(DoctorGroupDoctorMember::getDoctorUserId, doctorUserId));
+        if (exists != null) return;
+        DoctorGroupDoctorMember member = new DoctorGroupDoctorMember();
+        member.setGroupId(groupId);
+        member.setDoctorUserId(doctorUserId);
+        doctorGroupDoctorMemberMapper.insert(member);
     }
 
     @Override
@@ -157,8 +194,10 @@ public class AdminGroupGovernanceServiceImpl implements AdminGroupGovernanceServ
             group.setTargetDept(null);
             doctorGroupMapper.updateById(group);
             logAction(id, "batch-approve", "批量审核通过");
+            notifyDoctor(group.getDoctorId(), group.getGroupName(), "审核通过");
             processed++;
         }
+        evictDoctorCaches();
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("processed", processed);
         result.put("skipped", ids.size() - processed);
@@ -176,6 +215,7 @@ public class AdminGroupGovernanceServiceImpl implements AdminGroupGovernanceServ
             logAction(id, "batch-archive", "批量归档");
             processed++;
         }
+        evictDoctorCaches();
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("processed", processed);
         result.put("skipped", ids.size() - processed);
@@ -183,20 +223,25 @@ public class AdminGroupGovernanceServiceImpl implements AdminGroupGovernanceServ
     }
 
     @Override
-    public Map<String, Object> batchCrossDept(List<Long> ids, String targetDept) {
-        if (targetDept == null || targetDept.isBlank()) {
-            throw BusinessException.badRequest("目标科室不能为空");
-        }
+    public Map<String, Object> batchCrossDept(List<Long> ids, String targetDept, List<Long> doctorIds) {
         int processed = 0;
         for (Long id : ids) {
             DoctorGroup group = doctorGroupMapper.selectById(id);
             if (group == null || "ARCHIVED".equals(group.getGovernanceStatus())) continue;
             group.setGovernanceStatus("CROSS_DEPT");
-            group.setTargetDept(targetDept);
+            if (targetDept != null && !targetDept.isBlank()) {
+                group.setTargetDept(targetDept);
+            }
             doctorGroupMapper.updateById(group);
-            logAction(id, "batch-cross-dept", "批量跨科室处理，目标科室：" + targetDept);
+            logAction(id, "batch-cross-dept", "批量跨科室处理" + (targetDept != null && !targetDept.isBlank() ? "，目标科室：" + targetDept : ""));
+            if (doctorIds != null) {
+                for (Long doctorId : doctorIds) {
+                    addCollaboratorIfAbsent(id, doctorId);
+                }
+            }
             processed++;
         }
+        evictDoctorCaches();
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("processed", processed);
         result.put("skipped", ids.size() - processed);
@@ -206,8 +251,13 @@ public class AdminGroupGovernanceServiceImpl implements AdminGroupGovernanceServ
     @Override
     public Map<String, Object> deleteGroup(Long id) {
         DoctorGroup group = requireGroup(id);
+        doctorGroupMemberMapper.delete(new LambdaQueryWrapper<DoctorGroupMember>()
+                .eq(DoctorGroupMember::getGroupId, id));
+        doctorGroupDoctorMemberMapper.delete(new LambdaQueryWrapper<DoctorGroupDoctorMember>()
+                .eq(DoctorGroupDoctorMember::getGroupId, id));
         doctorGroupMapper.deleteById(id);
         logAction(id, "delete", "删除群组：" + group.getGroupName());
+        evictDoctorCaches();
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("groupId", id);
         result.put("deleted", true);
@@ -250,11 +300,32 @@ public class AdminGroupGovernanceServiceImpl implements AdminGroupGovernanceServ
         return map;
     }
 
+    private void evictDoctorCaches() {
+        cacheEvictionSupport.evictByPrefix(CacheNames.DOCTOR_OPEN_ALERTS, "");
+        cacheEvictionSupport.evictByPrefix(CacheNames.DOCTOR_PATIENT_INSIGHT, "");
+    }
+
     private void logAction(Long groupId, String action, String message) {
         RequestActor actor = SecurityActorUtils.currentActor();
         String username = actor != null ? actor.username() : "system";
         String roleType = actor != null ? actor.role() : "ADMIN";
         operationLogService.save(username, roleType, "PATCH",
                 BASE_URI + "/" + groupId + "/" + action, true, message);
+    }
+
+    private void notifyDoctor(Long doctorId, String groupName, String action) {
+        User doctor = userMapper.selectById(doctorId);
+        if (doctor == null) return;
+        FeedbackMessage msg = new FeedbackMessage();
+        msg.setSenderUserId(0L);
+        msg.setSenderUsername("系统");
+        msg.setSenderRoleType("ADMIN");
+        msg.setContent("群组「" + groupName + "」" + action + "，现已可使用。");
+        msg.setStatus(1);
+        msg.setReplyContent("系统审核通知");
+        msg.setRepliedTime(java.time.LocalDateTime.now());
+        msg.setReplyRead(0);
+        msg.setReplyReadTime(null);
+        feedbackMessageMapper.insert(msg);
     }
 }

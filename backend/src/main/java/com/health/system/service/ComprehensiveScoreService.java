@@ -5,4 +5,5 @@ import com.health.system.dto.ComprehensiveScoreResult;
 public interface ComprehensiveScoreService {
     ComprehensiveScoreResult calculateForPatient(String doctorUsername, Long patientUserId);
     ComprehensiveScoreResult calculate(String patientUsername);
+    ComprehensiveScoreResult calculate(String patientUsername, String range);
 }

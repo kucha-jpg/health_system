@@ -80,7 +80,8 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { ElMessageBox, ElMessage } from 'element-plus'
+import { ElMessageBox } from 'element-plus'
+import { showError, showConfirm } from '../utils/message'
 import { getDoctorAlertsApi, handleDoctorAlertApi } from '../api/modules'
 import { showFirstVisitGuide } from '../composables/useFirstVisitGuide'
 
@@ -114,7 +115,7 @@ const loadData = async () => {
     total.value = res?.total || 0
     lastUpdated.value = new Date().toLocaleString()
   } catch (err) {
-    ElMessage.error(err?.message || '加载预警数据失败，请稍后重试')
+    showError(err?.message || '加载预警数据失败，请稍后重试')
   } finally {
     loading.value = false
   }
@@ -159,30 +160,39 @@ const riskTagType = (level) => {
 }
 
 const handle = async (row) => {
-  const { value } = await ElMessageBox.prompt('请输入处理意见', '预警闭环', {
-    confirmButtonText: '确认',
-    cancelButtonText: '取消',
-    closeOnClickModal: false,
-    closeOnPressEscape: false,
-    showClose: false
-  })
-  await handleDoctorAlertApi(row.id, { handleRemark: value })
-  ElMessage.success('处理成功')
-  await loadData()
+  let value
+  try {
+    const result = await ElMessageBox.prompt('请输入处理意见', '预警闭环', {
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      closeOnClickModal: false,
+      closeOnPressEscape: false,
+      showClose: false
+    })
+    value = result.value
+  } catch {
+    return
+  }
+  try {
+    await handleDoctorAlertApi(row.id, { handleRemark: value })
+    await loadData()
+  } catch (err) {
+    showError(err?.message || '处理预警失败，请稍后重试')
+  }
 }
 
 const quickHandle = async (row) => {
-  await ElMessageBox.confirm('将使用默认处理意见“已电话随访，建议持续监测”，确认继续？', '一键闭环', {
-    confirmButtonText: '确认',
-    cancelButtonText: '取消',
-    type: 'warning',
-    closeOnClickModal: false,
-    closeOnPressEscape: false,
-    showClose: false
-  })
-  await handleDoctorAlertApi(row.id, { handleRemark: '已电话随访，建议持续监测' })
-  ElMessage.success('已快速完成闭环处理')
-  await loadData()
+  try {
+    await showConfirm('将使用默认处理意见”已电话随访，建议持续监测”，确认继续？', '一键闭环')
+  } catch {
+    return
+  }
+  try {
+    await handleDoctorAlertApi(row.id, { handleRemark: '已电话随访，建议持续监测' })
+    await loadData()
+  } catch (err) {
+    showError(err?.message || '一键闭环处理失败，请稍后重试')
+  }
 }
 
 onMounted(() => {

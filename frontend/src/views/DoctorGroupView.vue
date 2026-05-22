@@ -25,10 +25,10 @@
       <el-table-column prop="id" label="ID" width="80" />
       <el-table-column prop="groupName" label="群组名称" />
       <el-table-column prop="description" label="描述" show-overflow-tooltip />
-      <el-table-column label="操作" width="220">
+      <el-table-column label="操作" width="260">
         <template #default="scope">
-          <el-button link type="primary" @click="openMembers(scope.row)">成员管理</el-button>
-          <el-button link type="success" @click="openAddMember(scope.row)">添加成员</el-button>
+          <el-button link type="primary" :disabled="scope.row.governanceStatus === 'PENDING_REVIEW' || scope.row.governanceStatus === 'ARCHIVED'" @click="openMembers(scope.row)">成员管理</el-button>
+          <el-button link type="success" :disabled="scope.row.governanceStatus === 'PENDING_REVIEW' || scope.row.governanceStatus === 'ARCHIVED'" @click="openAddMember(scope.row)">添加成员</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -143,7 +143,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { showError, showWarning, showConfirm } from '../utils/message'
 import {
   addDoctorGroupDoctorApi,
   addDoctorGroupPatientApi,
@@ -199,8 +199,6 @@ const load = async () => {
   try {
     groups.value = await getDoctorGroupsApi()
     pageNo.value = 1
-  } catch (err) {
-    ElMessage.error(err?.message || '群组数据加载失败，请稍后重试')
   } finally {
     loading.value = false
   }
@@ -225,18 +223,11 @@ const openCreateDialog = () => {
 const createGroup = async () => {
   const groupName = String(createForm.value.groupName || '').trim()
   if (!groupName) {
-    ElMessage.warning('请输入群组名称')
+    showWarning('请输入群组名称')
     return
   }
   try {
-    await ElMessageBox.confirm('确认创建该群组？', '创建确认', {
-      type: 'warning',
-      confirmButtonText: '确认',
-      cancelButtonText: '取消',
-      closeOnClickModal: false,
-      closeOnPressEscape: false,
-      showClose: false
-    })
+    await showConfirm('确认创建该群组？', '创建确认')
   } catch {
     return
   }
@@ -246,11 +237,8 @@ const createGroup = async () => {
       groupName,
       description: String(createForm.value.description || '').trim()
     })
-    ElMessage.success('群组创建成功')
     createDialogVisible.value = false
     await load()
-  } catch (err) {
-    ElMessage.error(err?.message || '创建群组失败')
   } finally {
     saving.value = false
   }
@@ -265,8 +253,6 @@ const loadMembers = async (groupId) => {
     ])
     patients.value = patientList || []
     doctors.value = doctorList || []
-  } catch (err) {
-    ElMessage.error(err?.message || '成员数据加载失败')
   } finally {
     memberLoading.value = false
   }
@@ -283,7 +269,7 @@ const openAddMember = (row) => {
     activeGroup.value = row
   }
   if (!activeGroup.value) {
-    ElMessage.warning('请先选择群组')
+    showWarning('请先选择群组')
     return
   }
   memberForm.value = { memberType: 'PATIENT', userId: '' }
@@ -294,20 +280,13 @@ const submitAddMember = async () => {
   if (!activeGroup.value) return
   const userId = Number(memberForm.value.userId)
   if (!Number.isInteger(userId) || userId <= 0) {
-    ElMessage.warning('请输入有效的用户ID')
+    showWarning('请输入有效的用户ID')
     return
   }
 
   try {
     const roleLabel = memberForm.value.memberType === 'PATIENT' ? '患者' : '医生'
-    await ElMessageBox.confirm(`确认添加该${roleLabel}(ID:${userId})到群组？`, '添加确认', {
-      type: 'warning',
-      confirmButtonText: '确认',
-      cancelButtonText: '取消',
-      closeOnClickModal: false,
-      closeOnPressEscape: false,
-      showClose: false
-    })
+    await showConfirm(`确认添加该${roleLabel}(ID:${userId})到群组？`, '添加确认')
   } catch {
     return
   }
@@ -319,11 +298,8 @@ const submitAddMember = async () => {
     } else {
       await addDoctorGroupDoctorApi(activeGroup.value.id, { doctorUserId: userId })
     }
-    ElMessage.success('成员添加成功')
     addMemberVisible.value = false
     await loadMembers(activeGroup.value.id)
-  } catch (err) {
-    ElMessage.error(err?.message || '成员添加失败')
   } finally {
     memberSaving.value = false
   }
@@ -336,46 +312,30 @@ const goPatientInsight = (row) => {
 const removePatient = async (row) => {
   if (!activeGroup.value) return
   try {
-    await ElMessageBox.confirm(`确定将患者 ${row.name || row.username} 移出群组？`, '移除确认', {
-      type: 'warning',
-      confirmButtonText: '确认移除',
-      cancelButtonText: '取消',
-      closeOnClickModal: false,
-      closeOnPressEscape: false,
-      showClose: false
-    })
+    await showConfirm(`确定将患者 ${row.name || row.username} 移出群组？`, '移除确认')
   } catch {
     return
   }
   try {
     await removeDoctorGroupPatientApi(activeGroup.value.id, row.id)
-    ElMessage.success('患者已移除')
     await loadMembers(activeGroup.value.id)
-  } catch (err) {
-    ElMessage.error(err?.message || '移除失败')
+  } catch {
+    // http interceptor already shows the error
   }
 }
 
 const removeDoctor = async (row) => {
   if (!activeGroup.value) return
   try {
-    await ElMessageBox.confirm(`确定将医生 ${row.name || row.username} 移出群组？`, '移除确认', {
-      type: 'warning',
-      confirmButtonText: '确认移除',
-      cancelButtonText: '取消',
-      closeOnClickModal: false,
-      closeOnPressEscape: false,
-      showClose: false
-    })
+    await showConfirm(`确定将医生 ${row.name || row.username} 移出群组？`, '移除确认')
   } catch {
     return
   }
   try {
     await removeDoctorGroupDoctorApi(activeGroup.value.id, row.id)
-    ElMessage.success('医生已移除')
     await loadMembers(activeGroup.value.id)
-  } catch (err) {
-    ElMessage.error(err?.message || '移除失败')
+  } catch {
+    // http interceptor already shows the error
   }
 }
 

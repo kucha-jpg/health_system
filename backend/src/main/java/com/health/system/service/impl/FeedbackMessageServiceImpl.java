@@ -11,6 +11,7 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -47,7 +48,8 @@ public class FeedbackMessageServiceImpl implements FeedbackMessageService {
         feedback.setSenderUserId(user.getId());
         feedback.setSenderUsername(user.getUsername());
         feedback.setSenderRoleType(user.getRoleType());
-        feedback.setContent(dto.getContent().trim());
+        String content = dto.getContent();
+        feedback.setContent(content == null ? null : content.trim());
         feedback.setStatus(0);
         feedbackMessageMapper.insert(feedback);
     }
@@ -220,6 +222,7 @@ public class FeedbackMessageServiceImpl implements FeedbackMessageService {
     }
 
     @Override
+        @Transactional
         @Caching(evict = {
             @CacheEvict(cacheNames = CacheNames.ADMIN_FEEDBACK_STATS, allEntries = true)
         })
@@ -256,6 +259,7 @@ public class FeedbackMessageServiceImpl implements FeedbackMessageService {
     }
 
     @Override
+        @Transactional
         @Caching(evict = {
             @CacheEvict(cacheNames = CacheNames.ADMIN_FEEDBACK_STATS, allEntries = true)
         })
@@ -294,7 +298,8 @@ public class FeedbackMessageServiceImpl implements FeedbackMessageService {
         }
         validateStatus(dto.getStatus());
 
-        feedback.setReplyContent(dto.getReplyContent().trim());
+        String replyContent = dto.getReplyContent();
+        feedback.setReplyContent(replyContent == null ? null : replyContent.trim());
         feedback.setRepliedTime(LocalDateTime.now());
         feedback.setStatus(dto.getStatus());
         if (dto.getStatus() == 1) {
@@ -345,7 +350,7 @@ public class FeedbackMessageServiceImpl implements FeedbackMessageService {
 
     private Map<String, Object> pagedResult(List<FeedbackMessage> records, long total, int pageNo, int pageSize) {
         Map<String, Object> result = new HashMap<>();
-        result.put("records", records);
+        result.put("list", records);
         result.put("total", total);
         result.put("pageNo", pageNo);
         result.put("pageSize", pageSize);

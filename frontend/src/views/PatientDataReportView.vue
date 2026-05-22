@@ -27,17 +27,19 @@
       <el-form :model="form" label-width="120px">
         <el-form-item label="指标类型">
           <el-select v-model="form.indicatorType" class="w-full">
-            <el-option label="血压" value="血压" />
-            <el-option label="血糖" value="血糖" />
-            <el-option label="体重" value="体重" />
-            <el-option label="服药" value="服药" />
+            <el-option
+              v-for="item in indicatorTypeOptions"
+              :key="item.indicatorType"
+              :label="item.displayName || item.indicatorType"
+              :value="item.indicatorType"
+            />
           </el-select>
         </el-form-item>
         <el-form-item label="数值">
           <el-input v-model="form.value" placeholder="例如：120/80、6.1、65、已服药" />
         </el-form-item>
         <el-form-item label="上报时间">
-          <el-date-picker v-model="form.reportTime" class="w-full" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" />
+          <el-date-picker v-model="form.reportTime" class="w-full" type="datetime" />
         </el-form-item>
         <el-form-item label="备注">
           <el-input v-model="form.remark" type="textarea" :rows="3" />
@@ -52,20 +54,22 @@
 </template>
 
 <script setup>
-import { reactive } from 'vue'
-import { ElMessage } from 'element-plus'
+import { onMounted, reactive, ref } from 'vue'
+import { showError, showWarning } from '../utils/message'
 import { reportHealthDataApi } from '../api/modules'
 
-const form = reactive({ indicatorType: '血压', value: '', reportTime: '', remark: '' })
+const INDICATOR_TYPES = [
+  { indicatorType: '血压', displayName: '血压' },
+  { indicatorType: '血糖', displayName: '血糖' },
+  { indicatorType: '体重', displayName: '体重' },
+  { indicatorType: '服药', displayName: '服药' }
+]
 
-const nowString = () => {
-  const pad = (n) => String(n).padStart(2, '0')
-  const d = new Date()
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
-}
+const indicatorTypeOptions = ref([...INDICATOR_TYPES])
+const form = reactive({ indicatorType: '血压', value: '', reportTime: null, remark: '' })
 
 const fillNow = () => {
-  form.reportTime = nowString()
+  form.reportTime = new Date()
 }
 
 const fillSample = () => {
@@ -95,21 +99,28 @@ const validate = () => {
 const submit = async () => {
   const err = validate()
   if (err) {
-    ElMessage.error(err)
+    showWarning(err)
     return
   }
-  if (!form.reportTime) {
-    form.reportTime = nowString()
-  }
   try {
-    await reportHealthDataApi(form)
-    ElMessage.success('上报成功')
+    if (!form.reportTime) {
+      form.reportTime = new Date()
+    }
+    const pad = (n) => String(n).padStart(2, '0')
+    const d = form.reportTime instanceof Date ? form.reportTime : new Date(form.reportTime)
+    const payload = {
+      ...form,
+      reportTime: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+    }
+    await reportHealthDataApi(payload)
     form.value = ''
     form.remark = ''
   } catch (err) {
-    ElMessage.error(err?.message || '上报失败')
+    showError(err?.message || '上报失败')
   }
 }
+
+onMounted(() => {})
 </script>
 
 <style scoped>

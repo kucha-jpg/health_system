@@ -64,7 +64,7 @@
             range-separator="至"
             start-placeholder="开始"
             end-placeholder="结束"
-            value-format="YYYY-MM-DD HH:mm:ss"
+            value-format="yyyy-MM-dd HH:mm:ss"
             class="w-240"
           />
           <el-button @click="load">查询</el-button>
@@ -204,7 +204,7 @@
 <script setup>
 import * as echarts from 'echarts'
 import { nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { showSuccess, showError, showWarning, showConfirm } from '../utils/message'
 import { batchUpdateFeedbackStatusApi, batchUpdateFeedbackStatusByFilterApi, exportFeedbackApi, getAdminFeedbackStatsApi, listAdminFeedbackPageApi, replyFeedbackApi, updateFeedbackStatusApi } from '../api/modules'
 
 const tableRef = ref(null)
@@ -290,35 +290,43 @@ const handleResize = () => {
 }
 
 const loadStats = async () => {
-  const res = await getAdminFeedbackStatsApi()
-  stats.totalCount = res.totalCount || 0
-  stats.pendingCount = res.pendingCount || 0
-  stats.todayNewCount = res.todayNewCount || 0
-  stats.roleDistribution = res.roleDistribution || {}
-  stats.recent7Days = res.recent7Days || []
-  await renderTrendChart()
+  try {
+    const res = await getAdminFeedbackStatsApi()
+    stats.totalCount = res.totalCount || 0
+    stats.pendingCount = res.pendingCount || 0
+    stats.todayNewCount = res.todayNewCount || 0
+    stats.roleDistribution = res.roleDistribution || {}
+    stats.recent7Days = res.recent7Days || []
+    await renderTrendChart()
+  } catch (err) {
+    showError(err?.message || '加载反馈统计失败，请稍后重试')
+  }
 }
 
 const load = async () => {
-  const params = {
-    keyword: query.keyword,
-    roleType: query.roleType,
-    status: query.status,
-    replyStatus: query.replyStatus,
-    pageNo: pageNo.value,
-    pageSize: pageSize.value
-  }
-  if (query.range?.length === 2) {
-    params.startTime = query.range[0]
-    params.endTime = query.range[1]
-  }
-  const res = await listAdminFeedbackPageApi(params)
-  rows.value = res.records || []
-  total.value = res.total || 0
-  selectedRows.value = []
-  await nextTick()
-  if (tableRef.value) {
-    tableRef.value.clearSelection()
+  try {
+    const params = {
+      keyword: query.keyword,
+      roleType: query.roleType,
+      status: query.status,
+      replyStatus: query.replyStatus,
+      pageNo: pageNo.value,
+      pageSize: pageSize.value
+    }
+    if (query.range?.length === 2) {
+      params.startTime = query.range[0]
+      params.endTime = query.range[1]
+    }
+    const res = await listAdminFeedbackPageApi(params)
+    rows.value = res.list || []
+    total.value = res.total || 0
+    selectedRows.value = []
+    await nextTick()
+    if (tableRef.value) {
+      tableRef.value.clearSelection()
+    }
+  } catch (err) {
+    showError(err?.message || '加载反馈列表失败，请稍后重试')
   }
 }
 
@@ -336,7 +344,7 @@ const clearSelection = () => {
 const selectCurrentPending = async () => {
   const pendingRows = rows.value.filter(item => item.status !== 1)
   if (pendingRows.length === 0) {
-    ElMessage.warning('当前页没有未处理数据')
+    showWarning('当前页没有未处理数据')
     return
   }
 
@@ -348,7 +356,6 @@ const selectCurrentPending = async () => {
   pendingRows.forEach((row) => {
     tableRef.value.toggleRowSelection(row, true)
   })
-  ElMessage.success(`已选中本页未处理 ${pendingRows.length} 条`)
 }
 
 const refreshAll = async () => {
@@ -376,9 +383,9 @@ const exportCsv = async () => {
     link.click()
     document.body.removeChild(link)
     URL.revokeObjectURL(objectUrl)
-    ElMessage.success('导出成功')
+    showSuccess('导出成功')
   } catch {
-    ElMessage.error('导出失败')
+    showError('导出失败')
   }
 }
 
@@ -391,41 +398,25 @@ const resetQuery = async () => {
 const mark = async (id, status) => {
   const actionText = status === 1 ? '已处理' : '未处理'
   try {
-    await ElMessageBox.confirm(`确认将该反馈标记为${actionText}？`, '状态变更确认', {
-      type: 'warning',
-      confirmButtonText: '确认',
-      cancelButtonText: '取消',
-      closeOnClickModal: false,
-      closeOnPressEscape: false,
-      showClose: false
-    })
+    await showConfirm(`确认将该反馈标记为${actionText}？`, '状态变更确认')
   } catch {
     return
   }
   await updateFeedbackStatusApi(id, status)
-  ElMessage.success('状态更新成功')
   await refreshAll()
 }
 
 const batchMark = async (status) => {
   if (selectedRows.value.length === 0) {
-    ElMessage.warning('请先选择数据')
+    showWarning('请先选择数据')
     return
   }
 
   const actionText = status === 1 ? '已处理' : '未处理'
   try {
-    await ElMessageBox.confirm(
+    await showConfirm(
       `确认将选中的 ${selectedRows.value.length} 条反馈标记为${actionText}吗？`,
-      '批量操作确认',
-      {
-        type: 'warning',
-        confirmButtonText: '确认',
-        cancelButtonText: '取消',
-        closeOnClickModal: false,
-        closeOnPressEscape: false,
-        showClose: false
-      }
+      '批量操作确认'
     )
   } catch {
     return
@@ -438,44 +429,32 @@ const batchMark = async (status) => {
   const skippedCount = res.skippedCount || 0
   const failedIds = Array.isArray(res.failedIds) ? res.failedIds : []
   if (failedIds.length > 0) {
-    ElMessage.warning(`批量更新完成：请求 ${requestedCount} 条，成功 ${successCount} 条，跳过 ${skippedCount} 条，失败ID: ${failedIds.join(',')}`)
-  } else {
-    ElMessage.success(`批量更新完成：请求 ${requestedCount} 条，成功 ${successCount} 条，跳过 ${skippedCount} 条`)
+    showWarning(`批量更新完成：请求 ${requestedCount} 条，成功 ${successCount} 条，跳过 ${skippedCount} 条，失败ID: ${failedIds.join(',')}`)
   }
   await refreshAll()
 }
 
 const batchMarkByFilter = async (targetStatus) => {
   if (!total.value) {
-    ElMessage.warning('当前筛选结果为空')
+    showWarning('当前筛选结果为空')
     return
   }
 
   const actionText = targetStatus === 1 ? '已处理' : '未处理'
   try {
-    await ElMessageBox.confirm(
+    await showConfirm(
       `确认将当前筛选结果共 ${total.value} 条反馈标记为${actionText}吗？此操作会跨分页生效。`,
-      '跨页批量操作确认',
-      {
-        type: 'warning',
-        confirmButtonText: '确认',
-        cancelButtonText: '取消',
-        closeOnClickModal: false,
-        closeOnPressEscape: false,
-        showClose: false
-      }
+      '跨页批量操作确认'
     )
   } catch {
     return
   }
 
-  const params = {
-    keyword: query.keyword,
-    roleType: query.roleType,
-    status: query.status,
-    replyStatus: query.replyStatus,
-    targetStatus
-  }
+  const params = { targetStatus }
+  if (query.keyword) params.keyword = query.keyword
+  if (query.roleType) params.roleType = query.roleType
+  if (query.status !== null && query.status !== undefined) params.status = query.status
+  if (query.replyStatus !== null && query.replyStatus !== undefined) params.replyStatus = query.replyStatus
   if (query.range?.length === 2) {
     params.startTime = query.range[0]
     params.endTime = query.range[1]
@@ -488,11 +467,9 @@ const batchMarkByFilter = async (targetStatus) => {
   const failedIds = Array.isArray(res.failedIds) ? res.failedIds : []
 
   if (failedIds.length > 0) {
-    ElMessage.warning(
+    showWarning(
       `跨页批量完成：请求 ${requestedCount} 条，成功 ${successCount} 条，跳过 ${skippedCount} 条，失败ID: ${failedIds.join(',')}`
     )
-  } else {
-    ElMessage.success(`跨页批量完成：请求 ${requestedCount} 条，成功 ${successCount} 条，跳过 ${skippedCount} 条`)
   }
   await refreshAll()
 }
@@ -520,23 +497,15 @@ const openDetail = (row) => {
 const submitReply = async () => {
   const replyContent = (replyForm.replyContent || '').trim()
   if (!replyContent) {
-    ElMessage.warning('回复内容不能为空')
+    showWarning('回复内容不能为空')
     return
   }
   try {
-    await ElMessageBox.confirm('确认保存该回复？', '保存确认', {
-      type: 'warning',
-      confirmButtonText: '确认',
-      cancelButtonText: '取消',
-      closeOnClickModal: false,
-      closeOnPressEscape: false,
-      showClose: false
-    })
+    await showConfirm('确认保存该回复？', '保存确认')
   } catch {
     return
   }
   await replyFeedbackApi({ id: replyForm.id, status: replyForm.status, replyContent })
-  ElMessage.success('回复成功')
   replyVisible.value = false
   await refreshAll()
 }

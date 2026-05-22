@@ -33,7 +33,7 @@ public class ComprehensiveScoreServiceImpl implements ComprehensiveScoreService 
     );
 
     private static final int DATA_WINDOW_DAYS = 30;
-    private static final int MEDICATION_WINDOW_DAYS = 7;
+    private static final int MEDICATION_WINDOW_DAYS_WEEK = 3;
 
     private final UserMapper userMapper;
     private final HealthDataMapper healthDataMapper;
@@ -52,12 +52,18 @@ public class ComprehensiveScoreServiceImpl implements ComprehensiveScoreService 
 
     @Override
     public ComprehensiveScoreResult calculate(String patientUsername) {
+        return calculate(patientUsername, "week");
+    }
+
+    @Override
+    public ComprehensiveScoreResult calculate(String patientUsername, String range) {
         User patient = userMapper.selectOne(new LambdaQueryWrapper<User>()
                 .eq(User::getUsername, patientUsername));
         if (patient == null) {
             throw BusinessException.notFound("用户不存在");
         }
-        return buildResult(patient.getId());
+        boolean isMonth = "month".equalsIgnoreCase(range);
+        return buildResult(patient.getId(), isMonth ? 30 : 7, isMonth ? 7 : 3);
     }
 
     @Override
@@ -68,17 +74,17 @@ public class ComprehensiveScoreServiceImpl implements ComprehensiveScoreService 
         if (patient == null || !"PATIENT".equals(patient.getRoleType())) {
             throw BusinessException.notFound("患者不存在");
         }
-        return buildResult(patientUserId);
+        return buildResult(patientUserId, DATA_WINDOW_DAYS, MEDICATION_WINDOW_DAYS_WEEK);
     }
 
-    private ComprehensiveScoreResult buildResult(Long userId) {
-        LocalDateTime since = LocalDateTime.now().minusDays(DATA_WINDOW_DAYS);
+    private ComprehensiveScoreResult buildResult(Long userId, int dataWindowDays, int medicationWindowDays) {
+        LocalDateTime since = LocalDateTime.now().minusDays(dataWindowDays);
 
         List<IndicatorScoreDetail> details = new ArrayList<>();
         details.add(buildDetail(userId, IndicatorTypes.BLOOD_PRESSURE, since));
         details.add(buildDetail(userId, IndicatorTypes.BLOOD_SUGAR, since));
         details.add(buildDetail(userId, IndicatorTypes.WEIGHT, since));
-        details.add(buildMedicationDetail(userId));
+        details.add(buildMedicationDetail(userId, medicationWindowDays));
 
         List<IndicatorScoreDetail> activeDetails = details.stream()
                 .filter(IndicatorScoreDetail::isHasData)
@@ -134,6 +140,7 @@ public class ComprehensiveScoreServiceImpl implements ComprehensiveScoreService 
         HealthData latestData = healthDataMapper.selectOne(new LambdaQueryWrapper<HealthData>()
                 .eq(HealthData::getUserId, userId)
                 .eq(HealthData::getIndicatorType, indicatorType)
+                .ge(HealthData::getReportTime, since)
                 .orderByDesc(HealthData::getReportTime)
                 .last("limit 1"));
 
@@ -165,12 +172,12 @@ public class ComprehensiveScoreServiceImpl implements ComprehensiveScoreService 
         return detail;
     }
 
-    private IndicatorScoreDetail buildMedicationDetail(Long userId) {
+    private IndicatorScoreDetail buildMedicationDetail(Long userId, int medicationWindowDays) {
         IndicatorScoreDetail detail = new IndicatorScoreDetail();
         detail.setIndicatorType(IndicatorTypes.MEDICATION);
         detail.setWeight(DEFAULT_WEIGHTS.getOrDefault(IndicatorTypes.MEDICATION, BigDecimal.ZERO));
 
-        LocalDateTime medSince = LocalDateTime.now().minusDays(MEDICATION_WINDOW_DAYS);
+        LocalDateTime medSince = LocalDateTime.now().minusDays(medicationWindowDays);
         List<HealthData> medRecords = healthDataMapper.selectList(new LambdaQueryWrapper<HealthData>()
                 .eq(HealthData::getUserId, userId)
                 .eq(HealthData::getIndicatorType, IndicatorTypes.MEDICATION)

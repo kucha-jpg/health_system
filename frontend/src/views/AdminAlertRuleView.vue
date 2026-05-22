@@ -139,7 +139,7 @@
 
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { showError, showConfirm } from '../utils/message'
 import {
   createAlertRuleApi,
   createIndicatorTypeApi,
@@ -159,9 +159,13 @@ const indicatorForm = reactive({ id: null, indicatorType: '', displayName: '', e
 const enabledIndicatorTypes = ref([])
 
 const load = async () => {
-  rules.value = await listAlertRulesApi()
-  indicatorTypes.value = await listIndicatorTypesApi({ includeDisabled: true })
-  enabledIndicatorTypes.value = indicatorTypes.value.filter(item => item.enabled === 1)
+  try {
+    rules.value = await listAlertRulesApi()
+    indicatorTypes.value = await listIndicatorTypesApi({ includeDisabled: true })
+    enabledIndicatorTypes.value = indicatorTypes.value.filter(item => item.enabled === 1)
+  } catch (err) {
+    showError(err?.message || '加载预警规则失败，请稍后重试')
+  }
 }
 
 const openDialog = (row) => {
@@ -172,14 +176,7 @@ const openDialog = (row) => {
 
 const save = async () => {
   try {
-    await ElMessageBox.confirm(form.id ? '确认修改该预警规则？' : '确认新增该预警规则？', '保存确认', {
-      type: 'warning',
-      confirmButtonText: '确认',
-      cancelButtonText: '取消',
-      closeOnClickModal: false,
-      closeOnPressEscape: false,
-      showClose: false
-    })
+    await showConfirm(form.id ? '确认修改该预警规则？' : '确认新增该预警规则？', '保存确认')
   } catch {
     return
   }
@@ -189,11 +186,10 @@ const save = async () => {
     } else {
       await createAlertRuleApi(form)
     }
-    ElMessage.success('保存成功')
     visible.value = false
     await load()
   } catch (err) {
-    ElMessage.error(err?.message || '保存规则失败，请稍后重试')
+    showError(err?.message || '保存规则失败，请稍后重试')
   }
 }
 
@@ -204,14 +200,7 @@ const openIndicatorDialog = (row) => {
 
 const saveIndicator = async () => {
   try {
-    await ElMessageBox.confirm(indicatorForm.id ? '确认修改该指标类型？' : '确认新增该指标类型？', '保存确认', {
-      type: 'warning',
-      confirmButtonText: '确认',
-      cancelButtonText: '取消',
-      closeOnClickModal: false,
-      closeOnPressEscape: false,
-      showClose: false
-    })
+    await showConfirm(indicatorForm.id ? '确认修改该指标类型？' : '确认新增该指标类型？', '保存确认')
   } catch {
     return
   }
@@ -221,37 +210,27 @@ const saveIndicator = async () => {
     } else {
       await createIndicatorTypeApi(indicatorForm)
     }
-    ElMessage.success('保存成功')
     indicatorVisible.value = false
     await load()
   } catch (err) {
-    ElMessage.error(err?.message || '保存指标类型失败，请稍后重试')
+    showError(err?.message || '保存指标类型失败，请稍后重试')
   }
 }
 
 const deleteIndicator = async (row) => {
   try {
-    await ElMessageBox.confirm(
+    await showConfirm(
       `确认删除指标类型「${row.displayName || row.indicatorType}」吗？删除后关联的预警规则可能失效。`,
-      '删除确认',
-      {
-        type: 'warning',
-        confirmButtonText: '确认删除',
-        cancelButtonText: '取消',
-        closeOnClickModal: false,
-        closeOnPressEscape: false,
-        showClose: false
-      }
+      '删除确认'
     )
   } catch {
     return
   }
   try {
     await deleteIndicatorTypeApi(row.id)
-    ElMessage.success('已删除')
     await load()
   } catch (err) {
-    ElMessage.error(err?.message || '删除指标类型失败，请稍后重试')
+    showError(err?.message || '删除指标类型失败，请稍后重试')
   }
 }
 

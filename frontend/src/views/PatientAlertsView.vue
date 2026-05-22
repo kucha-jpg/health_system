@@ -65,7 +65,7 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { showError } from '../utils/message'
 import { getPatientAlertsApi } from '../api/modules'
 
 const alerts = ref([])
@@ -86,7 +86,7 @@ const load = async () => {
     alerts.value = res?.list || []
     total.value = res?.total || 0
   } catch (err) {
-    ElMessage.error(err?.message || '加载预警失败，请稍后重试')
+    showError(err?.message || '加载预警失败，请稍后重试')
   } finally {
     loading.value = false
   }

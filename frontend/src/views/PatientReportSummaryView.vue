@@ -17,7 +17,7 @@
       <el-card shadow="hover" :class="['hero-score-card', heroScoreClass]">
         <div class="hero-score-body">
           <div class="hero-score-left">
-            <div class="hero-score-label">综合风险评分</div>
+            <div class="hero-score-label">综合风险评分（{{ range === 'week' ? '周报' : '月报' }}）</div>
             <div class="hero-score-number">{{ compScore.totalScore ?? '--' }}</div>
             <div class="hero-score-tag" :style="heroScoreTagStyle">{{ compScore.riskLevelLabel ?? '加载中' }}</div>
           </div>
@@ -27,11 +27,12 @@
               :key="d.indicatorType"
               class="hero-indicator-item"
             >
-              <span class="hero-indicator-name">{{ d.indicatorType }}</span>
+              <span class="hero-indicator-name">{{ d.indicatorType }}（权重{{ d.weight }}）</span>
               <span class="hero-indicator-score">{{ d.hasData ? d.riskScore + '分' : '无数据' }}</span>
             </div>
           </div>
         </div>
+        <div v-if="compScore.summary" class="hero-score-summary">{{ compScore.summary }}</div>
       </el-card>
     </el-tooltip>
 
@@ -159,7 +160,7 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { showSuccess } from '../utils/message'
 import echarts from '../utils/echarts'
 import { csvEscape, downloadCsv } from '../utils/csv'
 import { getPatientReportSummaryApi, getPatientComprehensiveScoreApi } from '../api/modules'
@@ -361,9 +362,9 @@ async function renderAllCharts() {
 
 // ==================== Data loading ====================
 
-async function fetchScore() {
+async function fetchScore(rng) {
   try {
-    const data = await getPatientComprehensiveScoreApi()
+    const data = await getPatientComprehensiveScoreApi(rng || range.value)
     const level = data?.riskLevel
     compScore.value = {
       ...data,
@@ -379,7 +380,7 @@ async function load() {
   try {
     const [reportData] = await Promise.all([
       getPatientReportSummaryApi({ range: range.value }),
-      fetchScore(),
+      fetchScore(range.value),
     ])
     summary.value = reportData ?? {}
     latestPageNo.value = 1
@@ -438,7 +439,7 @@ function buildCsvLines() {
 
 function exportCsv() {
   downloadCsv(buildCsvLines(), `health_report_${range.value}_${Date.now()}.csv`)
-  ElMessage.success('报表导出成功')
+  showSuccess('报表导出成功')
 }
 
 // ==================== Resize handler ====================
@@ -563,6 +564,16 @@ onBeforeUnmount(() => {
   display: flex;
   gap: 20px;
   flex-wrap: wrap;
+}
+
+.hero-score-summary {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(128,128,128,0.15);
+  font-size: 12px;
+  color: #606266;
+  line-height: 1.6;
+  text-align: center;
 }
 
 .hero-indicator-item {

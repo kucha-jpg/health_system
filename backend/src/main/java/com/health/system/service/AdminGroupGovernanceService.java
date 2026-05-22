@@ -13,13 +13,13 @@ public interface AdminGroupGovernanceService {
 
     Map<String, Object> archive(Long id);
 
-    Map<String, Object> crossDept(Long id, String targetDept);
+    Map<String, Object> crossDept(Long id, String targetDept, List<Long> doctorIds);
 
     Map<String, Object> batchApprove(List<Long> ids);
 
     Map<String, Object> batchArchive(List<Long> ids);
 
-    Map<String, Object> batchCrossDept(List<Long> ids, String targetDept);
+    Map<String, Object> batchCrossDept(List<Long> ids, String targetDept, List<Long> doctorIds);
 
     Map<String, Object> deleteGroup(Long id);
 }

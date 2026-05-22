@@ -6,6 +6,7 @@
       </div>
       <div class="page-actions">
         <el-tag effect="plain" size="small">共 {{ total }} 条</el-tag>
+        <el-button @click="markRead">标记已读</el-button>
         <el-button @click="reloadFromStart">刷新</el-button>
       </div>
     </div>
@@ -79,7 +80,7 @@
 
 <script setup>
 import { onMounted, onUnmounted, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { showError, showWarning } from '../utils/message'
 import { createFeedbackApi, listMyFeedbackPageApi, markMyFeedbackReadApi } from '../api/modules'
 
 const content = ref('')
@@ -91,16 +92,20 @@ const statusFilter = ref(null)
 let timer = null
 
 const load = async () => {
-  const params = {
-    pageNo: pageNo.value,
-    pageSize: pageSize.value
+  try {
+    const params = {
+      pageNo: pageNo.value,
+      pageSize: pageSize.value
+    }
+    if (statusFilter.value !== null && statusFilter.value !== '') {
+      params.status = statusFilter.value
+    }
+    const res = await listMyFeedbackPageApi(params)
+    rows.value = res.list || []
+    total.value = res.total || 0
+  } catch (err) {
+    showError(err?.message || '加载反馈列表失败，请稍后重试')
   }
-  if (statusFilter.value !== null && statusFilter.value !== '') {
-    params.status = statusFilter.value
-  }
-  const res = await listMyFeedbackPageApi(params)
-  rows.value = res.records || []
-  total.value = res.total || 0
 }
 
 const reloadFromStart = async () => {
@@ -111,21 +116,30 @@ const reloadFromStart = async () => {
 const submit = async () => {
   const text = content.value.trim()
   if (!text) {
-    ElMessage.warning('反馈内容不能为空')
+    showWarning('反馈内容不能为空')
     return
   }
-  await createFeedbackApi({ content: text })
-  ElMessage.success('反馈提交成功')
-  content.value = ''
-  pageNo.value = 1
-  await load()
+  try {
+    await createFeedbackApi({ content: text })
+    content.value = ''
+    pageNo.value = 1
+    await load()
+  } catch (err) {
+    showError(err?.message || '提交反馈失败，请稍后重试')
+  }
+}
+
+const markRead = async () => {
+  try {
+    await markMyFeedbackReadApi()
+    window.dispatchEvent(new Event('feedback:read'))
+  } catch (err) {
+    showError(err?.message || '标记已读失败')
+  }
 }
 
 onMounted(() => {
   load()
-  markMyFeedbackReadApi().finally(() => {
-    window.dispatchEvent(new Event('feedback:read'))
-  })
   timer = window.setInterval(load, 10000)
 })
 
